@@ -42,6 +42,7 @@ from phx.plan import (
     phase_sort_key,
     show_main,
 )
+from phx.preflight import freshness
 from phx.recover import (
     Action,
     Decision,
@@ -98,6 +99,7 @@ class RunOptions:
     until: str | None = None
     dry_run: bool = False
     resume: bool = False  # `phx resume`: clear a pause first
+    require_preflight: bool = False  # refuse instead of warn without a current preflight
 
 
 class EndKind(StrEnum):
@@ -324,6 +326,9 @@ class Supervisor:
                 except ValueError as exc:
                     return End(EndKind.FAILED, str(exc), "config_error")
                 self._check_test_commands(plan)
+                refused = self._check_preflight(plan)
+                if refused:
+                    return refused
                 try:
                     self.launcher = find_launcher(self.env)
                 except LauncherError as exc:
@@ -374,6 +379,21 @@ class Supervisor:
                     test_source=plan.test_source,
                 )
                 self._say(f"phx: warning: test command `{command}` is unsupported: {exc}")
+
+    def _check_preflight(self, plan: Plan) -> End | None:
+        """Warn (or with ``--require-preflight`` refuse) without a current preflight (R13)."""
+        if all(p.status is Status.COMPLETE for p in plan.phases):
+            return None
+        fresh = freshness(plan)
+        if fresh.ok:
+            self.log.event("preflight", reason=fresh.describe(), recorded=fresh.recorded)
+            return None
+        reason = f"{fresh.describe()}; run phx preflight {self.repo}"
+        if self.options.require_preflight:
+            return End(EndKind.FAILED, f"{reason} (--require-preflight)", fresh.rule)
+        self.log.event("warning", reason=reason, rule=fresh.rule, reasons=list(fresh.reasons))
+        self._say(f"phx: warning: {reason}")
+        return None
 
     def _limits_reached(self) -> End | None:
         n = self.options.max_phases
@@ -920,6 +940,11 @@ class Supervisor:
             self.log.event("dry_run", reason=f"cannot run: {exc}")
             return EXIT_ERROR
         self._check_test_commands(plan)
+        refused = self._check_preflight(plan)
+        if refused:
+            self._say(f"phx: would refuse: {refused.reason}")
+            self.log.event("dry_run", reason=f"would refuse: {refused.reason}", end=refused.rule)
+            return EXIT_ERROR
         try:
             launcher: Launcher | None = find_launcher(self.env)
         except LauncherError as exc:

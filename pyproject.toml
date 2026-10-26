@@ -28,6 +28,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/phx"]
 
+# The preflight session prompt (Phase 08) ships inside the package; an editable install
+# reads it from prompts/ instead.
+[tool.hatch.build.targets.wheel.force-include]
+"prompts/PHX_preflight.md" = "phx/PHX_preflight.md"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"

@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -17,7 +18,7 @@ from phx import __version__
 from phx.detach import detach, unit_name
 from phx.locks import main_checkout, running
 from phx.logging import EventLog
-from phx.paths import default_state_root, state_dir
+from phx.paths import default_state_root, ensure_state_dirs, state_dir
 from phx.plan import (
     MAIN,
     STATUS_LABELS,
@@ -32,8 +33,10 @@ from phx.plan import (
     set_question_status,
     show_main,
 )
+from phx.preflight import PreflightRefused, freshness, launch, prepare, record
+from phx.runner import LauncherError, find_launcher
 from phx.state import RunStatus, load_state, now_ts
-from phx.supervisor import EXIT_ERROR, RunOptions, Supervisor
+from phx.supervisor import EXIT_ERROR, EXIT_PAUSED, RunOptions, Supervisor
 
 # subcommand -> (help text, phase that implements it)
 COMMANDS: dict[str, tuple[str, int]] = {
@@ -62,6 +65,28 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "plan":
             cmd.add_argument("repo", type=Path, nargs="?", default=Path("."), help="repo path")
             cmd.add_argument("--json", action="store_true", help="print JSON")
+        elif name == "preflight":
+            cmd.add_argument("repo", type=Path, nargs="?", default=Path("."), help="repo path")
+            mode = cmd.add_mutually_exclusive_group()
+            mode.add_argument(
+                "--dry-run", action="store_true", help="write the prompt and print the command only"
+            )
+            mode.add_argument(
+                "--check", action="store_true", help="say whether the recorded preflight is current"
+            )
+            mode.add_argument(
+                "--record",
+                action="store_true",
+                help="write and commit .phx/preflight.json (run by the preflight session)",
+            )
+            cmd.add_argument(
+                "--unresolved",
+                action="append",
+                default=[],
+                metavar="TEXT",
+                help="with --record: an item left open (repeatable)",
+            )
+            cmd.add_argument("--session-id", help="with --record: the preflight session's ID")
         elif name in ("run", "resume"):
             cmd.add_argument("repo", type=Path, nargs="?", default=Path("."), help="repo path")
             cmd.add_argument(
@@ -74,6 +99,11 @@ def build_parser() -> argparse.ArgumentParser:
             )
             cmd.add_argument(
                 "--dry-run", action="store_true", help="print what would run; launch nothing"
+            )
+            cmd.add_argument(
+                "--require-preflight",
+                action="store_true",
+                help="refuse when no current preflight is recorded (default: warn)",
             )
         elif name == "status":
             cmd.add_argument("repo", type=Path, nargs="?", help="repo path (default: all repos)")
@@ -220,6 +250,8 @@ def _forward_args(args: argparse.Namespace) -> list[str]:
         out += ["--until", args.until]
     if args.max_phases is not None:
         out += ["--max-phases", str(args.max_phases)]
+    if args.require_preflight:
+        out.append("--require-preflight")
     return out
 
 
@@ -236,6 +268,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         until=_phase_arg(args.until, "--until"),
         dry_run=args.dry_run,
         resume=args.command == "resume",
+        require_preflight=args.require_preflight,
     )
     if args.detach and not args.dry_run:
         holder = running(repo)
@@ -309,6 +342,12 @@ def status_report(repo: Path, state_root: Path | None = None) -> dict[str, Any]:
                 if q.open
             ],
         }
+        fresh = freshness(plan)
+        report["preflight"] = {
+            "state": fresh.state,
+            "recorded": fresh.recorded,
+            "detail": fresh.describe(),
+        }
     except PlanError as exc:
         report["plan_error"] = str(exc)
     return report
@@ -376,6 +415,8 @@ def _print_status(report: dict[str, Any]) -> None:
             print(
                 f"  Open question #{q['id']} ({', '.join(q['needed_by']) or '-'}): {q['question']}"
             )
+        if report.get("preflight"):
+            print(f"  Preflight:  {report['preflight']['detail']}")
     elif report.get("plan_error"):
         print(f"  Plan:       {report['plan_error']}")
 
@@ -568,10 +609,79 @@ def _cmd_answer(args: argparse.Namespace) -> int:
     return 0
 
 
+# --------------------------------------------------------------------------- preflight
+
+
+def _cmd_preflight(args: argparse.Namespace) -> int:
+    repo = _repo(args.repo)
+    if args.check:
+        try:
+            fresh = freshness(load_plan(repo))
+        except PlanError as exc:
+            print(f"phx preflight: {exc}", file=sys.stderr)
+            return EXIT_ERROR
+        print(f"phx: {fresh.describe()}")
+        return 0 if fresh.ok else EXIT_PAUSED
+    sdir = state_dir(repo, args.state_dir)
+    ensure_state_dirs(sdir)
+    log = EventLog(sdir / "run.jsonl", verbose=args.verbose)
+    if args.record:
+        try:
+            done = record(repo, session_id=args.session_id, unresolved=args.unresolved)
+        except PreflightRefused as exc:
+            log.event("preflight_refused", reason=str(exc), step="record")
+            print(f"phx preflight: {exc}", file=sys.stderr)
+            return EXIT_ERROR
+        log.event(
+            "preflight_recorded",
+            reason=f"recorded in {done.commit} ({done.pushed})",
+            covered=done.record["covered"],
+            unresolved=done.record["unresolved"],
+            session_id=args.session_id,
+        )
+        print(
+            f"phx: preflight recorded in {done.commit} ({done.pushed}); covers "
+            f"{', '.join(done.record['covered'])}; {len(done.record['unresolved'])} unresolved"
+        )
+        return 0
+    if os.geteuid() == 0:
+        print("phx: refusing to run as root (spec S1)", file=sys.stderr)
+        return EXIT_ERROR
+    try:
+        launcher = find_launcher(os.environ)
+        prep = prepare(
+            repo, launcher=launcher, state=sdir, env=os.environ, state_root=args.state_dir
+        )
+    except (PreflightRefused, LauncherError) as exc:
+        log.event("preflight_refused", reason=str(exc))
+        print(f"phx preflight: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    for note in prep.notes:
+        print(f"phx: warning: {note}", file=sys.stderr)
+    left = ", ".join(p.id for p in prep.plan.phases if p.status.name != "COMPLETE")
+    print(f"phx: preflight for {repo}: phases {left}; {prep.leads} lead(s) found")
+    print(f"     previous: {prep.freshness.describe()}")
+    print(f"     prompt:   {prep.prompt_file}")
+    if args.dry_run:
+        print(f"     command:  {shlex.join(prep.argv)}")
+        return 0
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        print("phx preflight: needs an interactive terminal (try --dry-run)", file=sys.stderr)
+        return EXIT_ERROR
+    try:
+        code, after = launch(prep, log=log)
+    except PreflightRefused as exc:
+        print(f"phx preflight: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    print(f"phx: {after.describe()}")
+    return code
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     handlers = {
         "plan": _cmd_plan,
+        "preflight": _cmd_preflight,
         "run": _cmd_run,
         "resume": _cmd_run,
         "status": _cmd_status,
@@ -579,9 +689,4 @@ def main(argv: Sequence[str] | None = None) -> int:
         "log": _cmd_log,
         "answer": _cmd_answer,
     }
-    handler = handlers.get(args.command)
-    if handler is not None:
-        return handler(args)
-    phase = COMMANDS[args.command][1]
-    print(f"phx {args.command}: not implemented yet (Phase {phase:02d})", file=sys.stderr)
-    return 2
+    return handlers[args.command](args)

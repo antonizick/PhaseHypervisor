@@ -19,11 +19,6 @@ def test_help_lists_every_subcommand(capsys: pytest.CaptureFixture[str]) -> None
         assert name in out
 
 
-def test_preflight_stub_exits_2(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["preflight"]) == 2
-    assert "not implemented yet (Phase 08)" in capsys.readouterr().err
-
-
 def test_global_flags_parse(tmp_path: Path) -> None:
     assert main(["--state-dir", str(tmp_path), "--verbose", "status"]) == 0
 

@@ -670,3 +670,54 @@ def test_unmigrated_repo_fails(h: Callable[..., H]) -> None:
     end = x.last_event("run_end")
     assert end["rule"] == "contract" and "not yet migrated" in end["reason"]
     assert x.calls() == []
+
+
+# --------------------------------------------------------------------------- preflight (Phase 08)
+
+
+def test_missing_preflight_warns_and_runs(h: Callable[..., H]) -> None:
+    x = h().all_auto().decide_q1()
+    assert x.run() == EXIT_FINISHED
+    (warn,) = [w for w in x.events("warning") if w.get("rule") == "preflight_missing"]
+    assert "no preflight recorded" in warn["reason"] and "phx preflight" in warn["reason"]
+    assert "phx: warning: no preflight recorded" in x.out.getvalue()
+    # the run finished, so a second run has nothing left to check
+    assert x.run() == EXIT_FINISHED
+    assert len([w for w in x.events("warning") if w.get("rule") == "preflight_missing"]) == 1
+
+
+def test_require_preflight_refuses_before_any_launch(h: Callable[..., H]) -> None:
+    x = h().all_auto().decide_q1()
+    assert x.run(require_preflight=True) == EXIT_ERROR
+    end = x.last_event("run_end")
+    assert end["rule"] == "preflight_missing" and "--require-preflight" in end["reason"]
+    assert x.phase_calls() == [] and x.state().pause is None
+
+
+def test_fresh_preflight_then_stale_after_a_phase_is_added(h: Callable[..., H]) -> None:
+    from phx.preflight import record
+
+    x = h().all_auto().decide_q1()
+    record(x.repo, env=x.env)
+    assert x.run(require_preflight=True, max_phases=1) == EXIT_FINISHED
+    assert x.last_event("preflight")["reason"].endswith("covers the plan")
+    assert not [w for w in x.events("warning") if str(w.get("rule")).startswith("preflight")]
+    # phase 01 completed: still fresh; a new row makes it stale
+    x.edit_plan(
+        "(prompts/SMP_phase-02-colour.md) | auto |",
+        "(prompts/SMP_phase-02-colour.md) | auto |\n"
+        "| 03 | Added | x | Haiku 5.5 | 02 | ⬜ Not started | n/a | auto |",
+    )
+    assert x.run(require_preflight=True) == EXIT_ERROR
+    end = x.last_event("run_end")
+    assert end["rule"] == "preflight_stale" and "phase(s) added: 03" in end["reason"]
+    assert x.phase_calls() == ["01"]
+
+
+def test_dry_run_reports_preflight(h: Callable[..., H]) -> None:
+    x = h().all_auto().decide_q1()
+    assert x.run(dry_run=True) == EXIT_FINISHED
+    assert "phx: warning: no preflight recorded" in x.out.getvalue()
+    assert x.run(dry_run=True, require_preflight=True) == EXIT_ERROR
+    assert "would refuse: no preflight recorded" in x.out.getvalue()
+    assert x.last_event("dry_run")["end"] == "preflight_missing"

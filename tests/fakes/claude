@@ -12,6 +12,13 @@ Environment (all optional):
   PHX_FAKE_ARGV_LOG     file to append {"argv": [...], "env": {...}} to, one JSON line
                         per call; env holds PHX_AUTO, ANTHROPIC_MODEL and ANTHROPIC_BASE_URL
   PHX_FAKE_AGENT        scenario JSON: act as a scripted phase agent (fake_agent.py)
+
+Interactive start (no -p, as `phx preflight` launches it):
+  PHX_FAKE_PROMPT_COPY  file to copy the --append-system-prompt-file prompt to
+  PHX_FAKE_EXPECT       JSON file with a list of strings the prompt must contain;
+                        any missing: listed on stderr, exit 3
+  PHX_FAKE_PREFLIGHT_RECORD  "1": act as the preflight agent and run the prompt's
+                        record command with one --unresolved item
 """
 
 import json
@@ -35,6 +42,41 @@ if "--output-format" in args and "stream-json" in args and "-p" in args and "--v
         "Error: When using --print, --output-format=stream-json requires --verbose", file=sys.stderr
     )
     sys.exit(1)
+
+
+def interactive() -> int:
+    """A scripted `phx preflight` session (Phase 08): check the prompt, maybe record."""
+    import shlex
+    import subprocess
+
+    flag = "--append-system-prompt-file"
+    prompt = ""
+    if flag in args:
+        with open(args[args.index(flag) + 1], encoding="utf-8") as fh:
+            prompt = fh.read()
+    copy = os.environ.get("PHX_FAKE_PROMPT_COPY")
+    if copy:
+        with open(copy, "w", encoding="utf-8") as fh:
+            fh.write(prompt)
+    expect = os.environ.get("PHX_FAKE_EXPECT")
+    if expect:
+        with open(expect, encoding="utf-8") as fh:
+            missing = [s for s in json.load(fh) if s not in prompt]
+        if missing:
+            print(
+                "fake claude: missing from preflight prompt: " + json.dumps(missing),
+                file=sys.stderr,
+            )
+            return 3
+    if os.environ.get("PHX_FAKE_PREFLIGHT_RECORD") == "1":
+        block = prompt.split("### Record command (step 7)", 1)[1].split("```")[1]
+        argv = [*shlex.split(block.strip()), "--unresolved", "phase 02: fake item"]
+        return subprocess.run(argv, check=False).returncode
+    return int(os.environ.get("PHX_FAKE_EXIT", "0"))
+
+
+if "-p" not in args:
+    sys.exit(interactive())
 
 if os.environ.get("PHX_FAKE_AGENT"):  # scripted agent for the Phase 07 e2e tests
     import fake_agent

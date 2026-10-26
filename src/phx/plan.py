@@ -487,13 +487,52 @@ def set_status_cell(text: str, phase_id: str, label: str) -> str:
             for lineno, row in table.rows:
                 if len(row) > max(id_col, st_col) and row[id_col].strip("` ") == phase_id:
                     raw = bare[lineno - 1]
-                    parts = re.split(r"(?<!\\)\|", raw)
-                    offset = 1 if raw.lstrip().startswith("|") else 0
-                    parts[st_col + offset] = f" {label} "
-                    lines[lineno - 1] = "|".join(parts) + lines[lineno - 1][len(raw) :]
+                    lines[lineno - 1] = (
+                        _replace_cell(raw, st_col, label) + lines[lineno - 1][len(raw) :]
+                    )
                     return "".join(lines)
             break
     raise PlanError(f"phase {phase_id} not in the phase table")
+
+
+def _replace_cell(line: str, col: int, value: str) -> str:
+    """``line`` (a table row, no newline) with cell ``col`` set to ``value``."""
+    parts = re.split(r"(?<!\\)\|", line)
+    offset = 1 if line.lstrip().startswith("|") else 0
+    parts[col + offset] = f" {value} "
+    return "|".join(parts)
+
+
+def set_question_status(text: str, question_id: str, label: str) -> str:
+    """``text`` with owner question ``question_id``'s Status cell set to ``label``.
+
+    Used by ``phx answer`` (contract §3). ``|`` in ``label`` is escaped; nothing else
+    changes. Raises ``PlanError`` if the table or the row is missing.
+    """
+    lines = text.splitlines(keepends=True)
+    bare = [ln.rstrip("\r\n") for ln in lines]
+    value = label.replace("|", "\\|")
+    for i, line in enumerate(bare):
+        if not re.match(r"^##\s+.*\bquestions\b", line, re.IGNORECASE):
+            continue
+        stop = next((j for j in range(i + 1, len(bare)) if bare[j].startswith("## ")), None)
+        for table in _tables(bare, i + 1, stop):
+            h = table.header
+            id_col = _column(h, "#", "id")
+            st_col = _column(h, "status", prefix=True)
+            if st_col is None:
+                st_col = next((k for k, c in enumerate(h) if "default" in c), None)
+            if id_col is None or st_col is None or _column(h, "question") is None:
+                continue
+            for lineno, row in table.rows:
+                if len(row) > max(id_col, st_col) and row[id_col].strip("`* ") == question_id:
+                    raw = bare[lineno - 1]
+                    lines[lineno - 1] = (
+                        _replace_cell(raw, st_col, value) + lines[lineno - 1][len(raw) :]
+                    )
+                    return "".join(lines)
+            raise PlanError(f"owner question {question_id} not in the questions table")
+    raise PlanError("the plan has no owner questions table")
 
 
 def parse_questions(text: str) -> tuple[OwnerQuestion, ...]:

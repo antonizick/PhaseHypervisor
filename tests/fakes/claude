@@ -11,6 +11,7 @@ Environment (all optional):
   PHX_FAKE_IGNORE_TERM  "1": ignore SIGTERM (to test the SIGKILL escalation)
   PHX_FAKE_ARGV_LOG     file to append {"argv": [...], "env": {...}} to, one JSON line
                         per call; env holds PHX_AUTO, ANTHROPIC_MODEL and ANTHROPIC_BASE_URL
+  PHX_FAKE_AGENT        scenario JSON: act as a scripted phase agent (fake_agent.py)
 """
 
 import json
@@ -34,6 +35,11 @@ if "--output-format" in args and "stream-json" in args and "-p" in args and "--v
         "Error: When using --print, --output-format=stream-json requires --verbose", file=sys.stderr
     )
     sys.exit(1)
+
+if os.environ.get("PHX_FAKE_AGENT"):  # scripted agent for the Phase 07 e2e tests
+    import fake_agent
+
+    sys.exit(fake_agent.main(args))
 
 session = "00000000-0000-4000-8000-00000000fake"
 for flag in ("--session-id", "--resume"):

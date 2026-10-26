@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Fake `ai-provider` for PHX tests.
 
-get   prints $PHX_FAKE_PROVIDER (default anthropic)
+get   prints the file $PHX_FAKE_PROVIDER_FILE if it exists, else $PHX_FAKE_PROVIDER
+      (default anthropic)
 env   prints the file named by $PHX_FAKE_ENV (default: nothing)
 run   execs the fake `claude` next to this file with the remaining arguments
 """
@@ -12,7 +13,11 @@ from pathlib import Path
 
 cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
 if cmd == "get":
-    print(os.environ.get("PHX_FAKE_PROVIDER", "anthropic"))
+    switch = os.environ.get("PHX_FAKE_PROVIDER_FILE")
+    if switch and Path(switch).is_file():
+        print(Path(switch).read_text(encoding="utf-8").strip())
+    else:
+        print(os.environ.get("PHX_FAKE_PROVIDER", "anthropic"))
 elif cmd == "env":
     path = os.environ.get("PHX_FAKE_ENV")
     if path:

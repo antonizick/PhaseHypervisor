@@ -259,12 +259,15 @@ def classify(
 ) -> Classification:
     """Classify how a session ended.
 
-    ``timed_out`` is ``"idle"`` or ``"wall"`` when the runner killed the session.
+    ``timed_out`` is ``"idle"``, ``"wall"`` or ``"stopped"`` (``phx stop``) when the
+    runner killed the session.
     ``provider`` (``anthropic``/``openrouter``) separates a Pro limit from an
     OpenRouter 429. With ``expect_result_line=False`` (the limit probe) a clean
     result counts as ``complete``.
     """
     if timed_out:
+        if timed_out == "stopped":
+            return Classification(ExitClass.TIMEOUT, "stopped by phx stop", kind=timed_out)
         what = "no stream events" if timed_out == "idle" else "wall-clock cap reached"
         return Classification(ExitClass.TIMEOUT, f"killed after timeout ({what})", kind=timed_out)
 

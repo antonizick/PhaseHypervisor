@@ -19,14 +19,13 @@ def test_help_lists_every_subcommand(capsys: pytest.CaptureFixture[str]) -> None
         assert name in out
 
 
-@pytest.mark.parametrize("name", [c for c in COMMANDS if c != "plan"])
-def test_stubs_exit_2(name: str, capsys: pytest.CaptureFixture[str]) -> None:
-    assert main([name]) == 2
-    assert "not implemented yet (Phase" in capsys.readouterr().err
+def test_preflight_stub_exits_2(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["preflight"]) == 2
+    assert "not implemented yet (Phase 08)" in capsys.readouterr().err
 
 
-def test_global_flags_parse() -> None:
-    assert main(["--state-dir", "/x", "--verbose", "status"]) == 2
+def test_global_flags_parse(tmp_path: Path) -> None:
+    assert main(["--state-dir", str(tmp_path), "--verbose", "status"]) == 0
 
 
 def test_module_runs_without_uv() -> None:

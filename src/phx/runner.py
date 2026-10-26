@@ -331,12 +331,17 @@ def run_session(
     on_event: Callable[[dict[str, Any]], None] | None = None,
     permission_mode: str = PERMISSION_MODE,
     extra_args: Sequence[str] = (),
+    cancel: threading.Event | None = None,
+    on_start: Callable[[str], None] | None = None,
 ) -> SessionOutcome:
     """Run one session to its end and classify it.
 
     ``resume`` continues an earlier session ID; otherwise a fresh UUID is used.
     ``on_event`` is called for every parsed stream event (heartbeat for Phase 07).
     ``permission_mode`` and ``extra_args`` exist for the tool-less triage session (Phase 06).
+    ``cancel`` (Phase 07, ``phx stop``): once set, the session's process group is stopped
+    like a timeout and the session classifies as ``timeout`` with kind ``stopped``.
+    ``on_start`` receives the session ID once the process has started.
     """
     config = config or Config()
     timeouts = timeouts or Timeouts.from_config(config)
@@ -398,6 +403,8 @@ def run_session(
     ]
     for pump in pumps:
         pump.start()
+    if on_start is not None:
+        on_start(session_id)
 
     stderr: deque[str] = deque(maxlen=_STDERR_LINES)
     recent: deque[dict[str, Any]] = deque(maxlen=_LAST_EVENTS)
@@ -411,13 +418,21 @@ def run_session(
     try:
         while open_streams:
             now = time.monotonic()
-            if now - started >= timeouts.wall_s:
+            if cancel is not None and cancel.is_set():
+                timed_out = "stopped"
+            elif now - started >= timeouts.wall_s:
                 timed_out = "wall"
             elif now - last_event >= timeouts.idle_s:
                 timed_out = "idle"
             if timed_out:
                 log.event(
-                    "timeout", phase=phase, reason=f"{timed_out} timeout; stopping process group"
+                    "stop" if timed_out == "stopped" else "timeout",
+                    phase=phase,
+                    reason=(
+                        "stop requested; stopping process group"
+                        if timed_out == "stopped"
+                        else f"{timed_out} timeout; stopping process group"
+                    ),
                 )
                 _kill_group(proc, timeouts.term_grace_s)
                 break

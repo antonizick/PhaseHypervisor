@@ -29,6 +29,10 @@ PHX is safe to leave running: the threat model is written down, risks are mitiga
 5. Secret-redaction audit: grep every state and session file produced in Phase 10 for key patterns.
 6. Docs pass: README, user guide, architecture, SECURITY all accurate; THIRD_PARTY_NOTICES for dev tools if required.
 7. Close or explicitly defer every Phase Log follow-up.
+8. **From the Phase 10 pilot** (see `docs/PHX_PILOT_REPORT.md`):
+   - Contract step 0 (manual-run guard) **fails open**: in a headless non-`--auto` session the lock check was denied by permissions four times and the agent went on to the next steps. Make it fail-closed ("if the check cannot run, tell Nick and stop before claiming") in the skill template, the playbook, `PHX_AUTO_MODE_CONTRACT.md` §8 and the five migrated `phase.md` files (PHX, MM3, CL, OCC, YTPL2), one commit per repo; decide with an ADR whether it needs a contract version bump (it should not: PHX reads nothing new).
+   - Threat-model the ADR-0019 guard heuristic: a main-checkout session that claimed a phase by hand but has not yet written anything is not seen; check that the claim commit itself counts (branch tip time after process start).
+   - `phx resume --require-preflight` clears the pause before the preflight check refuses the run; decide whether the pause should stay.
 
 ## Out of scope
 New features.

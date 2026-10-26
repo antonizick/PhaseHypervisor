@@ -470,8 +470,9 @@ def test_pty_host_and_start_time(tmp_path: Path) -> None:
     proc = tmp_path / "proc"
     work = tmp_path / "work"
     work.mkdir()
-    host = ["claude", "bg-pty-host", "--bg-pty-host", "/tmp/x.sock", "--", "/x/claude"]
-    fake_proc(proc, 20, comm="claude", argv=host, cwd=work)
+    host = ["claude bg-pty-host", "--bg-pty-host", "/tmp/x.sock", "124", "60", "--", "/x/claude"]
+    fake_proc(proc, 20, comm="claude", argv=host, cwd=work)  # real 2.1.310 cmdline
+    fake_proc(proc, 23, comm="claude", argv=["claude", "bg-pty-host", "/s"], cwd=work)
     fake_proc(proc, 21, comm="claude", argv=["claude"], cwd=work, started=1_800_000_000.0)
     fake_proc(proc, 22, comm="claude", argv=["claude", "-p", "/phase 05 --auto"], cwd=work)
     found = find_claude_processes({str(work): "main checkout"}, proc_root=proc, exclude=())

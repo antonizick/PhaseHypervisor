@@ -53,7 +53,7 @@ Each round, PHX re-reads the plan from `main` and picks, in this order:
 Gates (spec R12): `owner` phases are never started (PHX pauses and tells you to run them yourself with `/phase NN`); `review` phases run, then PHX pauses so you can look before the next one; `auto` phases just run. After each session PHX verifies the phase on `main` (Phase 06) and decides: next phase, pause, wait for a usage limit, resume the same session, or retry fresh.
 
 Options:
-- `--detach`: run as the transient systemd user unit `phx-<repo>`; the command returns once the supervisor holds its lock. It survives closing the terminal; with `Linger=no` (this machine's setting) it stops when you log out completely. `systemctl --user status phx-<repo>` shows the unit.
+- `--detach`: **always use it when you start PHX from inside Claude Code** (a `!` command or a Bash call): a foreground run gets SIGTERM when that session is backgrounded, ends or times out, and stops mid-phase (Phase 10 pilot). Runs as the transient systemd user unit `phx-<repo>`; the command returns once the supervisor holds its lock. It survives closing the terminal; with `Linger=no` (this machine's setting) it stops when you log out completely. `systemctl --user status phx-<repo>` shows the unit.
 - `--pause-after NN`: pause after phase NN completes.
 - `--until NN`: run up to and including NN, start nothing later, then finish.
 - `--max-phases N`: finish after N phases complete in this run.
@@ -72,10 +72,10 @@ A pause is remembered in `state.json` until you clear it with `phx resume`; `phx
 | Phase NN blocked on question #Q | `phx answer <repo> Q "<answer>"`, then `phx resume <repo>` |
 | No phase can start (open question needed by the next phase) | answer it, then `phx resume` |
 | Gate review after NN | review the phase's work, then `phx resume` |
-| Gate owner on NN | run `/phase NN` yourself, then `phx resume` |
+| Gate owner on NN | run `/phase NN` yourself, then `phx resume` (if NN is already `🔄`, the pause says so: finish it by hand first) |
 | `--pause-after NN` | `phx resume` |
 | Verification failed / needs review | read `phx status` and `phx log`, fix the repo (or finish the phase by hand), then `phx resume` |
-| A Claude session is open in the worktree or main checkout | close it (or wait for it), then `phx resume` |
+| A Claude session is open in the worktree or main checkout | it may be working on the phase: close it (or wait for it), then `phx resume`. An idle session in the main checkout, such as the one you drive `phx` from, does not cause this pause: it counts only if the phase's branch or worktree changed after it started and after PHX's last session for that phase (ADR-0019) |
 | Authentication or provider error | log in again or fix the provider, then `phx resume` |
 | Timeout or crash twice | PHX already resumed once and retried once; check the log, then `phx resume` |
 
@@ -111,7 +111,7 @@ phx log ~/Work/YTPL2            # last 40 events, one line each
 phx log ~/Work/YTPL2 -f         # follow
 phx log ~/Work/YTPL2 -n 0 --json   # everything, raw JSON
 ```
-`~/.local/state/phx/<repo-name>/run.jsonl` holds every decision with its reason: `run_start`, `plan` (next eligible phase and why each other phase waits), `select` (what runs and why), `launch` (full command line, provider), `session_end` (exit class, tokens, cost), `verify`, `decision`, `retry`, `wait_start`, `provider_check`, `provider_switch`, `wake`, `probe`, `wait_extend`, `wait_end`, `notify`, `run_end` (finished, paused, stopped or failed, with the reason and totals), `vault`. Session transcripts are in `sessions/<phase>-<n>.jsonl` beside it, and the current state in `state.json`. Everything is redacted before it is written.
+`~/.local/state/phx/<repo-name>/run.jsonl` holds every decision with its reason: `run_start`, `plan` (next eligible phase and why each other phase waits), `select` (what runs and why), `session_dropped` (a recorded session forgotten because its phase was finished outside PHX), `launch` (full command line, provider), `session_end` (exit class, tokens, cost; a session stopped or cut off by a limit before its final result event counts the tokens of its turns, with cost unknown), `verify`, `decision`, `retry`, `wait_start`, `provider_check`, `provider_switch`, `wake`, `probe`, `wait_extend`, `wait_end`, `notify`, `run_end` (finished, paused, stopped or failed, with the reason and totals), `vault`. Session transcripts are in `sessions/<phase>-<n>.jsonl` beside it, and the current state in `state.json`. Everything is redacted before it is written.
 
 ## Usage limits and switching provider
 When a Pro 5-hour or weekly limit stops a phase, PHX records the stop, notifies you with the resume time and waits: until the announced reset time plus 2 minutes, or 30 min, 1 h, 2 h, 4 h, then every 6 h when no reset time is given. Then one tiny `haiku` probe checks that capacity is back and the **same session** resumes (`--resume`). The wait survives suspend, `phx stop` and restarts.
@@ -162,7 +162,8 @@ Exit status: `0` when the plan was read, `1` with `phx plan: <reason>` when it c
 | Command | What it does |
 |---|---|
 | `/phx status [repo]` | runs `phx plan` and `phx status`, then summarises the next phase, the run state and anything that needs you (open question, pause, drift, `Contract:` not 1) |
-| `/phx preflight [repo]` | runs `phx preflight <repo> --check` and `--dry-run`, summarises the remaining phases, leads and whether the record is current, then tells you to run `phx preflight <repo>` in a terminal (or type `! phx preflight <repo>` here). The preflight itself is an *interactive* session and refuses without a terminal, so it cannot run inside another session (ADR-0017) |
+| `/phx preflight [repo]` | runs `phx preflight <repo> --check` and `--dry-run`, summarises the remaining phases, leads and whether the record is current, then tells you to run `phx preflight <repo>` in a terminal (not a `!` command here). The preflight itself is an *interactive* session and refuses without a terminal, so it cannot run inside another session (ADR-0017) |
+| `/phx resume [repo]` | runs `phx status`, says why the run stopped or paused, asks you to confirm, then starts `phx resume <repo> --detach` |
 | `/phx run [repo] [--pause-after NN …]` | checks the contract and preflight, shows `phx run --dry-run`, asks you to confirm, then starts `phx run <repo> --detach` and tells you how to follow it (`phx status`, `phx log -f`, `phx stop`, `phx resume`) |
 
 `repo` is a path, a project name (`MM3`, `CL`, `OCC`, `YTPL2`) or, when left out, the repo of the current directory. The command never answers owner questions, edits a repo or stops a run unless you ask. To remove it: `rm ~/.claude/commands/phx.md`.

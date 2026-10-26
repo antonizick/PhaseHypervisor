@@ -22,6 +22,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0016 | 2026-10-26 16:28 CDT | Supervisor: pauses cleared only by `phx resume`, suspend-safe limit waits, graceful stop, detach env allowlist, work-root guard, `uv tool install --editable` | Accepted | 07 |
 | ADR-0017 | 2026-10-26 16:59 CDT | Preflight: interactive launch with an appended system-prompt file, PHX-built context, `--record` fingerprint and staleness rules, no pre-approved publishing | Accepted | 08 |
 | ADR-0018 | 2026-10-26 17:16 CDT | Rollout to the four existing projects: one adoption commit each, repo-specific stricter rules kept and flagged, `/phx` as a user-level command | Accepted | 09 |
+| ADR-0019 | 2026-10-26 18:38 CDT | Pilot corrections: live-session guard counts main-checkout sessions only on later work, stopped sessions charge their turns, always detach from Claude Code | Accepted | 10 |
 
 ---
 
@@ -262,3 +263,20 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 - The test fixtures under `tests/fixtures/plans/` are refreshed copies of the migrated files, so tests now see `Contract: 1` and column-sourced Gates; the unmigrated path is tested with a fixture whose marker is removed.
 
 **Consequences.** `phx plan` reports `Contract: 1` and the same next phase as before for all four (MM3 16, CL none, OCC 11, YTPL2 03). Interactive `/phase` behaves as before: the differences are step 0 (stops only when a `phx` supervisor is running), the hands-off section (inert without `--auto`/`PHX_AUTO=1`) and the ADR-0004 git rules. A preflight recorded before the migration is stale. Undo per repo: `git revert` its adoption commit (MM3 `ba51654`, CL `dec549e`, OCC `2e0a7d4`, YTPL2 `2935948`).
+
+## ADR-0019: Pilot corrections to the live-session guard, accounting and detaching
+**Recorded.** 2026-10-26 18:38 CDT (Phase 10)
+
+**Context.** In the Phase 10 pilot Nick drove PHX from Claude Code sessions opened in the pilot repo. A foreground `phx resume` started with `!` got SIGTERM when that session was backgrounded, and stopped phase 05 cleanly. Every `phx resume` afterwards paused with "a Claude session is open in the main checkout": first Nick's idle interactive `claude`, then a `claude bg-pty-host` wrapper hosting an idle background agent. Neither was working on 05, so the phase had to be finished by hand. The stopped session was logged with 0 tokens although it had spent 4.5 k output and 386 k cache-read tokens, because PHX read totals only from the final `result` event.
+
+**Options considered.**
+| Option | Pros | Cons |
+|---|---|---|
+| Keep counting every Claude process in the main checkout | Never resumes over a manual session | Driving PHX from Claude Code in the repo (what `/phx` invites) blocks every resume |
+| Count a main-checkout process only on evidence of later work: headless `/phase`, or the phase's branch tip or a changed worktree file newer than the process start and PHX's last session end (chosen) | Idle shells and the driver session stop blocking; a manual `/phase NN` that is editing still blocks | Heuristic: a manual session that has done nothing for the phase since it started is not seen; its first commit or edit makes it count |
+| An override flag (`--ignore-sessions`) | Simple | Puts the judgement on Nick every time; easy to misuse |
+
+**Decision.** The second option (spec R21). Processes in the worktree always count. `claude bg-pty-host` wrappers are skipped. PHX's last session end is the mtime of its newest `sessions/<phase>-<n>.jsonl`. A resumable check names the ignored processes in `resume_check`. Usage: when the result event is missing or reports zero tokens, PHX sums the last `usage` per assistant message ID; cost stays unknown. A recorded session whose phase is `✅` on `main` is dropped (`session_dropped`). `/phx` gains `resume` and always detaches; the user guide says to always `--detach` from inside Claude Code.
+
+**Consequences.** Resume works while Nick keeps Claude Code open in the repo. Token totals now include interrupted sessions (cost still only from result events). The guard remains conservative for sessions in the worktree.
+

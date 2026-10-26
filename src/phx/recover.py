@@ -295,7 +295,12 @@ def _is_claude(comm: str, argv: list[str]) -> bool:
 
 def _is_pty_host(argv: list[str]) -> bool:
     """``claude bg-pty-host …`` only hosts a background session; that session is its own process."""
-    return len(argv) > 1 and argv[1] == "bg-pty-host"
+    # Real cmdline (2.1.310): "claude bg-pty-host" as one argv entry, then --bg-pty-host …
+    return (
+        "--bg-pty-host" in argv
+        or "bg-pty-host" in argv[:2]
+        or (bool(argv) and argv[0].endswith(" bg-pty-host"))
+    )
 
 
 def _is_headless_phase(argv: list[str]) -> bool:

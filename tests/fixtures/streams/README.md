@@ -26,3 +26,4 @@ Claude Code `--output-format stream-json --verbose` streams that the runner and 
 | `max_budget.jsonl` | provider_error (budget) | documented | `subtype: error_max_budget_usd` |
 | `probe_ok.jsonl` | complete (probe) | synthetic | One-turn `ok` answer |
 | `probe_real.jsonl` | complete (probe) | real | The Phase 05 live `haiku` probe on Anthropic Pro, including a real `rate_limit_event` (`status: allowed`, `unifiedWindows`) |
+| `triage.jsonl` | complete (triage) | synthetic | Phase 06: a tool-less one-turn `haiku` summary of a blocked phase |

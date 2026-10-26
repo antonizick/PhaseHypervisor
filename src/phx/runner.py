@@ -19,7 +19,7 @@ import threading
 import time
 import uuid
 from collections import deque
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO, Any
@@ -95,6 +95,8 @@ def build_argv(
     resume: str | None = None,
     max_budget_usd: float | None = None,
     max_turns: int | None = None,
+    permission_mode: str = PERMISSION_MODE,
+    extra_args: Sequence[str] = (),
 ) -> list[str]:
     """Argument list for one headless session (never run through a shell).
 
@@ -110,7 +112,7 @@ def build_argv(
         "--model",
         alias,
         "--permission-mode",
-        PERMISSION_MODE,
+        permission_mode,
         "--output-format",
         "stream-json",
         "--verbose",
@@ -120,7 +122,7 @@ def build_argv(
         argv += ["--max-turns", str(max_turns)]
     if max_budget_usd is not None:
         argv += ["--max-budget-usd", f"{max_budget_usd:g}"]
-    return argv
+    return argv + list(extra_args)
 
 
 def build_env(base: Mapping[str, str] | None = None, *, auto: bool = True) -> dict[str, str]:
@@ -327,11 +329,14 @@ def run_session(
     auto: bool = True,
     expect_result_line: bool = True,
     on_event: Callable[[dict[str, Any]], None] | None = None,
+    permission_mode: str = PERMISSION_MODE,
+    extra_args: Sequence[str] = (),
 ) -> SessionOutcome:
     """Run one session to its end and classify it.
 
     ``resume`` continues an earlier session ID; otherwise a fresh UUID is used.
     ``on_event`` is called for every parsed stream event (heartbeat for Phase 07).
+    ``permission_mode`` and ``extra_args`` exist for the tool-less triage session (Phase 06).
     """
     config = config or Config()
     timeouts = timeouts or Timeouts.from_config(config)
@@ -350,6 +355,8 @@ def run_session(
         resume=resume,
         max_budget_usd=budget,
         max_turns=max_turns,
+        permission_mode=permission_mode,
+        extra_args=extra_args,
     )
     transcript = transcript_path(state, phase)
     log.event(

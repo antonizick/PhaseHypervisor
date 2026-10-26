@@ -473,6 +473,29 @@ def parse_phase_table(text: str) -> tuple[list[tuple[Phase, str]], list[str]]:
     return out, problems
 
 
+def set_status_cell(text: str, phase_id: str, label: str) -> str:
+    """``text`` with phase ``phase_id``'s Status cell replaced by ``label``; nothing else changes.
+
+    Used only by the ``⛔`` repair (Phase 06). Raises ``PlanError`` if the row is missing.
+    """
+    lines = text.splitlines(keepends=True)
+    bare = [ln.rstrip("\r\n") for ln in lines]
+    for table in _tables(bare):
+        if "phase" in table.header and "status" in table.header:
+            id_col, st_col = _column(table.header, "phase"), _column(table.header, "status")
+            assert id_col is not None and st_col is not None
+            for lineno, row in table.rows:
+                if len(row) > max(id_col, st_col) and row[id_col].strip("` ") == phase_id:
+                    raw = bare[lineno - 1]
+                    parts = re.split(r"(?<!\\)\|", raw)
+                    offset = 1 if raw.lstrip().startswith("|") else 0
+                    parts[st_col + offset] = f" {label} "
+                    lines[lineno - 1] = "|".join(parts) + lines[lineno - 1][len(raw) :]
+                    return "".join(lines)
+            break
+    raise PlanError(f"phase {phase_id} not in the phase table")
+
+
 def parse_questions(text: str) -> tuple[OwnerQuestion, ...]:
     """The Owner questions table (contract §3); legacy "Open questions" headings work too."""
     lines = text.splitlines()

@@ -18,6 +18,7 @@ class Config:
     triage: bool = True
     idle_timeout_s: int = 1800  # no stream events for this long: kill the session
     wall_timeout_s: int = 21600  # hard cap on one session
+    test_timeout_s: int = 3600  # cap on each verification test command (Phase 06)
 
 
 def default_state_root() -> Path:

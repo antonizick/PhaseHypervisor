@@ -18,6 +18,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0012 | 2026-10-26 09:05 CDT | Hands-off `/phase` contract version 1, with a `refused` outcome and a lock checked by `flock` | Accepted | 03 |
 | ADR-0013 | 2026-10-26 09:21 CDT | Plan parser heuristics: Gate outside eligibility, ⛔ exempt from drift, first-clause test command, publishing inference, config read from main | Accepted | 04 |
 | ADR-0014 | 2026-10-26 10:20 CDT | Session runner and classifier: signal priority, `no_result` class, OpenRouter 429 as provider error, allowlisted provider snapshot, context-free probe | Accepted | 05 |
+| ADR-0015 | 2026-10-26 15:33 CDT | Verifier and recovery: shell-free test commands, verdict outcomes, retry ladder, live sessions in the main checkout, tool-less triage | Accepted | 06 |
 
 ---
 
@@ -165,4 +166,30 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | B. Map a missing line to `crash` | Matches the prompt's list | A finished, merged phase would look like a crash and trigger needless recovery |
 
 **Consequences.** Phases 06/07 handle `no_result` by verifying. The probe still loads the user's global `CLAUDE.md` and system prompt (~24k mostly cached tokens per probe); Phase 10 may measure whether `--safe-mode` makes it cheaper without changing auth.
+
+## ADR-0015: Verifier and recovery design
+**Recorded.** 2026-10-26 15:33 CDT (Phase 06)
+**Context.** Phase 06 builds `phx.verify`, `phx.recover` and `phx.triage` (spec R6, R9, R14). The prompt asks for an ADR on running plan test commands that need a shell without `shell=True` on untrusted text, and leaves open how the decision table treats combinations it does not list, where to look for a live manual session, and how to keep the triage session safe.
+**Decision.**
+- **Test commands run without a shell, through a small interpreter.** A command is split on top-level `&&` into steps; a step is `cd DIR`, or words with optional leading `NAME=value` assignments. Single and double quotes and backslash escapes are honoured; unquoted `*`, `?`, `[` are globs expanded with Python's `glob` (`**` recursive, like bash `globstar`) relative to the step's directory. Pipes, redirects, `;`, `||`, `&`, subshells, `$` and backtick expansions, `~`, braces and comments are refused: the `tests` check fails with "not run: … set test_command in .phx/config.toml to a script". `cd` and glob results must stay inside the checkout. Each command runs with an argument list, stdin `/dev/null`, a `test_timeout_s` cap (new config key, default 3600) and an environment without `PHX_AUTO`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` and `VIRTUAL_ENV`.
+- **Where tests run:** a `git clone --no-checkout` of the repo into a fresh temp directory, then a detached checkout of `main`'s commit; removed afterwards. Ignored and untracked files of the user's checkout never reach it, and the user's checkout, index and worktree list are never written.
+- **Plans whose checks live elsewhere (ADR-0013):** when the command comes from the shared instructions and refers to a path the checkout lacks (a `cd` target, a script, a glob with no match), the command is `skip` with a note pointing to `.phx/config.toml`. When it comes from `.phx/config.toml`, the same thing is a failure: an explicit setting must be right. CL's `shellcheck lab/**/*.sh` is skipped this way.
+- **Verdicts.** Checks are pass/fail/skip with evidence; some are optional (reported, never decisive): `pushed` (from the local `origin/main` ref, never fetched), `branch_kept`, `work_in_progress`, `main_unchanged`. The outcome is `complete`, `blocked`, `in_progress`, `not_started` (what the row says, all required checks passing), `failed` (a required check failed) or `needs_review` (the `PHX-RESULT` line disagrees with the repo on status, phase ID, `merged`, `pushed` or question IDs; a `refused` session whose row is `🔄` or whose `main` moved since launch). A **baseline** taken before the launch makes pre-existing uncommitted files in the main checkout pass (MM3 has some) and lets "refused, nothing changed" be checked. Tests run only for a `✅` row and never for a `refused` session.
+- **Decision rules beyond the table.** Auth and provider errors pause without verifying. Otherwise the repo decides: a phase that is `✅` and verified goes on to the next phase even if the session ended as `timeout`, `crash`, `no_result` or `usage_limit`. A `⛔` row with a recorded question pauses whatever the class. `no_result` on an unclaimed phase pauses (it neither worked nor refused). The timeout/crash ladder (also `no_result` with the row `🔄`) is: `--resume` of the same session with a "continue the phase" prompt, then a fresh `/phase NN --auto`, then pause; the supervisor counts the recoveries (`MAX_RECOVERIES = 2`).
+- **The `⛔` repair** has the claim protocol's preconditions (main checkout on `main`, plan file unchanged there and equal to `main`, row `🔄`), rewrites only that row's Status cell, commits only the plan file as `chore(plan): phase NN blocked (recorded by phx)` and pushes `main` when an `origin` remote exists (ADR-0004; a failed push is logged, not fatal). Anything unsafe is logged as `repair_skipped` and left for Nick.
+- **Live sessions (R14, R15) are looked for in the phase worktree and the main checkout.** Claude Code's process keeps the directory it started in, and `/phase` sessions start in the main checkout (the claim protocol); only their tools run in the worktree. Observed in this phase: this very session's `claude` process (pid 9892) has the main checkout as its cwd. A Claude process is matched by `comm`, by `argv[0]`/`argv[1]` basename `claude`, or a `node`/`bun` running `claude-code`. The current process and its ancestors are excluded, so a `phx` started from inside Claude Code is not its own rival.
+- **Triage is tool-less.** One `haiku` session with `--tools ""`, `--permission-mode default`, `--max-turns 1`, in the state directory and without `PHX_AUTO`; the prompt marks the verdict and the phase's final messages (redacted, last 6000 characters) as data. The answer is redacted and clipped to 150 words. It runs only when a pause follows a `blocked`, `needs_review` or `failed` verdict and `triage` is on; a failure is logged and the decision stands.
+
+| Option for test commands | Pros | Cons |
+|---|---|---|
+| A. Shell-free interpreter for `&&`, `cd`, assignments, quotes, globs (chosen) | No shell ever parses plan text; covers every real plan (PHX `uv run …`, OCC/YTPL2 `make check`, CL's `**` glob, `cd x && …`); refusals say exactly what to change | A subset: pipes or `||` need a script |
+| B. `bash -c "<command>"` in the clone | Full compatibility, little code | A shell on plan text (S3); variable and command expansion from repo content |
+| C. `shlex.split` and run as one argument list | Smallest | No `&&`, `cd` or globs: CL and product-style commands cannot run |
+
+| Option for live-session scope | Pros | Cons |
+|---|---|---|
+| A. Worktree and main checkout (chosen) | Finds real `/phase` sessions, whose cwd is the main checkout | A Claude session open in the main checkout for something else also pauses a resume (safe direction; reason says "may be running") |
+| B. Worktree only (spec R15 text) | No false positives | Misses every real session |
+
+**Consequences.** Phase 07 calls `capture_baseline` before each launch, `handle_outcome` after it, keeps the recovery count and session ID in `state.json`, calls `check_resumable` before resuming a `🔄` phase (R14) and puts `Decision.summary` in the notification. Phase 11 threat-models the interpreter and the triage prompt. Spec amendment R18.
 

@@ -1,6 +1,6 @@
 # PHX Architecture
 
-> Skeleton from Phase 01; Phase 02, 04 and 05 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
+> Skeleton from Phase 01; Phase 02, 04, 05 and 06 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
 
 ## Components
 | Component | Module (planned) | Phase | Role |
@@ -17,7 +17,7 @@
 | Module | Role |
 |---|---|
 | `cli.py`, `__main__.py` | argparse entry point. Global flags `--state-dir`, `-v/--verbose`, `--version`. The `COMMANDS` table maps each subcommand to its help text and the phase that implements it; stubs print `not implemented yet (Phase NN)` and exit 2. |
-| `paths.py` | `default_state_root()` (`$XDG_STATE_HOME/phx`, else `~/.local/state/phx`), `state_dir(repo)`, `sessions_dir()`, and `load_config(repo)` reading `<repo>/.phx/config.toml` into the frozen `Config` dataclass (`test_command`, `max_budget_usd`, `poll_interval_s`, `limit_poll_interval_s`, `triage`, and from Phase 05 `idle_timeout_s`, `wall_timeout_s`). Unknown keys or wrong types raise `ValueError`. `parse_config(text, source)` parses TOML text from anywhere (Phase 04 reads it from `main`). |
+| `paths.py` | `default_state_root()` (`$XDG_STATE_HOME/phx`, else `~/.local/state/phx`), `state_dir(repo)`, `sessions_dir()`, and `load_config(repo)` reading `<repo>/.phx/config.toml` into the frozen `Config` dataclass (`test_command`, `max_budget_usd`, `poll_interval_s`, `limit_poll_interval_s`, `triage`, from Phase 05 `idle_timeout_s`, `wall_timeout_s`, from Phase 06 `test_timeout_s`). Unknown keys or wrong types raise `ValueError`. `parse_config(text, source)` parses TOML text from anywhere (Phase 04 reads it from `main`). |
 | `logging.py` | `EventLog(path)`: one redacted JSON object per line (`ts` as `YYYY-MM-DD HH:MM:SS TZ`, `epoch`, `event`, `phase`, `reason`, extra fields), a single `O_APPEND` write plus `fsync` per record (safe for concurrent appenders), optional human-readable stderr mirror. |
 | `redact.py` | `redact()` / `redact_text()`: `sk-or-…`, `sk-ant-…`, `ANTHROPIC_AUTH_TOKEN=…`, `ANTHROPIC_API_KEY=…`, `Authorization: Bearer …`, `ghp_`/`gho_`/`github_pat_` tokens, in strings and nested JSON. Every `EventLog` write goes through it. |
 
@@ -65,6 +65,7 @@ run_session(repo, state, phase, prompt, alias, log, config, resume?) ──► S
   classify(...)       → Classification;  Usage.from_result(result) → tokens, cost, durations, per-model usage
   run.jsonl           `launch` (argv, cwd, session, transcript, provider, mapped model, budget, timeouts),
                       `launcher_fallback`, `timeout`, `session_end` (class, reason, reset_at, kind, result line, tokens, cost)
+  (permission_mode, extra_args: only for the tool-less triage session, Phase 06)
 probe(state, log) ──► Classification   `-p ok --model haiku --max-turns 1`, cwd = state dir, no PHX_AUTO,
                                         clean answer = complete (R8)
 ```
@@ -82,6 +83,60 @@ probe(state, log) ──► Classification   `-p ok --model haiku --max-turns 1`
 | `crash` | no result event, signal, `error_during_execution`, max turns | recover/resume |
 
 Test doubles: `tests/fakes/claude` replays a fixture (`PHX_FAKE_STREAM`, `PHX_FAKE_EXIT`, `PHX_FAKE_DELAY`, `PHX_FAKE_HANG`, `PHX_FAKE_STDERR`, `PHX_FAKE_IGNORE_TERM`, `PHX_FAKE_ARGV_LOG`) and enforces `--verbose`; `tests/fakes/ai-provider` answers `get` (`PHX_FAKE_PROVIDER`), `env` (`PHX_FAKE_ENV`) and `run` (execs the fake claude). Put `tests/fakes` first on the child's `PATH` and set its `HOME` to a temp dir. Fixtures and their provenance: `tests/fixtures/streams/README.md`.
+
+## Phase 06: verifier and recovery (`verify.py`, `recover.py`, `triage.py`, built)
+```
+capture_baseline(repo) ──► Baseline(main_head, dirty)          taken by the supervisor before each launch
+run_session(...) ──► SessionOutcome                              (Phase 05)
+handle_outcome(repo, outcome, state, log, recoveries, baseline, config) ──► Decision
+  auth_error / provider_error ─────────────────────────────────► decide (no verification)
+  row 🔄 and (result line "blocked" or wip(phase-NN): blocked commit) ─► repair_blocked  (the only write)
+  verify_phase(repo, NN, classification, baseline) ──► Verdict    reads main; tests in a temp clone
+  live_sessions(repo, NN)      only before a retry: claude processes in the worktree or main checkout
+  decide(NN, classification, verdict, session_id, recoveries, live) ──► Decision
+  triage.summarize(...)        haiku, tool-less, on a pause after blocked / needs_review / failed
+  run.jsonl                    verify · repair / repair_skipped · triage · decision
+check_resumable(repo, NN) ──► Resumability   R14: before resuming a 🔄 phase at start-up
+```
+
+**Checks** (`Check(name, status pass|fail|skip, evidence, required)`), all read from `main` and the main checkout without writing:
+
+| Row on `main` | Checks |
+|---|---|
+| `✅` | `branch_merged`, `branch_deleted`, `worktree_removed`, `phase_log` (latest `✅` entry, Timeline first), `pushed` (optional, local `origin/main` ref), `tests` (temp clone of `main`) |
+| `⛔` | `question_recorded` (an open question names the phase), `phase_log` (latest `⛔` entry, Timeline with a `blocked` interval), `branch_kept` (optional) |
+| `🔄` | `work_in_progress` (optional: worktree, last commit, uncommitted count) |
+| any, `refused` session | `main_unchanged` (optional, against the baseline); no tests |
+| always | `status`, `main_checkout` (on `main`), `main_clean` (no new uncommitted files since the baseline) |
+
+**Verdict outcome:** `needs_review` if the `PHX-RESULT` line disagrees with the repo (status, phase ID, `merged`, `pushed`, question IDs; `refused` with the row `🔄` or `main` moved); else `failed` if a required check failed; else the row's state: `complete`, `blocked`, `in_progress`, `not_started`. `missing` state (plan unreadable, phase not in the table) is always `failed`.
+
+**Test commands** (ADR-0015): `parse_command` splits on `&&` into `cd DIR` and word steps with `NAME=value` prefixes, quotes and globs (`**` recursive); anything else is `UnsupportedCommand`. `run_command` runs each step with an argument list in the clone; a missing path is `skip` for a shared-instructions command (ADR-0013), `fail` for a `.phx/config.toml` one.
+
+**Decision table** (`recover.decide`, first matching row wins; `rule` is logged):
+
+| # | Session class | Verdict | Action | Rule |
+|---|---|---|---|---|
+| 1 | `auth_error` | not verified | pause, notify | `auth_error` |
+| 2 | `provider_error` (any kind) | not verified | pause, notify; no retry that could burn credit | `provider_error` |
+| 3 | any other | `needs_review` | pause, notify, report with both sides | `needs_review` |
+| 4 | `refused` | any | pause with the agent's reason; no repair | `refused` |
+| 5 | any other | `failed` | pause with the report | `verification_failed` |
+| 6 | `complete`, `no_result`, `timeout`, `crash`, `usage_limit` | `complete` | next phase | `complete` |
+| 7 | `blocked`, `no_result`, `crash`, … | `blocked` (after the `⛔` repair if needed) | pause, notify, question IDs | `blocked` |
+| 8 | `usage_limit` | `in_progress` / `not_started` | wait (Phase 07), then `--resume` the same session with the continue prompt | `usage_limit` |
+| 9 | `no_result` | `not_started` | pause | `no_result_unclaimed` |
+| 10 | `timeout` / `crash` / `no_result` | `in_progress` / `not_started`, live Claude process | pause ("another session is running phase NN" / "open in the main checkout") | `live_session` |
+| 11 | same | same, `recoveries == 0` | `--resume <session>` with the continue prompt | `retry_resume` |
+| 12 | same | same, `recoveries == 1` (or no session ID) | fresh `/phase NN --auto` | `retry_fresh` |
+| 13 | same | same, `recoveries >= 2` | pause | `retries_exhausted` |
+| 14 | no verdict / anything else | | pause | `unverified` / `unexpected` |
+
+`Decision`: `action` (`next_phase`, `pause`, `wait`, `resume_session`, `fresh_session`), `phase`, `reason`, `rule`, `notify`, `session_id` and `prompt` for the next launch, `reset_at`, `question_ids`, `verdict`, `repair` (commit hash), `summary` (triage), `live`.
+
+**`⛔` repair** (`repair_blocked`): main checkout on `main`, plan file clean and equal to `main`, row `🔄`; rewrites only the Status cell (`plan.set_status_cell`), commits only the plan file (`chore(plan): phase NN blocked (recorded by phx)`), pushes if `origin` exists. Otherwise `repair_skipped` with the reason.
+
+**Triage** (`triage.summarize`): `haiku`, `--tools ""`, `--permission-mode default`, `--max-turns 1`, cwd = state dir, no `PHX_AUTO`; prompt = verdict report + the phase's last messages from its redacted transcript, marked as data; answer redacted and clipped to 150 words; transcript `sessions/<phase>-triage-<n>.jsonl`; cost and tokens in the `triage` event. Best effort: never raises.
 
 ## Control flow of `phx run`
 ```

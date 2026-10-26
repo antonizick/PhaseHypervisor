@@ -28,10 +28,16 @@ Optional, committed on `main`, never containing secrets. Unknown keys or wrong t
 
 | Key | Default | Meaning |
 |---|---|---|
-| `test_command` | from the shared instructions | Command(s) verification runs on `main` (Phase 06) |
+| `test_command` | from the shared instructions | Command verification runs on a clean clone of `main` (Phase 06). No shell: `&&`, `cd DIR`, `NAME=value`, quotes and globs (`**` too) work; pipes, `;`, `||`, redirects and `$VAR` do not, so point it at a script for anything more (ADR-0015) |
+| `test_timeout_s` | `3600` | Cap on each verification test command (Phase 06) |
 | `max_budget_usd` | none | Passed as `--max-budget-usd` **only when the provider is OpenRouter** (spec R9) |
 | `idle_timeout_s` | `1800` | A phase session that emits no stream event for this long is stopped (SIGTERM, then SIGKILL) and classified `timeout` (Phase 05) |
 | `wall_timeout_s` | `21600` | Hard cap on one phase session (Phase 05) |
-| `poll_interval_s`, `limit_poll_interval_s`, `triage` | `300`, `900`, `true` | Supervisor timing and haiku triage (Phases 06/07) |
+| `poll_interval_s`, `limit_poll_interval_s` | `300`, `900` | Supervisor timing (Phase 07) |
+| `triage` | `true` | When a phase blocks, needs review or fails verification, one tool-less `haiku` turn writes a ≤ 150-word summary for the notification and `run.jsonl` (Phase 06) |
 
 Session transcripts land in `~/.local/state/phx/<repo-name>/sessions/<phase>-<n>.jsonl` (redacted), and every launch and its classified ending in `run.jsonl` beside it.
+
+## How PHX checks a phase (Phase 06)
+After every phase session PHX looks at the repo itself instead of trusting the session's last line: the row on `main`, whether the phase branch was merged and deleted and its worktree removed, the Phase Log entry and its Timeline, whether the main checkout is on `main` and has no new uncommitted files, and the test command, run in a throwaway clone of `main` (your checkout is never touched). If the session's `PHX-RESULT` line says something the repo does not show, the phase is marked **needs review** and PHX pauses with both sides in the report. The only change PHX ever makes on its own is committing `⛔ Blocked` for a phase whose agent blocked but forgot to record it. Every check and decision is in `run.jsonl` (`verify`, `repair`, `triage` and `decision` events). Before retrying or resuming a phase, PHX pauses if a Claude Code session is open in that phase's worktree or in the repo's main checkout, since it may be the one working on it.
+

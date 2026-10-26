@@ -29,7 +29,7 @@ Each phase is claimed by a `chore(plan): start phase NN` commit on `main` and ru
 | Phase | Phase Name | Phase Purpose | AI Model to Use | Depends on | Status | Prompt to Initiate This Phase | Gate |
 |---|---|---|---|---|---|---|---|
 | 00 | Planning & spec refinement | Capture Nick's request and answers, resolve decisions, write the spec, ADRs, this plan and the phase prompts | Opus 5.5 | none | ✅ Complete | n/a (planning session) | owner |
-| 01 | Repository foundation & governance | GitHub-ready repo: LICENSE, NOTICE, README, SECURITY, CONTRIBUTING, CoC, CHANGELOG, THIRD_PARTY_NOTICES, ignore files, .editorconfig, .github/, docs skeleton, private GitHub remote | Sonnet 5.5 | 00 | 🔄 In progress | [PHX_phase-01-repo-foundation.md](prompts/PHX_phase-01-repo-foundation.md) | auto |
+| 01 | Repository foundation & governance | GitHub-ready repo: LICENSE, NOTICE, README, SECURITY, CONTRIBUTING, CoC, CHANGELOG, THIRD_PARTY_NOTICES, ignore files, .editorconfig, .github/, docs skeleton, private GitHub remote | Sonnet 5.5 | 00 | ✅ Complete | [PHX_phase-01-repo-foundation.md](prompts/PHX_phase-01-repo-foundation.md) | auto |
 | 02 | Python scaffold, CLI skeleton & CI | uv project, stdlib-only `phx` package and `phx` entry point with subcommand stubs, logging/redaction core, state paths, pytest/ruff/mypy, CI, pre-commit secret scan | Sonnet 5.5 | 01 | ⬜ Not started | [PHX_phase-02-python-scaffold.md](prompts/PHX_phase-02-python-scaffold.md) | auto |
 | 03 | Hands-off `/phase` contract & standing rules | Define `/phase NN --auto` / `PHX_AUTO=1`, block-with-question, `PHX-RESULT` line, Gate column, risk-stop rule and new git/GitHub authority; update the `phased-project` skill templates and playbook note | Opus 5.5 | 01 | ⬜ Not started | [PHX_phase-03-auto-phase-contract.md](prompts/PHX_phase-03-auto-phase-contract.md) | review |
 | 04 | Plan parser & eligibility engine | Parse prefixed and legacy plans: rows, lettered IDs, ordering, deps, status, model→alias, gates, owner questions, test command; drift detection vs branches/worktrees; fixtures from MM3, CL, OCC, YTPL2 | Opus 5.5 | 02, 03 | ⬜ Not started | [PHX_phase-04-plan-parser.md](prompts/PHX_phase-04-plan-parser.md) | auto |
@@ -89,3 +89,10 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 - Open: owner question 2.
 - 2026-10-26 08:44 CDT: first commit made without asking; the standing git authority was applied to the global CLAUDE.md, the skill templates and the playbook now (ahead of Phase 03, per Nick).
 - 2026-10-26 08:41 CDT: Nick answered owner question 1 (MIT) and set PHX as additive and opt-in (ADR-0011, spec A10, R15).
+
+### 2026-10-26 08:51 CDT: Phase 01: Repository foundation & governance (✅ Complete)
+- **Timeline:** started 2026-10-26 08:50 CDT (claim commit 792294d) · finished 2026-10-26 08:51 CDT · merged MERGED_TS
+- Built: LICENSE (MIT), NOTICE, THIRD_PARTY_NOTICES, README, SECURITY (S1–S5), CONTRIBUTING, CODE_OF_CONDUCT (Contributor Covenant 2.1 by reference), CHANGELOG, .gitignore, .editorconfig, `.github/` (bug and feature issue templates, PR template, Dependabot for github-actions and uv, placeholder CI), `docs/PHX_ARCHITECTURE.md` skeleton. Private repo `antonizick/PhaseHypervisor` created (visibility checked) and `main` pushed.
+- Deviations: the prompt's copyright holder "Nick Antoncic" is a misspelling; the licence and notices use "Nick Antonizick" (the owner's name per git config and email). Owner question 1 was already decided (MIT), so no default was needed. No ADR needed.
+- Follow-ups: Phase 02 replaces the placeholder CI and fills THIRD_PARTY_NOTICES with dev tools; prompt 01 should have its copyright spelling fixed (left as is, historical).
+- Tests: none in scope. Every Markdown link in the new files resolves (scripted check); `gh repo view antonizick/PhaseHypervisor --json visibility` is checked at close-out.

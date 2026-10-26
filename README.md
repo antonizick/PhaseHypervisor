@@ -15,6 +15,7 @@ PHX is built with its own method. Work is split into phases in [PHX_IMPLEMENTATI
 | [PHX_IMPLEMENTATION_PLAN.md](PHX_IMPLEMENTATION_PLAN.md) | Phase table, status, owner questions, phase log |
 | [docs/PHX_DECISIONS.md](docs/PHX_DECISIONS.md) | Architecture decision records |
 | [docs/PHX_ARCHITECTURE.md](docs/PHX_ARCHITECTURE.md) | Components and control flow |
+| [docs/PHX_AUTO_MODE_CONTRACT.md](docs/PHX_AUTO_MODE_CONTRACT.md) | Hands-off `/phase NN --auto` contract (version 1) shared by PHX and every phase command |
 | [CLAUDE.md](CLAUDE.md) | Rules for AI agents working in this repo |
 
 ## Usage

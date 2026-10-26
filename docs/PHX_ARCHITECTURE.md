@@ -43,4 +43,10 @@ verify independently (plan status on main, merge, tests, docs)
 gate (auto continues · review/owner pauses) ─► next phase, or stop when none remain
 ```
 
+## Interface with phase sessions
+PHX and a phase session talk only through the repo and one line of output, defined in [PHX_AUTO_MODE_CONTRACT.md](PHX_AUTO_MODE_CONTRACT.md) (contract version 1, Phase 03):
+- **In:** `/phase NN --auto` plus `PHX_AUTO=1`. The command must carry `PHX-CONTRACT: 1`.
+- **Out:** the plan on `main` (`✅`, or `⛔` with an Owner question whose Status starts with `Open`), the phase branch/worktree, and a final `PHX-RESULT: {json}` line with status `complete`, `blocked` or `refused`. The line is a hint; verification decides.
+- **Locks:** `${XDG_RUNTIME_DIR}/phx/phx.lock` and `<repo-name>.lock`, held with `flock` for the supervisor's life, so a manual `/phase` can see a running supervisor and stop.
+
 See [PHX_SPECIFICATION.md](PHX_SPECIFICATION.md) for the requirements behind each step and [PHX_DECISIONS.md](PHX_DECISIONS.md) for the decisions.

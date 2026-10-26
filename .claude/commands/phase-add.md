@@ -12,7 +12,7 @@ a planning Phase Log entry, ADRs for any decisions made now, the vault note, and
   prints nothing. If not, stop and tell Nick (another agent may be mid-claim).
 - Read `CLAUDE.md`, `PHX_IMPLEMENTATION_PLAN.md` (from `main`, including the Phase Log and owner questions),
   `prompts/PHX_shared-instructions.md`, `docs/PHX_DECISIONS.md` (the list of ADR titles plus any the request touches),
-  `docs/PHX_SPECIFICATION.md` §15 (amendments), and the **most recent phase prompt** as a style reference.
+  the Amendments section of `docs/PHX_SPECIFICATION.md`, and the **most recent phase prompt** as a style reference.
 
 ## 1. Intake
 **No argument (`$ARGUMENTS` is empty): interview Nick before anything else.** Never guess the request.
@@ -68,7 +68,7 @@ a planning Phase Log entry, ADRs for any decisions made now, the vault note, and
 
 ## 4. Write
 1. **Prompt** `prompts/PHX_phase-<ID>-<slug>.md`, in the same structure as the other prompts:
-   - header line (model and `/model` command, Depends on, branch, worktree);
+   - header line (model and `/model` command, Depends on, branch, worktree, and `· **Gate:** <value>` if the plan has a Gate column);
    - context (one paragraph: why this phase exists);
    - **Read first**;
    - **Nick's request (verbatim intent, TIMESTAMP)**;
@@ -82,7 +82,7 @@ a planning Phase Log entry, ADRs for any decisions made now, the vault note, and
    - **Phase-specific docs**;
    - "Then the standard close-out checklist."
 2. **`PHX_IMPLEMENTATION_PLAN.md`:**
-   - add the row in ID order with `⬜ Not started`;
+   - add the row in ID order with `⬜ Not started` and, if the table has a `Gate` column, a Gate cell (`auto` unless the phase publishes or needs a human check: `review`; or needs Nick's hands: `owner`). Put the same value in the prompt header as `· **Gate:** <value>`;
    - rewire dependents;
    - update the dependency graph and the "Last updated" line;
    - add any owner questions;
@@ -99,7 +99,7 @@ a planning Phase Log entry, ADRs for any decisions made now, the vault note, and
   prompt's "Depends on" matches the table; no `{{` remains; `/phase status` logic would list the new phase
   in the right order.
 - Commit only the planning files to `main`: `git commit -m "docs(plan): add phase <ID> (<title>)" -- <files>`.
-  This is **not** a claim. **Never push.**
+  This is **not** a claim. Push `main` afterwards if a remote exists (standing git authority).
 
 ## Naming and timestamps
 Use the project prefix `PHX_` on every new project document (the prompt file is

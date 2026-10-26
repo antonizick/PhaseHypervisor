@@ -15,6 +15,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0009 | 2026-10-26 08:35 CDT | Headless usage-limit stop is recognisable from stream-json/exit status | Proposed (verify in 05) | 00 |
 | ADR-0010 | 2026-10-26 08:35 CDT | Python ≥ 3.12, standard library only at runtime | Accepted (2026-10-26 08:55 CDT, Phase 02) | 00, 02 |
 | ADR-0011 | 2026-10-26 08:41 CDT | PHX is additive and opt-in; manual /phased-project and /phase stay unchanged and fully supported | Accepted | 00 |
+| ADR-0012 | 2026-10-26 09:05 CDT | Hands-off `/phase` contract version 1, with a `refused` outcome and a lock checked by `flock` | Accepted | 03 |
 
 ---
 
@@ -97,3 +98,22 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 - Manual and PHX runs can alternate on one plan at any phase boundary, and never run at once (spec R15).
 - Making PHX the default needs a future ADR.
 **Consequences.** Phase 03 must prove interactive `/phase` is unchanged with auto mode off. Phase 09 must not alter manual flows in migrated repos. Phase 10 includes a manual-to-PHX-to-manual handover test. The user guide documents both ways of working side by side.
+
+## ADR-0012: Hands-off phase contract, version 1
+**Recorded.** 2026-10-26 09:05 CDT (Phase 03)
+**Context.** PHX runs `/phase NN --auto` in headless sessions and must know, without asking anyone, how the command behaves and how it reports. Spec R3, R4, R5, R12 and R15 set the outline; Phase 03 had to make it exact enough for Phases 04–07 to implement against, and portable to every phased project through the skill templates.
+**Decision.** [`docs/PHX_AUTO_MODE_CONTRACT.md`](PHX_AUTO_MODE_CONTRACT.md) is the normative contract, version `1`, marked in each command by a `PHX-CONTRACT: 1` line. Choices beyond the spec text:
+- **A third result status, `refused`** (spec R5 lists `complete` and `blocked`). Preconditions the interactive command answers with "say so and stop" (unmet dependency, phase already complete, Gate `owner`, claim impossible, no phase ID) change nothing, so they must not look like a block; otherwise PHX's R6 repair would commit a `⛔` for a phase nobody claimed. Two more required keys, `pushed` and `question_ids` (from the phase prompt), plus `contract`.
+- **Every block records a question**, including technical failures, so `phx answer` always has something to answer and `question_ids` is never empty for `blocked`.
+- **Open questions** are those whose Status cell starts with `Open`; question IDs are carried as strings.
+- **Lock check by `flock`**, not by PID: PHX holds an exclusive `flock` on `${XDG_RUNTIME_DIR:-/run/user/$UID}/phx/<repo-name>.lock` for its whole life, and the command tests it with `flock -n -s`. A crashed supervisor leaves no live lock, so stale files are harmless. `flock` is util-linux, present on the reference machine, so `phx` need not be installed.
+- **`/phase status` with a supervisor running** shows the notice and still prints the table (the phase prompt said every form stops; status changes nothing, and is most useful exactly then).
+- **Resuming a blocked phase** in auto mode is a separate `chore(plan): resume phase NN` commit that closes the Timeline's blocked interval, followed by `git merge main` in the worktree.
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Contract with `refused`, `flock` lock check (chosen) | Unambiguous for the verifier; stale locks harmless; no `phx` install needed | One more status for 05/06 to handle |
+| B. Two statuses only, preconditions reported as `blocked` | Matches spec R5 text | `blocked` would sometimes mean "nothing claimed", forcing the verifier to guess |
+| C. PID file checked with `kill -0` | No `flock` needed | PID reuse gives false positives; a crashed supervisor's file looks live |
+
+**Consequences.** Phase 04 parses `Open` and the marker; Phase 05 parses the result line including `refused`; Phase 06 pauses on `refused` without repair; Phase 07 implements the locks exactly as §8. Phase 09 copies the template sections into MM3, CL, OCC and YTPL2. Interactive `/phase` is unchanged apart from step 0 (verified by diff in Phase 03). A change an older reader would misread needs contract version 2 and a new ADR.

@@ -11,13 +11,14 @@ After any phase session ends, PHX decides from the **repo itself** what actually
 ## Tasks
 1. `verify.py`: `verify_phase(repo, phase_id, classification) -> Verdict`, implementing every R6 check against `main` (status, merge, branch deleted, worktree removed, Phase Log entry with Timeline bullet, clean `main`, test command passes on a temporary clean checkout of `main`, never in the user's working tree). Each check reports pass/fail/skip with evidence.
 2. Reconcile the agent's `PHX-RESULT` with the verdict; disagreement → `needs_review` with both shown.
-3. Safe repairs only: if the agent blocked but did not commit `⛔` to `main`, commit it (`chore(plan): phase NN blocked (recorded by phx)`). Nothing else is auto-fixed.
+3. Safe repairs only: if the agent blocked (its result line says `blocked`, or the phase branch has a `wip(phase-NN): blocked` commit) but did not commit `⛔` to `main`, commit it (`chore(plan): phase NN blocked (recorded by phx)`). Nothing else is auto-fixed.
 4. `recover.py` decision table (document it in the architecture doc):
 
    | Situation | Action |
    |---|---|
    | complete + verified | next phase |
    | blocked + question recorded | pause, notify |
+   | refused (contract §2 precondition; nothing changed) | pause with the reason; no repair |
    | usage_limit | wait (07) then `--resume` same session |
    | timeout / crash, work in progress | one `--resume` of the same session with "continue the phase" prompt, then a fresh `/phase NN --auto`, then pause |
    | auth_error / provider_error | pause, notify (no retries that could burn credit) |

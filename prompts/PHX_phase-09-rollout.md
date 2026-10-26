@@ -11,8 +11,8 @@ Every existing phased project (MeetingMaster3 `MM3`, ChessLoop `CL`, OCC `OCC`, 
 ## Tasks
 1. For each repo under `/home/nick/Work` that has a `*IMPLEMENTATION_PLAN.md` and `.claude/commands/phase.md` (find them; expect the four above), check it is idle: no `🔄` row on `main`, no `phase-*` worktrees, `main` clean. **Skip any repo that isn't idle** and record it as a follow-up (it can be migrated later with `phx`'s migration notes).
 2. In each idle repo, as one commit `chore(phx): adopt hands-off phase contract` on `main`:
-   - `phase.md`: add the auto-mode section and `PHX-CONTRACT: 1`, keeping repo-specific wording (e.g. MM3's ADR references).
-   - shared instructions: block-with-question pointers; close-out merge item per ADR-0004.
+   - `phase.md`: add step 0 (PHX check), the trigger paragraph, the "Hands-off mode" section and `PHX-CONTRACT: 1` from the skill's `templates/phase-command.md`, keeping repo-specific wording (e.g. MM3's ADR references).
+   - shared instructions: §1 step 4 and step 6 pointers, the new §1b from the template, the `PHX-RESULT` note in the final-message item; close-out merge item per ADR-0004.
    - `CLAUDE.md`: ADR-0004 git rule replaces "Never push…" (keep any stricter repo-specific rule and flag it to Nick rather than loosening it silently); Risk rule section.
    - plan: add the Gate column (`auto` by default; `review` for release/publication phases such as MM3 Phase 16) and its legend.
    - an ADR in that repo's decisions log recording the adoption, linking to ADR-0004 here.

@@ -14,6 +14,7 @@ phx = "phx.cli:main"
 
 [dependency-groups]
 dev = [
+    "coverage>=7.6",
     "mypy>=1.13",
     "pre-commit>=4.0",
     "pytest>=8.3",
@@ -43,3 +44,11 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 strict = true
 python_version = "3.12"
 files = ["src"]
+
+[tool.coverage.run]
+branch = true
+source = ["phx"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

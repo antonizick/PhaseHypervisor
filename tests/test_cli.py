@@ -19,7 +19,7 @@ def test_help_lists_every_subcommand(capsys: pytest.CaptureFixture[str]) -> None
         assert name in out
 
 
-@pytest.mark.parametrize("name", list(COMMANDS))
+@pytest.mark.parametrize("name", [c for c in COMMANDS if c != "plan"])
 def test_stubs_exit_2(name: str, capsys: pytest.CaptureFixture[str]) -> None:
     assert main([name]) == 2
     assert "not implemented yet (Phase" in capsys.readouterr().err

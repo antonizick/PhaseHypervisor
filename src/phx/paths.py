@@ -46,12 +46,16 @@ def load_config(repo: Path) -> Config:
     path = repo / ".phx" / "config.toml"
     if not path.is_file():
         return Config()
-    with path.open("rb") as fh:
-        data: dict[str, Any] = tomllib.load(fh)
+    return parse_config(path.read_text(encoding="utf-8"), str(path))
+
+
+def parse_config(text: str, source: str) -> Config:
+    """Parse config TOML ``text``; ``source`` names it in error messages."""
+    data: dict[str, Any] = tomllib.loads(text)
     known = {f.name: f for f in fields(Config)}
     unknown = sorted(set(data) - set(known))
     if unknown:
-        raise ValueError(f"{path}: unknown config keys: {', '.join(unknown)}")
+        raise ValueError(f"{source}: unknown config keys: {', '.join(unknown)}")
     defaults = Config()
     for key, value in data.items():
         expected = type(getattr(defaults, key))
@@ -61,5 +65,5 @@ def load_config(repo: Path) -> Config:
         if isinstance(value, bool) and expected is not bool:
             ok = False
         if not ok:
-            raise ValueError(f"{path}: {key} must be {expected.__name__}")
+            raise ValueError(f"{source}: {key} must be {expected.__name__}")
     return Config(**data)

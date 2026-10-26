@@ -10,7 +10,7 @@ Prove PHX on real sessions and real tokens, measure what it costs, and fix what 
 
 ## Tasks
 1. **Dry run:** `phx run --dry-run` against each migrated repo; confirm the planned actions are right.
-2. **Sample plan:** bootstrap a throwaway plan `/home/nick/Work/tries/phx-pilot/` (prefix `PXP`, 3 tiny phases on `haiku`/`sonnet`, e.g. write a function, its tests, its docs; no remote). Run `phx preflight` (real, interactive, short) then `phx run --detach`. Include:
+2. **Sample plan:** (`tests/fixtures/plans/sample/` from Phase 04 is a parser fixture with a stub `phase.md`; it can seed this plan, but the real `phase.md` must come from the skill template.) Bootstrap a throwaway plan `/home/nick/Work/tries/phx-pilot/` (prefix `PXP`, 3 tiny phases on `haiku`/`sonnet`, e.g. write a function, its tests, its docs; no remote). Run `phx preflight` (real, interactive, short) then `phx run --detach`. Include:
    - one phase whose prompt deliberately requires an owner answer (→ block, `phx answer`, `phx resume`);
    - a forced interruption (`phx stop` mid-phase, then `phx resume`, which must continue the same session);
    - a simulated usage limit: point PHX at the Phase 05 fake for one launch via config, or, if a real limit occurs naturally, record it.

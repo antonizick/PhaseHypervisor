@@ -15,6 +15,7 @@ Every existing phased project (MeetingMaster3 `MM3`, ChessLoop `CL`, OCC `OCC`, 
    - shared instructions: §1 step 4 and step 6 pointers, the new §1b from the template, the `PHX-RESULT` note in the final-message item; close-out merge item per ADR-0004.
    - `CLAUDE.md`: ADR-0004 git rule replaces "Never push…" (keep any stricter repo-specific rule and flag it to Nick rather than loosening it silently); Risk rule section.
    - plan: add the Gate column (`auto` by default; `review` for release/publication phases such as MM3 Phase 16) and its legend.
+   - check with `phx plan <repo>` before and after: same next phase, no new problems, `Contract: 1` afterwards. CL's test line yields only its planning-repo check (`shellcheck lab/**/*.sh`, ADR-0013); flag to Nick whether CL needs a `.phx/config.toml` `test_command`.
    - an ADR in that repo's decisions log recording the adoption, linking to ADR-0004 here.
    - its Obsidian project note: a timestamped log line.
    - push if the repo has a remote (ADR-0004).

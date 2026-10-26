@@ -11,5 +11,6 @@ Development tools are used to build and test the project, are not redistributed 
 | pytest | 9.1.1 | MIT | tests |
 | ruff | 0.17.2 | MIT | lint and format |
 | mypy | 2.4.0 | MIT | strict type checks |
+| coverage | 7.17.0 | Apache-2.0 | branch coverage (Phase 04) |
 | pre-commit | 4.7.0 | MIT | git hooks |
 | detect-secrets | 1.5.0 (pre-commit hook) | Apache-2.0 | secret scan |

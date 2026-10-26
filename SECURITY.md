@@ -9,7 +9,7 @@ Please do not open a public issue. Email nick@antonizick.com with a description,
 ## Security baseline (spec §4.3, S1–S5)
 - **S1, bypass permissions are local-only.** PHX runs only on the owner's machine, in repos under `/home/nick/Work`, and refuses to run as root. Phase sessions are confined to their repo and worktree by the `/phase` rules, and a risk-stop rule makes an agent stop and ask (or block the phase with the question recorded) when an action looks high-risk or irreversible.
 - **S2, no secret leakage.** Everything written to logs passes through a redaction step, and PHX never reads or copies `~/.config/ai-provider/openrouter.key` itself.
-- **S3, untrusted content.** Repo content, plan text and agent output are treated as data. PHX parses them with strict patterns and never evaluates them or passes them unquoted to a shell.
+- **S3, untrusted content.** Repo content, plan text and agent output are treated as data. PHX parses them with strict patterns and never evaluates them or passes them unquoted to a shell. The plan parser (Phase 04) only reads `main` through `git` with argument lists, matches text with regular expressions, and never runs a command found in a plan (the test command is only extracted; Phase 06 decides how to run it).
 - **S4, one writer.** A machine-wide lock plus a per-repo lock prevent two supervisors, or two phases of one repo, from running at once.
 - **S5, irreversible actions stay human.** Making a repository public, publishing a release and force-pushing shared history always stop for the owner.
 

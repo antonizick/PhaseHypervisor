@@ -15,11 +15,14 @@ PHX is built with its own method. Work is split into phases in [PHX_IMPLEMENTATI
 | [PHX_IMPLEMENTATION_PLAN.md](PHX_IMPLEMENTATION_PLAN.md) | Phase table, status, owner questions, phase log |
 | [docs/PHX_DECISIONS.md](docs/PHX_DECISIONS.md) | Architecture decision records |
 | [docs/PHX_ARCHITECTURE.md](docs/PHX_ARCHITECTURE.md) | Components and control flow |
+| [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md) | How to use `phx` (grows with each phase) |
 | [docs/PHX_AUTO_MODE_CONTRACT.md](docs/PHX_AUTO_MODE_CONTRACT.md) | Hands-off `/phase NN --auto` contract (version 1) shared by PHX and every phase command |
 | [CLAUDE.md](CLAUDE.md) | Rules for AI agents working in this repo |
 
 ## Usage
-The `phx` command exists as a skeleton (Phase 02): `phx --help` lists the subcommands, and each one exits with "not implemented yet (Phase NN)" until its phase lands (`plan` in 04, `run` and friends in 07, `preflight` in 08).
+`phx plan [<repo>] [--json]` (Phase 04) parses a phased-project repo read-only, from `main`, and prints its phase table with model aliases, Gates and live branches/worktrees, the next eligible phase, resume candidates, drift, open owner questions, the `PHX-CONTRACT` version and the test command. See [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md).
+
+The other subcommands still exit with "not implemented yet (Phase NN)" until their phase lands (`run` and friends in 07, `preflight` in 08).
 
 ## Development setup
 ```bash
@@ -28,6 +31,7 @@ uv run phx --help
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src
+uv run coverage run -m pytest && uv run coverage report   # branch coverage
 uv run pre-commit install    # ruff + detect-secrets on each commit
 ```
 The runtime needs no install: `cd src && python3 -m phx --version` works on any Python 3.12+.

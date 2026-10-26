@@ -16,6 +16,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0010 | 2026-10-26 08:35 CDT | Python ≥ 3.12, standard library only at runtime | Accepted (2026-10-26 08:55 CDT, Phase 02) | 00, 02 |
 | ADR-0011 | 2026-10-26 08:41 CDT | PHX is additive and opt-in; manual /phased-project and /phase stay unchanged and fully supported | Accepted | 00 |
 | ADR-0012 | 2026-10-26 09:05 CDT | Hands-off `/phase` contract version 1, with a `refused` outcome and a lock checked by `flock` | Accepted | 03 |
+| ADR-0013 | 2026-10-26 09:21 CDT | Plan parser heuristics: Gate outside eligibility, ⛔ exempt from drift, first-clause test command, publishing inference, config read from main | Accepted | 04 |
 
 ---
 
@@ -117,3 +118,21 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | C. PID file checked with `kill -0` | No `flock` needed | PID reuse gives false positives; a crashed supervisor's file looks live |
 
 **Consequences.** Phase 04 parses `Open` and the marker; Phase 05 parses the result line including `refused`; Phase 06 pauses on `refused` without repair; Phase 07 implements the locks exactly as §8. Phase 09 copies the template sections into MM3, CL, OCC and YTPL2. Interactive `/phase` is unchanged apart from step 0 (verified by diff in Phase 03). A change an older reader would misread needs contract version 2 and a new ADR.
+
+## ADR-0013: Plan parser heuristics
+**Recorded.** 2026-10-26 09:21 CDT (Phase 04)
+**Context.** `phx.plan` must read four real plans written over several months (MM3, CL, OCC, YTPL2) and every future one, without ever changing them. The phase prompt, spec R6/R12 and contract §3/§7 leave a few rules open.
+**Decision.**
+- **Gate is not part of eligibility.** `next_eligible` returns the lowest ⬜ phase with deps ✅ and no open question needed by it, and carries its Gate; the supervisor (Phase 07) decides what `review`/`owner` mean. Keeps "what is next" identical to `/phase next`.
+- **`⛔ Blocked` rows are exempt from "branch or worktree without a claim" drift.** `/phase status` flags any `phase-NN-*` branch whose row is not `🔄`, but block-with-question (contract §4.2) keeps the branch and worktree on purpose. Flagging them would make every block look like drift.
+- **Test command = the first clause** of the shared instructions' "Tests, lint and type checks pass" line: backticked spans, skipping anything in parentheses, up to the first `;` or `.` outside backticks. On the real plans this yields PHX's four `uv run` commands, OCC/YTPL2 `make check`, CL `shellcheck lab/**/*.sh` (its product checks live in another repo; CL needs a `.phx/config.toml` `test_command` if it is ever run hands-off), MM3 none. A `.phx/config.toml` `test_command` on `main` wins.
+- **Publishing inference (R12)** is a conservative regex: "make/turn the repo public", "public GitHub repo", "GitHub release/publication", "publish(ed) a release", "publish(ed) to/on GitHub" (not "ready to publish on GitHub"), "create a release", `gh release create`. It matches every release prompt of the four repos and PHX 12; the only extra hit is PHX 04's own prompt, which has an explicit Gate. A false positive costs one pause; an explicit Gate always wins.
+- **Everything is read from `main`** with `git show main:<path>`: the plan, prompts (for Gate), shared instructions, `.claude/commands/phase.md` and `.phx/config.toml` (new `paths.parse_config`). A phase branch or a dirty working tree never changes what PHX sees.
+- **Problems vs errors.** Malformed IDs, duplicate IDs, short rows, missing required columns, unreadable status and bad Gate cells raise `PlanError` (the plan cannot be trusted). Zero/two status icons, icon/word disagreement, an unknown model on a phase that is not complete, a dependency not in the table and a missing prompt are listed in `Plan.problems` and shown by `phx plan`; `Phase.require_alias()` raises `UnknownModel` before a launch (R2).
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Heuristics above (chosen) | Correct on all five real plans; no plan needs editing; explicit settings always win | Heuristics can misread an unusual plan (shown in `phx plan` output) |
+| B. Require explicit Gate and test-command settings in every plan | Exact | Every existing plan needs edits before `phx plan` works; contradicts ADR-0011's "unchanged" spirit |
+
+**Consequences.** Phase 06 runs `Plan.test_commands` (a tuple) and reports CL-style plans whose real checks are elsewhere; Phase 07 applies Gates after `next_eligible`; Phase 09 may add Gate columns and a CL `.phx/config.toml` when migrating.

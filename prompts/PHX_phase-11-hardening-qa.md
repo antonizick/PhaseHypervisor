@@ -11,7 +11,7 @@ PHX is safe to leave running: the threat model is written down, risks are mitiga
 ## Tasks
 1. `docs/PHX_THREAT_MODEL.md`, covering:
    - bypassed permissions;
-   - prompt injection through repo text, plan rows, phase prompts or tool output steering a phase agent or the triage/preflight sessions;
+   - prompt injection through repo text, plan rows, phase prompts or tool output steering a phase agent or the triage/preflight sessions (Phase 08: the preflight prompt quotes clipped lead sentences and question cells from `main` into an appended system prompt, between « » and marked as data; the session is interactive with normal permissions; `phx preflight --record` commits only `.phx/preflight.json`; ADR-0017);
    - PHX itself parsing hostile plan text (S3), including the shell-free test-command interpreter in `phx.verify` (ADR-0015: quoting, globs, `cd` confinement) and the tool-less triage prompt in `phx.triage`;
    - secrets in logs and session transcripts;
    - lock and state races;

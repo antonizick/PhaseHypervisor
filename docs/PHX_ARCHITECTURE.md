@@ -1,6 +1,6 @@
 # PHX Architecture
 
-> Skeleton from Phase 01; Phase 02, 04, 05, 06 and 07 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
+> Skeleton from Phase 01; Phase 02, 04, 05, 06, 07 and 08 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
 
 ## Components
 | Component | Module (planned) | Phase | Role |
@@ -11,12 +11,12 @@
 | Session runner | `runner.py`, `classify.py` | 05 | launch via `ai-provider run -p`, stream-json capture, exit classification |
 | Verifier and recovery | `verify.py`, `recover.py`, `triage.py` | 06 | independent post-phase checks, blocked-status repair, retry/resume |
 | Supervisor | `supervisor.py`, `locks.py`, `state.py`, `notify.py`, `vault.py`, `detach.py` | 07 | `phx run / status / resume / stop / log / answer`, locks, state, waits, notifications, detached runs, vault summary |
-| Preflight | `preflight.py` | 08 | one interactive question sweep before a hands-off run |
+| Preflight | `preflight.py`, `prompts/PHX_preflight.md` | 08 | one interactive question sweep before a hands-off run; staleness check in `phx run` |
 
 ## Phase 02 modules (built)
 | Module | Role |
 |---|---|
-| `cli.py`, `__main__.py` | argparse entry point. Global flags `--state-dir`, `-v/--verbose`, `--version`. The `COMMANDS` table maps each subcommand to its help text and the phase that implements it; stubs print `not implemented yet (Phase NN)` and exit 2. |
+| `cli.py`, `__main__.py` | argparse entry point. Global flags `--state-dir`, `-v/--verbose`, `--version`. The `COMMANDS` table maps each subcommand to its help text and the phase that implements it (all implemented since Phase 08). |
 | `paths.py` | `default_state_root()` (`$XDG_STATE_HOME/phx`, else `~/.local/state/phx`), `state_dir(repo)`, `sessions_dir()`, and `load_config(repo)` reading `<repo>/.phx/config.toml` into the frozen `Config` dataclass (`test_command`, `max_budget_usd`, `poll_interval_s`, `limit_poll_interval_s`, `triage`, from Phase 05 `idle_timeout_s`, `wall_timeout_s`, from Phase 06 `test_timeout_s`). Unknown keys or wrong types raise `ValueError`. `parse_config(text, source)` parses TOML text from anywhere (Phase 04 reads it from `main`). |
 | `logging.py` | `EventLog(path)`: one redacted JSON object per line (`ts` as `YYYY-MM-DD HH:MM:SS TZ`, `epoch`, `event`, `phase`, `reason`, extra fields), a single `O_APPEND` write plus `fsync` per record (safe for concurrent appenders), optional human-readable stderr mirror. |
 | `redact.py` | `redact()` / `redact_text()`: `sk-or-…`, `sk-ant-…`, `ANTHROPIC_AUTH_TOKEN=…`, `ANTHROPIC_API_KEY=…`, `Authorization: Bearer …`, `ghp_`/`gho_`/`github_pat_` tokens, in strings and nested JSON. Every `EventLog` write goes through it. |
@@ -176,6 +176,35 @@ Supervisor.run
 Phase 05/06 additions used here: `run_session(cancel=…, on_start=…)`; `classify(timed_out="stopped")` → `timeout` kind `stopped`; `plan.set_question_status`.
 
 Test doubles: `tests/fakes/fake_agent.py` makes the fake `claude` a scripted phase agent (`PHX_FAKE_AGENT=<scenario.json>`: per phase a list of actions `complete`, `block:Q`, `limit[:s]`, `crash`, `hang`, `refuse`, `noop`; `probe` and `triage` keys) that claims, works in a worktree, merges or blocks for real; `tests/fakes/notify-send` records calls; `PHX_FAKE_PROVIDER_FILE` lets a test flip `ai-provider get` mid-wait.
+
+## Phase 08: preflight (`preflight.py`, `prompts/PHX_preflight.md`, built)
+```
+phx preflight <repo>                    (cli._cmd_preflight; --dry-run, --check, --record)
+  prepare: load_plan(main) → check_can_start (no supervisor lock, on main, no 🔄, something left)
+           remaining phases → prompts from main → scan_leads (regex, no model call)
+           relevant_questions (open, or deferred to a remaining phase) · freshness · gather_facts
+           assemble_prompt = prompts/PHX_preflight.md + "Context for this run" → state/preflight/prompt-….md (0600)
+  launch:  ai-provider run --model opus --session-id <uuid> --name "phx preflight <repo>"
+             --append-system-prompt-file <prompt> "<kickoff>"     (interactive, cwd = main checkout,
+           no PHX_AUTO, no ANTHROPIC_MODEL, Nick's own permission mode)
+  session: asks Nick → plan (Owner questions, Gate column) + ADRs → docs(plan): phx preflight <TS>
+           → phx preflight --record → .phx/preflight.json committed (chore(phx): record preflight <TS>)
+  after:   preflight_end event with the record's freshness
+
+phx run → Supervisor._loop first round → _check_preflight(plan) → warning | End(failed) with --require-preflight
+```
+
+| Piece | Role |
+|---|---|
+| `phase_fingerprint` / `plan_fingerprints` | sha256 of each row's definition: ID, name, model, dependencies, prompt path, and the Gate only when the column or prompt header sets it. Status is excluded, so completing phases never makes a preflight stale. |
+| `check_freshness(plan, text)` → `Freshness` | `fresh`, `missing`, `stale` (rows added, removed or changed; plan file renamed; an open owner question the record never saw) or `invalid`; `rule` is `preflight_missing`, `preflight_stale` or `preflight_invalid`. |
+| `scan_leads` | Joins hard-wrapped lines into paragraphs, splits sentences, tags them `publishing`, `ask`, `credential`, `spend`, `manual`, `risk`; ranks publishing/ask first; clips to 240 characters around the match. `suggest_gate` turns leads into a proposed Gate. |
+| `assemble_prompt` | Static instructions plus the context: repo, contract, spec/decisions paths, previous preflight, remaining phases with current and suggested Gate, questions on file, up to 20 leads per phase, facts, the record command (`sys.executable -m phx … --record --session-id …`). |
+| `prepare` / `launch` | Refusals, prompt file, argv and env (`build_env(auto=False)`); `launch` runs the session with inherited stdio and logs `preflight_launch` / `preflight_end`. |
+| `record` / `build_record` | Writes `.phx/preflight.json` (`version`, `recorded`, `phx`, `plan_file`, `plan_hash`, `base_commit`, `covered`, `phases`, `questions`, `open_questions`, `unresolved`, `session_id`) from `main`, commits only that file, pushes when `origin` exists. |
+| `base_prompt` | The packaged `phx/PHX_preflight.md` (wheel, via hatch `force-include`), else `prompts/PHX_preflight.md` of the editable checkout. |
+
+Test double: the fake `claude` started without `-p` acts as the preflight session (`PHX_FAKE_EXPECT` asserts strings in the appended prompt, `PHX_FAKE_PREFLIGHT_RECORD=1` runs the record command, `PHX_FAKE_PROMPT_COPY` keeps the prompt).
 
 ## Interface with phase sessions
 PHX and a phase session talk only through the repo and one line of output, defined in [PHX_AUTO_MODE_CONTRACT.md](PHX_AUTO_MODE_CONTRACT.md) (contract version 1, Phase 03):

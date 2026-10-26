@@ -14,13 +14,13 @@ Every existing phased project (MeetingMaster3 `MM3`, ChessLoop `CL`, OCC `OCC`, 
    - `phase.md`: add step 0 (PHX check), the trigger paragraph, the "Hands-off mode" section and `PHX-CONTRACT: 1` from the skill's `templates/phase-command.md`, keeping repo-specific wording (e.g. MM3's ADR references).
    - shared instructions: §1 step 4 and step 6 pointers, the new §1b from the template, the `PHX-RESULT` note in the final-message item; close-out merge item per ADR-0004.
    - `CLAUDE.md`: ADR-0004 git rule replaces "Never push…" (keep any stricter repo-specific rule and flag it to Nick rather than loosening it silently); Risk rule section.
-   - plan: add the Gate column (`auto` by default; `review` for release/publication phases such as MM3 Phase 16) and its legend.
+   - plan: add the Gate column (`auto` by default; `review` for release/publication phases such as MM3 Phase 16) and its legend. (A later `phx preflight` can also add or change Gates, ADR-0017; adding the column here keeps the migration self-contained. Adding the column makes every row's Gate explicit, which changes the rows' preflight fingerprints, so a preflight recorded before the migration turns stale; run preflights after migrating.)
    - check with `phx plan <repo>` before and after: same next phase, no new problems, `Contract: 1` afterwards. CL's test line yields only its planning-repo check (`shellcheck lab/**/*.sh`, ADR-0013); flag to Nick whether CL needs a `.phx/config.toml` `test_command`.
    - an ADR in that repo's decisions log recording the adoption, linking to ADR-0004 here.
    - its Obsidian project note: a timestamped log line.
    - push if the repo has a remote (ADR-0004).
 3. Run `phx plan <repo>` on each migrated repo and confirm it reports `PHX-CONTRACT: 1` and the expected next phase.
-4. Add a user-level slash command `~/.claude/commands/phx.md` (`/phx status|run|preflight [repo]`) that runs the CLI and summarises its output, so Nick can drive PHX from inside Claude Code. Document it in the user guide.
+4. Add a user-level slash command `~/.claude/commands/phx.md` (`/phx status|run|preflight [repo]`) that runs the CLI and summarises its output, so Nick can drive PHX from inside Claude Code. Document it in the user guide. (Phase 08 note: `phx preflight` opens an *interactive* Claude Code session and refuses without a terminal, so `/phx preflight` cannot host it; have it run `phx preflight <repo> --check` and `--dry-run`, summarise the remaining phases and leads, and tell Nick to run `phx preflight <repo>` in a terminal or as `! phx preflight <repo>`. ADR-0017.)
 5. Update the skill's "Adopting the system in an existing repo" section with a "Migrating to the hands-off contract" checklist (the steps above), and mirror it in the playbook note.
 6. Update the PHX tests' fixture copies of these plans to their migrated versions.
 

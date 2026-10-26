@@ -1,6 +1,6 @@
 # PHX User Guide
 
-PHX runs the remaining phases of a phased-project plan for you, one at a time, each in a fresh headless Claude Code session on the model the plan names, and checks each phase itself. It is optional (ADR-0011): manual `/phase` keeps working exactly as before, and you can switch between the two at any phase boundary. `phx preflight` (asking every foreseeable question up front) arrives in Phase 08.
+PHX runs the remaining phases of a phased-project plan for you, one at a time, each in a fresh headless Claude Code session on the model the plan names, and checks each phase itself. It is optional (ADR-0011): manual `/phase` keeps working exactly as before, and you can switch between the two at any phase boundary. `phx preflight` asks every question it can foresee up front, so the run that follows stops as rarely as possible.
 
 ## Install
 ```bash
@@ -12,6 +12,7 @@ The install follows the repo's main checkout, so merged phases take effect witho
 ## Quick start
 ```bash
 phx plan ~/Work/YTPL2              # what PHX sees: next phase, Gates, open questions
+phx preflight ~/Work/YTPL2         # one interactive session: answer what the rest will need
 phx run ~/Work/YTPL2 --dry-run     # what it would run, in order; launches nothing
 phx run ~/Work/YTPL2 --detach      # run hands-off in the background
 phx status ~/Work/YTPL2            # where it is, what it waits for, tokens and cost so far
@@ -19,9 +20,29 @@ phx log ~/Work/YTPL2 -f            # follow every decision as it happens
 ```
 The repo must carry the hands-off contract (`PHX-CONTRACT: 1` in `.claude/commands/phase.md`; Phase 09 migrates the existing projects) and live under `~/Work` (spec S1; the variable `PHX_WORK_ROOT` overrides that root).
 
+## `phx preflight`: answer the foreseeable questions first
+```bash
+phx preflight [<repo>]             # interactive session on opus, in the repo's main checkout
+phx preflight [<repo>] --dry-run   # build the session prompt and print the command; launch nothing
+phx preflight [<repo>] --check     # is the recorded preflight still current? (exit 0 yes, 3 no)
+```
+A preflight is one interactive Claude Code session (through `ai-provider run`, so it follows Super+Alt+A) that reads the plan, the spec's Amendments and the prompts of every phase not yet `✅ Complete` (not the code, to keep tokens down). It lists everything a hands-off session would otherwise stop for: open or deferred owner questions, "ask Nick" or "confirm" instructions, keys and logins, spending, manual or hardware checks, publishing, and risky steps. It checks the prerequisites it can check cheaply (tools on PATH, `gh auth status`, whether key files **exist**; it never reads them) and asks you in rounds of up to four questions, recommended answer first. Then it:
+- writes each answer into the Owner questions table (`Decided <TS>: … (phx preflight)`) and, for real decisions, an ADR;
+- proposes a Gate for every remaining phase (`review` for publishing, spending or manual-check phases, `owner` where you must act yourself) and writes the ones you confirm (adding the `Gate` column if the plan has none);
+- commits `docs(plan): phx preflight <TS>` to `main` and pushes;
+- runs `phx preflight --record`, which writes `.phx/preflight.json` (time, a fingerprint of the phase table, the phases covered, what was left unresolved), commits it and pushes.
+
+Before the session starts, PHX does the free part itself: it refuses if a phase is `🔄 In progress` (preflight runs between phases; see `phx status`), if a supervisor is running on the repo, if the main checkout is not on `main`, or if every phase is complete. It lists the remaining phases with a suggested Gate and the questions already on file, scans the remaining prompts for leads ("ask Nick", publishing, keys, spend, manual checks), and checks `git`, `gh`, `uv`, `docker` and `gh auth status`. All of that goes into the session prompt, which is saved (mode 0600) in `~/.local/state/phx/<repo>/preflight/` and passed with `--append-system-prompt-file`. The session runs with your normal permission settings, not bypassed, because you are there.
+
+Publishing is never pre-approved: making a repo public, publishing a release or force-pushing still needs your yes at that moment (spec S5). The preflight records the details (owner, name, visibility…) so the phase only has to ask "go?", and gives such a phase a `review` Gate.
+
+**Mid-plan:** a preflight covers only the phases not yet complete, so you can run one at any phase boundary, for example after `/phase-add`.
+
+**Staleness:** `phx run` checks `.phx/preflight.json` on `main` before starting. It warns (or, with `--require-preflight`, refuses) when there is none, or when it is stale: a phase row was added, removed or redefined (name, model, dependencies, prompt, Gate) since, or an owner question is open that the preflight never saw. Completing phases and answering questions do not make it stale. `phx status <repo>` shows the same line.
+
 ## `phx run`: run a plan hands-off
 ```bash
-phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--dry-run]
+phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--dry-run] [--require-preflight]
 ```
 Each round, PHX re-reads the plan from `main` and picks, in this order:
 1. a usage-limit wait left by an earlier run (it finishes the wait, then resumes that session);
@@ -37,6 +58,7 @@ Options:
 - `--until NN`: run up to and including NN, start nothing later, then finish.
 - `--max-phases N`: finish after N phases complete in this run.
 - `--dry-run`: print the phases it would run in order (assuming each completes), with the exact launch command, and where it would stop. Launches nothing, takes no lock, writes no state.
+- `--require-preflight`: refuse to start (exit 1, rule `preflight_missing` or `preflight_stale`) unless a current preflight is recorded. Without it, PHX only warns.
 
 Exit status: `0` finished (nothing left, or `--until`/`--max-phases` reached), `1` error (another supervisor running, plan or contract problem, repo outside `~/Work`, internal error), `3` paused, `4` stopped.
 
@@ -106,6 +128,8 @@ At the end of every run (finished, paused or stopped), PHX appends one line to t
 - **"another phx supervisor holds the … lock"**: one supervisor at a time per machine. `phx status` shows which; `phx stop <that repo>` stops it.
 - **"repo not yet migrated"**: the repo's `phase.md` lacks `PHX-CONTRACT: 1` (Phase 09).
 - **"run is paused"**: see "When a run pauses"; `phx resume` clears it.
+- **"no preflight recorded" / "preflight … is stale"**: run `phx preflight <repo>`; the warning names what changed. Ignore it if you'd rather let phases block on their own questions.
+- **`phx preflight` says "needs an interactive terminal"**: it opens a normal Claude Code session; run it in a terminal (`--dry-run` works anywhere).
 - **"is outside …/Work"**: PHX runs only repos under `~/Work` (spec S1).
 - **A warning about the test command**: verification runs it without a shell; set `test_command` in `.phx/config.toml` to a script (ADR-0015).
 - **The detached unit is gone**: it is collected when it ends; `phx log` and `phx status` still have everything. `journalctl --user -u phx-<repo>` shows its stdout.

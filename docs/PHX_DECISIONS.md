@@ -20,6 +20,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0014 | 2026-10-26 10:20 CDT | Session runner and classifier: signal priority, `no_result` class, OpenRouter 429 as provider error, allowlisted provider snapshot, context-free probe | Accepted | 05 |
 | ADR-0015 | 2026-10-26 15:33 CDT | Verifier and recovery: shell-free test commands, verdict outcomes, retry ladder, live sessions in the main checkout, tool-less triage | Accepted | 06 |
 | ADR-0016 | 2026-10-26 16:28 CDT | Supervisor: pauses cleared only by `phx resume`, suspend-safe limit waits, graceful stop, detach env allowlist, work-root guard, `uv tool install --editable` | Accepted | 07 |
+| ADR-0017 | 2026-10-26 16:59 CDT | Preflight: interactive launch with an appended system-prompt file, PHX-built context, `--record` fingerprint and staleness rules, no pre-approved publishing | Accepted | 08 |
 
 ---
 
@@ -216,3 +217,25 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 
 **Consequences.** Phase 08 adds the preflight staleness warning where the test-command warnings are emitted (first loop iteration). Phase 10's simulated limit must run in the foreground or through shims, because a detached unit does not receive `PHX_FAKE_*` variables. Phase 11 threat-models the work-root override, the detach allowlist and the `phx answer` write path. Spec amendment R19.
 
+## ADR-0017: Preflight session, record and staleness
+**Recorded.** 2026-10-26 16:59 CDT (Phase 08)
+**Context.** Spec R13 asks for one interactive session on the strongest model that asks Nick everything foreseeable for the rest of a plan, records the answers and Gates, and commits; `phx run` warns when no preflight has run since the plan last changed. The prompt leaves open how the session is started interactively, how much PHX does itself, what "the plan last changed" means when every phase changes the status column, and what a preflight may decide about publishing.
+**Decision.**
+- **Launch:** `ai-provider run --model opus --session-id <uuid> --name "phx preflight <repo>" --append-system-prompt-file <prompt> "<kickoff>"`, interactive (no `-p`), in the main checkout. Verified on Claude Code 2.1.310 without tokens: the flag is parsed on an interactive start (a missing file fails with "Append system prompt file not found" before any UI or API call; an unknown flag fails with "unknown option"), and the binary's help text for it carries no "only works with --print" note, unlike the subagent variant. The kickoff is a short first message so the session starts at once. No `PHX_AUTO` (the session must ask), no `ANTHROPIC_MODEL`, and no `--permission-mode`: Nick is present, so his own permission settings apply.
+- **PHX does the free part:** it refuses when a supervisor holds the repo lock, the checkout is off `main`, a phase is `🔄` (offering `phx status`) or every phase is `✅`; it lists the remaining phases with a suggested Gate, the open questions and the **deferred** ones a remaining phase needs (MM3's Q3/Q5 style), heuristic leads from the remaining prompts (regex, ranked, clipped, quoted as data), and `git`/`gh`/`uv`/`docker`/`gh auth status` checks. The session reads only the plan, `CLAUDE.md`, the spec's Amendments, the ADR index and the remaining prompts.
+- **Record by command, not by the agent:** the session runs `phx preflight --record` (exact command in its prompt, `sys.executable -m phx`), which computes the fingerprint from `main` and commits only `.phx/preflight.json`. An agent-written hash would not match PHX's.
+- **Staleness = the plan's definition changed, not its progress.** A fingerprint per phase row covers ID, name, model, dependencies, prompt path and an explicitly set Gate; status and inferred/default Gates (which follow prompt edits that phases make routinely) are left out. The record also lists the question IDs it saw. Stale when a row was added, removed or changed, the plan file was renamed, or an owner question is open that the record never saw.
+
+| Option for "the plan changed" | Pros | Cons |
+|---|---|---|
+| A. Row-definition fingerprint + unseen open questions (chosen) | Completing phases and answering questions keep it fresh; `/phase-add`, re-planned rows and new hand-written questions make it stale; reasons name the phases | A question raised and answered by a block is not flagged (by design: it was handled) |
+| B. Hash of the whole phase table and questions | Simple | Stale after every phase (the Status column) and every answer: the warning would always fire |
+| C. Git history since the record (commits touching the table) | Exact "since" | Needs history walks and diff parsing of Markdown tables; same Status-column problem |
+
+- **Publishing is never pre-approved (S5, ADR-0004).** A preflight records the details (owner, name, visibility, topics) and proposes a `review` Gate for publishing, spending and manual-check phases (`owner` where Nick must act himself); the phase still asks for the yes at that moment and blocks with the question in hands-off mode.
+- **Gate column:** a preflight may add the `Gate` column (last column, a value in every row) to a plan that has none, per contract §7.
+- **`--require-preflight`** ends the run as `failed` (exit 1) before anything is launched, with rule `preflight_missing`, `preflight_stale` or `preflight_invalid`; without it PHX logs a `warning` with the same rule and carries on. It is not a sticky pause: nothing about the run needs resuming.
+- **Packaging:** the prompt lives in `prompts/PHX_preflight.md` (a project document) and is force-included into the wheel as `phx/PHX_preflight.md`; an editable install reads the repo copy.
+- `phx preflight` does not apply the S1 work-root check: it bypasses no permissions and Nick is at the keyboard. It refuses to run as root.
+
+**Consequences.** Phase 09's `/phx` slash command cannot host an interactive preflight inside a running Claude Code session; it should print `phx preflight <repo>` for Nick to run in a terminal (or run `--dry-run`/`--check`). Phase 10 runs the first real preflight and measures its tokens (the interactive session writes no PHX transcript; its session ID is in `run.jsonl`). Phase 11's threat model covers the preflight prompt's quoted repo text and the `--record` write path.

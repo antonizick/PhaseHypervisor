@@ -49,6 +49,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 **Recorded.** 2026-10-26 08:35 CDT (Phase 00)
 **Context.** Nick's standing instruction: agents may always push, merge and commit to GitHub without asking; he has technical controls in place. He chose to apply this to all phased projects, not only PHX runs.
 **Decision.** Agents commit, merge, push and create **private** GitHub repos without asking. Making a repo public, publishing a GitHub release and force-pushing shared history still stop for Nick. The `phased-project` skill templates, the playbook note and the MM3, CL, OCC and YTPL2 repos are updated to match (Phases 03 and 09).
+**Update 2026-10-26 08:44 CDT.** Nick made this a global standing instruction ("never ask for authorization to merge, push or commit, ever"). It was applied straight away to `~/.claude/CLAUDE.md`, the skill and the playbook, ahead of Phase 03.
 **Consequences.** This supersedes the template rule "Never push … without Nick's explicit confirmation". Each existing repo is changed only when none of its phases is `🔄 In progress`.
 
 ## ADR-0005: Follow the ai-provider switch

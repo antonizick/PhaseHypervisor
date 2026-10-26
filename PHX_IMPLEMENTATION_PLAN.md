@@ -87,4 +87,5 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 - Findings that shaped the plan: `ANTHROPIC_MODEL`/`PRO_MODEL` would silently override phase models (R2); the `claude()` wrapper is a bash function unavailable to non-interactive launchers (R7); `/phase` has four interactive points (R3).
 - Decisions: ADR-0001 to ADR-0008 accepted; ADR-0009 (limit detection) and ADR-0010 (stdlib runtime) proposed.
 - Open: owner question 2.
+- 2026-10-26 08:44 CDT: first commit made without asking; the standing git authority was applied to the global CLAUDE.md, the skill templates and the playbook now (ahead of Phase 03, per Nick).
 - 2026-10-26 08:41 CDT: Nick answered owner question 1 (MIT) and set PHX as additive and opt-in (ADR-0011, spec A10, R15).

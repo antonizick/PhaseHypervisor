@@ -5,6 +5,8 @@
 ## Read first
 `CLAUDE.md`, `prompts/PHX_shared-instructions.md`, spec §3 and §4.2 R3, R4, R5, R12, §4.1 A3, A4, A5. ADR-0003, ADR-0004, ADR-0008. The skill at `~/.claude/skills/phased-project/` (SKILL.md and every template) and the playbook `/home/nick/Documents/04 Resources/Claude Code Phased Project Method.md`. MeetingMaster3's `.claude/commands/phase.md` and `prompts/MM3_shared-instructions.md` as the reference implementation. Phase Log entry for 01.
 
+> **Note (2026-10-26 08:44 CDT):** the ADR-0004 git wording was already applied to the skill (`SKILL.md` "Git authority" section, templates `CLAUDE`, `_shared-instructions`, `IMPLEMENTATION_PLAN`, `phase-add-command`), the playbook and Nick's global `~/.claude/CLAUDE.md` during planning, at Nick's request. Verify it, keep it consistent, and don't redo it. The rest of this phase is unchanged.
+
 ## Goal
 Define the hands-off mode of `/phase` precisely and make it, plus the new risk and git/GitHub rules, part of Nick's standard method. After this phase, every newly bootstrapped project supports `phx`. Existing repos are migrated in Phase 09.
 

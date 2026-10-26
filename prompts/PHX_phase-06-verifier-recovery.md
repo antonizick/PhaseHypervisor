@@ -19,9 +19,12 @@ After any phase session ends, PHX decides from the **repo itself** what actually
    | complete + verified | next phase |
    | blocked + question recorded | pause, notify |
    | refused (contract §2 precondition; nothing changed) | pause with the reason; no repair |
+   | no_result (clean end, no valid `PHX-RESULT` line; Phase 05, ADR-0014) | verify; act on the verdict as if the line said what the repo shows |
    | usage_limit | wait (07) then `--resume` same session |
    | timeout / crash, work in progress | one `--resume` of the same session with "continue the phase" prompt, then a fresh `/phase NN --auto`, then pause |
    | auth_error / provider_error | pause, notify (no retries that could burn credit) |
+
+   Phase 05 note: `phx.runner.run_session(...)` returns a `SessionOutcome` whose `classification` (`phx.classify.Classification`: `cls`, `reason`, `reset_at`, `kind`, `result`) drives this table. `provider_error.kind` is `credits`, `rate_limited`, `server`, `budget`, `invalid_request` or `unknown`; `timeout.kind` is `idle` or `wall`. Fakes: put `tests/fakes` first on the child env's `PATH`, set `HOME` to a temp dir, choose the stream with `PHX_FAKE_STREAM` (fixtures in `tests/fixtures/streams/`).
    | verification failed | pause with report |
 5. Stale and orphan handling for R14: a `🔄` row whose worktree has no live Claude process (check `/proc` for a `claude` process with that cwd) is resumable; one with a live process means pause ("another session is running phase NN").
 6. `triage.py`: on `blocked`, `needs_review` or verification failure, optionally (config, default on) run one `haiku` session that reads the phase's final messages and the verdict and writes a ≤ 150-word plain-English summary for the notification and run log. Capped by `--max-turns` and logged with its cost.

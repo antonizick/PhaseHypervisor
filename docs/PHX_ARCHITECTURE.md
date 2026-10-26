@@ -1,6 +1,6 @@
 # PHX Architecture
 
-> Skeleton from Phase 01; Phase 02 and 04 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
+> Skeleton from Phase 01; Phase 02, 04 and 05 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
 
 ## Components
 | Component | Module (planned) | Phase | Role |
@@ -17,7 +17,7 @@
 | Module | Role |
 |---|---|
 | `cli.py`, `__main__.py` | argparse entry point. Global flags `--state-dir`, `-v/--verbose`, `--version`. The `COMMANDS` table maps each subcommand to its help text and the phase that implements it; stubs print `not implemented yet (Phase NN)` and exit 2. |
-| `paths.py` | `default_state_root()` (`$XDG_STATE_HOME/phx`, else `~/.local/state/phx`), `state_dir(repo)`, `sessions_dir()`, and `load_config(repo)` reading `<repo>/.phx/config.toml` into the frozen `Config` dataclass (`test_command`, `max_budget_usd`, `poll_interval_s`, `limit_poll_interval_s`, `triage`). Unknown keys or wrong types raise `ValueError`. `parse_config(text, source)` parses TOML text from anywhere (Phase 04 reads it from `main`). |
+| `paths.py` | `default_state_root()` (`$XDG_STATE_HOME/phx`, else `~/.local/state/phx`), `state_dir(repo)`, `sessions_dir()`, and `load_config(repo)` reading `<repo>/.phx/config.toml` into the frozen `Config` dataclass (`test_command`, `max_budget_usd`, `poll_interval_s`, `limit_poll_interval_s`, `triage`, and from Phase 05 `idle_timeout_s`, `wall_timeout_s`). Unknown keys or wrong types raise `ValueError`. `parse_config(text, source)` parses TOML text from anywhere (Phase 04 reads it from `main`). |
 | `logging.py` | `EventLog(path)`: one redacted JSON object per line (`ts` as `YYYY-MM-DD HH:MM:SS TZ`, `epoch`, `event`, `phase`, `reason`, extra fields), a single `O_APPEND` write plus `fsync` per record (safe for concurrent appenders), optional human-readable stderr mirror. |
 | `redact.py` | `redact()` / `redact_text()`: `sk-or-…`, `sk-ant-…`, `ANTHROPIC_AUTH_TOKEN=…`, `ANTHROPIC_API_KEY=…`, `Authorization: Bearer …`, `ghp_`/`gho_`/`github_pat_` tokens, in strings and nested JSON. Every `EventLog` write goes through it. |
 
@@ -49,6 +49,40 @@ Errors vs problems: anything that makes the plan untrustworthy (malformed or dup
 
 Runtime state lives outside the repo in `~/.local/state/phx/<repo-name>/` (`run.jsonl`, `state.json`, `sessions/`). Per-repo overrides: `<repo>/.phx/config.toml`.
 
+## Phase 05: session runner and exit classifier (`runner.py`, `classify.py`, built)
+```
+run_session(repo, state, phase, prompt, alias, log, config, resume?) ──► SessionOutcome
+  find_launcher       ai-provider on PATH → ~/.local/bin/ai-provider ($HOME of the given env) → claude (logged warning, R7)
+  provider_snapshot   `ai-provider get`; on OpenRouter `ai-provider env` parsed in memory against an allowlist → mapped model
+  build_argv          <launcher> -p <prompt> --model <alias> --permission-mode bypassPermissions
+                      --output-format stream-json --verbose (--session-id <uuid> | --resume <id>)
+                      [--max-turns N] [--max-budget-usd X  (OpenRouter + config only, R9)]
+  build_env           + PHX_AUTO=1, − ANTHROPIC_MODEL
+  Popen               cwd = repo main checkout, own process group, stdin /dev/null
+  stream loop         stdout lines → redacted → sessions/<phase>-<n>.jsonl; JSON events → on_event (heartbeat), last 20 kept,
+                      `result` remembered; stderr → redacted 50-line tail
+  timeouts            idle (no event for idle_timeout_s) / wall (wall_timeout_s) → SIGTERM group, SIGKILL after 10 s
+  classify(...)       → Classification;  Usage.from_result(result) → tokens, cost, durations, per-model usage
+  run.jsonl           `launch` (argv, cwd, session, transcript, provider, mapped model, budget, timeouts),
+                      `launcher_fallback`, `timeout`, `session_end` (class, reason, reset_at, kind, result line, tokens, cost)
+probe(state, log) ──► Classification   `-p ok --model haiku --max-turns 1`, cwd = state dir, no PHX_AUTO,
+                                        clean answer = complete (R8)
+```
+
+`classify(exit_code, result, last_events, stderr_tail, *, timed_out, provider, expect_result_line, now)` is pure. Priority (ADR-0014): timeout → when the session ended in error: rejected `rate_limit_event` / `You've hit your …` → `usage_limit` (reset from `resetsAt`, else `parse_reset` of the text, local aware datetime) → `rate_limit`/429 (`usage_limit` without reset on Pro, `provider_error(rate_limited)` on OpenRouter) → `auth_error` → `provider_error` (`budget`, `credits`, `server`, `invalid_request`, `unknown`) → `crash` for other error subtypes; when it ended cleanly: the `PHX-RESULT` line (`parse_result_line`, contract §6, last line wins, malformed = none) → `complete`/`blocked`/`refused`, else `no_result`; no `result` event: `auth_error` if stderr says so, else `crash`.
+
+| Class | Meaning | Typical next step (Phases 06/07) |
+|---|---|---|
+| `complete` / `blocked` / `refused` | the session's own result line | verify (R6) |
+| `no_result` | ended cleanly, no valid line | verify |
+| `usage_limit` | Pro window exhausted; `reset_at` if known, `kind` = limit type | wait, probe, `--resume` (ADR-0006) |
+| `auth_error` | login expired / bad key | notify Nick, stop |
+| `provider_error` | `credits`, `rate_limited`, `server`, `budget`, `invalid_request`, `unknown` | retry or stop by kind |
+| `timeout` | `idle` or `wall` | recover/resume |
+| `crash` | no result event, signal, `error_during_execution`, max turns | recover/resume |
+
+Test doubles: `tests/fakes/claude` replays a fixture (`PHX_FAKE_STREAM`, `PHX_FAKE_EXIT`, `PHX_FAKE_DELAY`, `PHX_FAKE_HANG`, `PHX_FAKE_STDERR`, `PHX_FAKE_IGNORE_TERM`, `PHX_FAKE_ARGV_LOG`) and enforces `--verbose`; `tests/fakes/ai-provider` answers `get` (`PHX_FAKE_PROVIDER`), `env` (`PHX_FAKE_ENV`) and `run` (execs the fake claude). Put `tests/fakes` first on the child's `PATH` and set its `HOME` to a temp dir. Fixtures and their provenance: `tests/fixtures/streams/README.md`.
+
 ## Control flow of `phx run`
 ```
 phx run <repo>
@@ -60,7 +94,7 @@ parse plan on main ──► pick next eligible phase (status ⬜, deps ✅, gat
 ai-provider run -p "/phase NN --auto"   (model alias from the plan; fresh session)
   │        └─ usage limit? ─► wait, notify, resume same session
   ▼
-classify exit (done / blocked / limit / failure)
+classify exit (complete / blocked / refused / no_result / usage_limit / auth / provider / timeout / crash)
   │
   ▼
 verify independently (plan status on main, merge, tests, docs)

@@ -22,3 +22,16 @@ The output has:
 - **Problems** (⚠️): things that look wrong but don't stop parsing, such as a status cell with no icon or two, an icon that disagrees with its word, an unknown model on a phase still to run, a dependency not in the table, or a prompt file missing on `main`.
 
 Exit status: `0` when the plan was read, `1` with `phx plan: <reason>` when it cannot be (no plan on `main`, a malformed phase ID or row, a duplicate ID, a missing column, an unreadable status, an unknown Gate value, an invalid `.phx/config.toml`).
+
+## Per-repo settings (`.phx/config.toml`)
+Optional, committed on `main`, never containing secrets. Unknown keys or wrong types are an error.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `test_command` | from the shared instructions | Command(s) verification runs on `main` (Phase 06) |
+| `max_budget_usd` | none | Passed as `--max-budget-usd` **only when the provider is OpenRouter** (spec R9) |
+| `idle_timeout_s` | `1800` | A phase session that emits no stream event for this long is stopped (SIGTERM, then SIGKILL) and classified `timeout` (Phase 05) |
+| `wall_timeout_s` | `21600` | Hard cap on one phase session (Phase 05) |
+| `poll_interval_s`, `limit_poll_interval_s`, `triage` | `300`, `900`, `true` | Supervisor timing and haiku triage (Phases 06/07) |
+
+Session transcripts land in `~/.local/state/phx/<repo-name>/sessions/<phase>-<n>.jsonl` (redacted), and every launch and its classified ending in `run.jsonl` beside it.

@@ -345,12 +345,12 @@ def classify(
                 kind=kind or "unknown",
                 api_error=detail,
             )
-        if result is not None:
-            return Classification(
-                ExitClass.CRASH,
-                f"session ended with {subtype or 'an error'}: {text[:200]}".rstrip(": "),
-                kind=subtype,
-            )
+        # Only an error result without any API signal is left here.
+        return Classification(
+            ExitClass.CRASH,
+            f"session ended with {subtype or 'an error'}: {text[:200]}".rstrip(": "),
+            kind=subtype,
+        )
 
     if result is not None:
         line = parse_result_line(str(result.get("result") or ""))

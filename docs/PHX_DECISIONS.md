@@ -12,11 +12,12 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0006 | 2026-10-26 08:35 CDT | On a Pro usage limit: wait, notify, auto-resume the same session; never auto-switch provider | Accepted | 00 |
 | ADR-0007 | 2026-10-26 08:35 CDT | Strictly one phase at a time | Accepted | 00 |
 | ADR-0008 | 2026-10-26 08:35 CDT | No default milestone checkpoints; per-phase Gate (auto/review/owner) and `--pause-after` | Accepted | 00 |
-| ADR-0009 | 2026-10-26 08:35 CDT | Headless usage-limit stop is recognisable from stream-json/exit status | Proposed (verify in 05) | 00 |
+| ADR-0009 | 2026-10-26 08:35 CDT | Headless usage-limit stop is recognisable from stream-json/exit status | Accepted (2026-10-26 10:20 CDT, Phase 05) | 00, 05 |
 | ADR-0010 | 2026-10-26 08:35 CDT | Python ≥ 3.12, standard library only at runtime | Accepted (2026-10-26 08:55 CDT, Phase 02) | 00, 02 |
 | ADR-0011 | 2026-10-26 08:41 CDT | PHX is additive and opt-in; manual /phased-project and /phase stay unchanged and fully supported | Accepted | 00 |
 | ADR-0012 | 2026-10-26 09:05 CDT | Hands-off `/phase` contract version 1, with a `refused` outcome and a lock checked by `flock` | Accepted | 03 |
 | ADR-0013 | 2026-10-26 09:21 CDT | Plan parser heuristics: Gate outside eligibility, ⛔ exempt from drift, first-clause test command, publishing inference, config read from main | Accepted | 04 |
+| ADR-0014 | 2026-10-26 10:20 CDT | Session runner and classifier: signal priority, `no_result` class, OpenRouter 429 as provider error, allowlisted provider snapshot, context-free probe | Accepted | 05 |
 
 ---
 
@@ -78,11 +79,20 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 **Decision.** No blocking milestone checkpoints by default. An optional per-phase Gate (`auto` default, `review` pauses after the phase, `owner` won't start the phase) and `phx run --pause-after NN`. A desktop notification after every phase, and a summary in the vault note after every run.
 **Consequences.** Errors could pile up between Nick's reviews; independent verification (spec R6) and the stop-on-risk rule limit this.
 
-## ADR-0009: Headless usage-limit stops are recognisable (Proposed)
+## ADR-0009: Headless usage-limit stops are recognisable (Accepted)
 **Recorded.** 2026-10-26 08:35 CDT (Phase 00)
 **Context.** The exact message, exit code and reset-time format of a headless Pro usage-limit stop have not been verified.
 **Decision (proposed).** Phase 05 collects real or documented samples, writes the classifier against them with fixtures, and falls back to timed back-off probes when no reset time can be parsed.
 **Consequences.** Until verified, the back-off path is the safety net.
+
+**Accepted 2026-10-26 10:20 CDT (Phase 05), with evidence.** Verified against Claude Code 2.1.310 on this machine:
+1. **Stream shape (real, captured).** A failed API call in `-p --output-format stream-json --verbose` mode ends with a synthetic `assistant` event (`message.model: "<synthetic>"`, top-level `error` kind and `is_api_error_message: true`) followed by a `result` event with `subtype: "success"`, `is_error: true`, `terminal_reason: "api_error"`, `api_error_status` (HTTP status or `null`) and the message in `result`. Exit code 1. Captured against a closed port and against a local fake API answering 429 (`error: "rate_limit"`, `api_error_status: 429`); no tokens spent.
+2. **Pro limit text (real).** `~/.claude/projects` transcripts contain the subscriber stops verbatim, stored with `error: "rate_limit"` and `apiErrorStatus: 429`: `You've hit your session limit · resets 7:40pm (America/Chicago)` (2026-10-12, 2026-10-21). Also real: `Login expired · Please run /login` (`authentication_failed`), OpenRouter `API Error: 402 … requires more credits`, `Connection lost mid-response` (`server_error`).
+3. **Templates (documented, from the binary).** The message is `You've hit your <limit>[ · resets <when>][ · progress saved]`. `<limit>` is `session limit` (five_hour), `weekly limit` (seven_day), `Opus limit`, `Sonnet limit`, `Fable limit`, `usage credit limit`, `usage limit` and others. `<when>` is `7:40pm`/`10pm` within 24 h, else `Oct 28, 9am` (with `, 2027` when the year differs), followed by ` (IANA zone)`. Fast mode says `resets in 3h 20m`.
+4. **Machine-readable signal (real).** The stream also carries `{"type":"rate_limit_event","rate_limit_info":{"status":"allowed|allowed_warning|rejected","resetsAt":<epoch seconds>,"rateLimitType":"five_hour|seven_day|…",…}}`. Seen live (`status: "allowed"`, with `unifiedWindows`) in the Phase 05 probe on Pro (one `haiku` call, 24,371 tokens, $0.0032 notional).
+5. **Docs/web.** No official page documents the headless limit output; issue reports quote the same `You've hit your session limit · resets …` text.
+
+**So:** the classifier uses a `rejected` `rate_limit_event`'s `resetsAt` first, then the `You've hit your …` text (reset parsed in its own zone, returned in local time), then `error: rate_limit` / 429 without a reset time, which triggers the back-off probes. Fixtures in `tests/fixtures/streams/` are labelled real, real-text, documented or synthetic (see its README). Residual risk: Anthropic can change the wording; the event and 429 paths still catch it, without a reset time.
 
 ## ADR-0010: Standard-library-only runtime (Accepted)
 **Recorded.** 2026-10-26 08:35 CDT (Phase 00)
@@ -136,3 +146,23 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | B. Require explicit Gate and test-command settings in every plan | Exact | Every existing plan needs edits before `phx plan` works; contradicts ADR-0011's "unchanged" spirit |
 
 **Consequences.** Phase 06 runs `Plan.test_commands` (a tuple) and reports CL-style plans whose real checks are elsewhere; Phase 07 applies Gates after `next_eligible`; Phase 09 may add Gate columns and a CL `.phx/config.toml` when migrating.
+
+## ADR-0014: Session runner and exit classifier design
+**Recorded.** 2026-10-26 10:20 CDT (Phase 05)
+**Context.** Phase 05 builds `phx.runner` and `phx.classify` (spec R7–R10). The prompt lists eight exit classes and leaves the precedence between signals, the OpenRouter case and the probe's footprint open.
+**Decision.**
+- **Signal priority:** timeout → (session ended in error) rejected `rate_limit_event` or `You've hit your …` text → `rate_limit`/429 → auth (`authentication_failed`, 401/403, `/login` text) → `--max-budget-usd` stop → credit (`billing_error`, 402) → server (`server_error`, 5xx) → rejected request (`invalid_request`, 400) → other API error → otherwise the `PHX-RESULT` line → no `result` event = `crash`. An API error that the session recovered from (a normal assistant message came after it, clean `result`) is ignored.
+- **A ninth class, `no_result`:** the session ended cleanly but without a valid result line. Calling that `complete` or `crash` would mislead; contract §6 says verification decides, so Phase 06 treats it as "verify".
+- **A 429 on OpenRouter is `provider_error(rate_limited)`**, not `usage_limit`: Pro limits are waited out (ADR-0006); OpenRouter throttling is not a Pro window.
+- **Provider snapshot:** `ai-provider get` each launch; on OpenRouter `ai-provider env` is parsed in memory against an allowlist of non-secret variables (base URL, model mappings, token caps). The rest of that output, including the key, is dropped unread and never logged.
+- **Probe:** `-p ok --model haiku --max-turns 1` through the same launcher, in the state directory and without `PHX_AUTO`, classified with `expect_result_line=False` (a clean answer = `complete`).
+- **Timeouts:** `idle_timeout_s` (default 1800) and `wall_timeout_s` (21600) in `.phx/config.toml`; the session runs in its own process group (`start_new_session`), SIGTERM then SIGKILL after 10 s.
+- **`--verbose` is mandatory** with `-p --output-format stream-json` (2.1.310 exits 1 without it).
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Nine classes with `no_result` (chosen) | Honest; Phase 06 can tell "agent forgot the line" from a crash | One class more than the prompt listed |
+| B. Map a missing line to `crash` | Matches the prompt's list | A finished, merged phase would look like a crash and trigger needless recovery |
+
+**Consequences.** Phases 06/07 handle `no_result` by verifying. The probe still loads the user's global `CLAUDE.md` and system prompt (~24k mostly cached tokens per probe); Phase 10 may measure whether `--safe-mode` makes it cheaper without changing auth.
+

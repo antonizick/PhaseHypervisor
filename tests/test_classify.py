@@ -294,3 +294,39 @@ def test_real_rate_limit_event_shape_when_rejected() -> None:
     c = classify(1, result, [*events[:-1], result], now=NOW)
     assert c.cls is ExitClass.USAGE_LIMIT and c.kind == "five_hour"
     assert c.reset_at == epoch_to_local(event["rate_limit_info"]["resetsAt"])
+
+
+def test_validate_rejects_non_object() -> None:
+    from phx.classify import _validate_result
+
+    assert _validate_result([1, 2]) is None
+
+
+def test_parse_reset_unknown_zone_falls_back_to_local() -> None:
+    got = parse_reset("You've hit your session limit · resets 11pm (Mars/Olympus_Mons)", NOW)
+    assert got is not None and got.astimezone().hour == 23
+
+
+def api_end(text: str, error: str | None, status: int | None) -> Any:
+    err = {"type": "assistant", "error": error, "is_api_error_message": True,
+           "message": {"content": [{"type": "text", "text": text}]}}  # fmt: skip
+    result = {"type": "result", "subtype": "success", "is_error": True,
+              "api_error_status": status, "result": text}  # fmt: skip
+    return classify(1, result, [err, result])
+
+
+def test_invalid_request_and_unknown_api_errors() -> None:
+    c = api_end("API Error: Opus 5.5's safeguards flagged this message", "invalid_request", None)
+    assert c.cls is ExitClass.PROVIDER_ERROR and c.kind == "invalid_request"
+    c = api_end("API Error: 400 status code (no body)", "unknown", 400)
+    assert c.cls is ExitClass.PROVIDER_ERROR and c.kind == "unknown"
+    c = api_end("API Error: 418 teapot", None, 418)
+    assert c.cls is ExitClass.PROVIDER_ERROR and c.kind == "unknown"
+    c = api_end("API Error: 503 overloaded", None, 503)
+    assert c.kind == "server"
+
+
+def test_error_result_without_text() -> None:
+    result = {"type": "result", "subtype": "error_max_turns", "is_error": True}
+    c = classify(1, result, [result])
+    assert c.cls is ExitClass.CRASH and c.reason == "session ended with error_max_turns"

@@ -1,4 +1,6 @@
 import json
+import time
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,16 @@ STREAMS = Path(__file__).resolve().parent / "fixtures" / "streams"
 CHICAGO = ZoneInfo("America/Chicago")
 # 2026-10-26 09:30 CDT
 NOW = datetime(2026, 10, 26, 14, 30, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def _local_zone_chicago(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Reset times come back in local time; pin it so CI (UTC) sees what Nick sees."""
+    monkeypatch.setenv("TZ", "America/Chicago")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
 
 
 def load(name: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:

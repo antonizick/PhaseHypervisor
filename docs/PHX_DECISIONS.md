@@ -21,6 +21,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0015 | 2026-10-26 15:33 CDT | Verifier and recovery: shell-free test commands, verdict outcomes, retry ladder, live sessions in the main checkout, tool-less triage | Accepted | 06 |
 | ADR-0016 | 2026-10-26 16:28 CDT | Supervisor: pauses cleared only by `phx resume`, suspend-safe limit waits, graceful stop, detach env allowlist, work-root guard, `uv tool install --editable` | Accepted | 07 |
 | ADR-0017 | 2026-10-26 16:59 CDT | Preflight: interactive launch with an appended system-prompt file, PHX-built context, `--record` fingerprint and staleness rules, no pre-approved publishing | Accepted | 08 |
+| ADR-0018 | 2026-10-26 17:16 CDT | Rollout to the four existing projects: one adoption commit each, repo-specific stricter rules kept and flagged, `/phx` as a user-level command | Accepted | 09 |
 
 ---
 
@@ -239,3 +240,25 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 - `phx preflight` does not apply the S1 work-root check: it bypasses no permissions and Nick is at the keyboard. It refuses to run as root.
 
 **Consequences.** Phase 09's `/phx` slash command cannot host an interactive preflight inside a running Claude Code session; it should print `phx preflight <repo>` for Nick to run in a terminal (or run `--dry-run`/`--check`). Phase 10 runs the first real preflight and measures its tokens (the interactive session writes no PHX transcript; its session ID is in `run.jsonl`). Phase 11's threat model covers the preflight prompt's quoted repo text and the `--record` write path.
+
+## ADR-0018: Rollout to existing projects
+**Recorded.** 2026-10-26 17:16 CDT (Phase 09)
+
+**Context.** MeetingMaster3 (`MM3`), chessloopDeploy (`CL`), OCC and YTPL2 were bootstrapped before the hands-off contract. All four were idle (no `🔄` row on `main`, no `phase-*` worktree, nothing running) when Phase 09 started; MM3's main checkout had three unrelated untracked scripts (`runServer.sh`, `serverCheck.sh`, `serverTest.sh`), which were left alone and not committed.
+
+**Options considered.**
+| Option | Pros | Cons |
+|---|---|---|
+| One `chore(phx): adopt hands-off phase contract` commit per repo, only the files the migration touches (chosen) | Easy to review and to revert; never sweeps in other work | Four commits to look at |
+| Copy the skill templates over each repo's files | Uniform text | Loses repo-specific wording (ADR references, CL's product section, OCC's vault rule) |
+| Migrate only the repo about to be piloted | Smaller change now | Phase 10 and later pilots would each need a rollout first |
+
+**Decision.**
+- Each repo got the contract by inserting the template blocks into its own files (`phase.md`: marker, step 0, hands-off section; shared instructions: pointers, block-with-question section, ADR-0004 merge/push wording, `PHX-RESULT` note; `CLAUDE.md`: Risk rule and the ADR-0004 git rule; plan: Gate column, legend and a `phx` paragraph; an ADR and a vault log line). Gates: `auto` for every phase, `review` for the release or publication phase (MM3 16, CL 13, OCC 12, YTPL2 13).
+- **Stricter repo-specific rules were kept and flagged to Nick:** CL's planning repo stays local-only (no remote) and its product PRs stay under ADR-0012 (low-risk test, never changing GitHub repo settings); because CL's shared instructions already use §1b for product changes, its block-with-question section is **§1c** and its `phase.md` says so. The older rules "Never push…" (MM3, OCC, YTPL2 `CLAUDE.md` and close-out) and "Ask Nick whether to merge" (YTPL2, CL) were *not* stricter-by-design, they predate Nick's standing authority of 2026-10-26 08:44 CDT, so they were replaced by the ADR-0004 text. `/phase-add` in MM3, OCC and YTPL2 no longer says "Never push" (CL's stays: no remote).
+- CL's test line yields only its planning-repo check (`shellcheck lab/**/*.sh`, ADR-0013). Whether CL needs a `.phx/config.toml` `test_command` is left to Nick (CL is complete, so no run is planned).
+- No repo has a git remote, so nothing was pushed.
+- `~/.claude/commands/phx.md` is a user-level command (works in any repo; not a project file) and, per ADR-0017, never hosts the interactive preflight.
+- The test fixtures under `tests/fixtures/plans/` are refreshed copies of the migrated files, so tests now see `Contract: 1` and column-sourced Gates; the unmigrated path is tested with a fixture whose marker is removed.
+
+**Consequences.** `phx plan` reports `Contract: 1` and the same next phase as before for all four (MM3 16, CL none, OCC 11, YTPL2 03). Interactive `/phase` behaves as before: the differences are step 0 (stops only when a `phx` supervisor is running), the hands-off section (inert without `--auto`/`PHX_AUTO=1`) and the ADR-0004 git rules. A preflight recorded before the migration is stale. Undo per repo: `git revert` its adoption commit (MM3 `ba51654`, CL `dec549e`, OCC `2e0a7d4`, YTPL2 `2935948`).

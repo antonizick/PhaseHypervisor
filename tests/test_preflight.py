@@ -300,7 +300,7 @@ def test_mm3_acceptance_publication_caught(make_repo: RepoFactory) -> None:
         ts="2026-10-26 17:00 CDT",
     )
     row = next(line for line in text.splitlines() if line.startswith("| 16 |"))
-    assert "| review (inferred) | review (publishing) |" in row
+    assert "| review (column) | review (publishing) |" in row
     assert "| Q3 | GitHub owner, repo name, visibility | **Deferred:**" in text
     assert "| Q5 |" in text
     leads = text.split("#### Phase 16", 1)[1].split("###", 1)[0]
@@ -308,7 +308,7 @@ def test_mm3_acceptance_publication_caught(make_repo: RepoFactory) -> None:
     assert confirm.startswith("- [publishing, ask] line 39:") and "gh repo create" in confirm
     assert "decide with Nick how sources are offered" in leads  # GHCR GPL question
     assert "Firefox click-through" in leads  # a manual check: Gate, not a question
-    assert "repo not yet migrated" in text  # MM3 is migrated in Phase 09
+    assert "repo not yet migrated" not in text  # MM3 was migrated in Phase 09
     # the instructions turn those into a confirmed review Gate and no pre-approval
     assert "Use it for publishing, spending and manual-check phases" in text
     assert "never pre-approved here" in text
@@ -440,6 +440,9 @@ def test_prepare_notes_unmigrated_repo(
     make_repo: RepoFactory, env: dict[str, str], tmp_path: Path
 ) -> None:
     repo = make_repo("mm3", name="work/MM3")
+    cmd = repo / ".claude/commands/phase.md"
+    cmd.write_text(cmd.read_text().replace("PHX-CONTRACT: 1\n", ""))  # an older, unmigrated repo
+    git(repo, "commit", "-q", "-am", "unmigrate")
     prep = prepare(repo, launcher=find_launcher(env), state=tmp_path / "s", env=env, facts=[])
     assert any("not yet migrated" in n for n in prep.notes)
 

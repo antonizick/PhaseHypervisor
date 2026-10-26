@@ -18,7 +18,7 @@ phx run ~/Work/YTPL2 --detach      # run hands-off in the background
 phx status ~/Work/YTPL2            # where it is, what it waits for, tokens and cost so far
 phx log ~/Work/YTPL2 -f            # follow every decision as it happens
 ```
-The repo must carry the hands-off contract (`PHX-CONTRACT: 1` in `.claude/commands/phase.md`; Phase 09 migrates the existing projects) and live under `~/Work` (spec S1; the variable `PHX_WORK_ROOT` overrides that root).
+The repo must carry the hands-off contract (`PHX-CONTRACT: 1` in `.claude/commands/phase.md`; Phase 09 migrated MeetingMaster3, chessloopDeploy, OCC and YTPL2) and live under `~/Work` (spec S1; the variable `PHX_WORK_ROOT` overrides that root).
 
 ## `phx preflight`: answer the foreseeable questions first
 ```bash
@@ -126,7 +126,7 @@ At the end of every run (finished, paused or stopped), PHX appends one line to t
 
 ## Troubleshooting
 - **"another phx supervisor holds the … lock"**: one supervisor at a time per machine. `phx status` shows which; `phx stop <that repo>` stops it.
-- **"repo not yet migrated"**: the repo's `phase.md` lacks `PHX-CONTRACT: 1` (Phase 09).
+- **"repo not yet migrated"**: the repo's `phase.md` lacks `PHX-CONTRACT: 1`. The four existing projects were migrated in Phase 09; a newer repo gets the marker from the `phased-project` skill, an older one by the skill's "Migrating to the hands-off contract" checklist.
 - **"run is paused"**: see "When a run pauses"; `phx resume` clears it.
 - **"no preflight recorded" / "preflight … is stale"**: run `phx preflight <repo>`; the warning names what changed. Ignore it if you'd rather let phases block on their own questions.
 - **`phx preflight` says "needs an interactive terminal"**: it opens a normal Claude Code session; run it in a terminal (`--dry-run` works anywhere).
@@ -150,11 +150,25 @@ The output has:
 - **Why the others wait**: a reason for each not-started or blocked phase (dependencies not complete, open owner question, or "eligible, after NN").
 - **Drift** (⚠️): a `phase-NN-*` branch or worktree whose row is not `🔄` (a skipped claim; `⛔ Blocked` rows are exempt because a block keeps its branch), a `🔄` row with no branch or worktree (a stale claim), or a branch for a phase that is not in the table.
 - **Open owner questions**: rows whose Status cell starts with `Open`, with the phases that need them.
-- **Contract**: the `PHX-CONTRACT` version in `.claude/commands/phase.md`, or "repo not yet migrated". PHX will not run a repo without a known version (Phase 09 migrates the existing repos).
+- **Contract**: the `PHX-CONTRACT` version in `.claude/commands/phase.md`, or "repo not yet migrated". PHX will not run a repo without a known version (Phase 09 migrated the four existing repos).
 - **Test command**: from `.phx/config.toml` (`test_command = "…"`) on `main` if set, else the backticked commands of the first clause of the shared instructions' "Tests, lint and type checks pass" line, else none.
 - **Problems** (⚠️): things that look wrong but don't stop parsing, such as a status cell with no icon or two, an icon that disagrees with its word, an unknown model on a phase still to run, a dependency not in the table, or a prompt file missing on `main`.
 
 Exit status: `0` when the plan was read, `1` with `phx plan: <reason>` when it cannot be (no plan on `main`, a malformed phase ID or row, a duplicate ID, a missing column, an unreadable status, an unknown Gate value, an invalid `.phx/config.toml`).
+
+## `/phx`: drive PHX from inside Claude Code (Phase 09)
+`~/.claude/commands/phx.md` is a user-level slash command, so it works in any session and any directory:
+
+| Command | What it does |
+|---|---|
+| `/phx status [repo]` | runs `phx plan` and `phx status`, then summarises the next phase, the run state and anything that needs you (open question, pause, drift, `Contract:` not 1) |
+| `/phx preflight [repo]` | runs `phx preflight <repo> --check` and `--dry-run`, summarises the remaining phases, leads and whether the record is current, then tells you to run `phx preflight <repo>` in a terminal (or type `! phx preflight <repo>` here). The preflight itself is an *interactive* session and refuses without a terminal, so it cannot run inside another session (ADR-0017) |
+| `/phx run [repo] [--pause-after NN …]` | checks the contract and preflight, shows `phx run --dry-run`, asks you to confirm, then starts `phx run <repo> --detach` and tells you how to follow it (`phx status`, `phx log -f`, `phx stop`, `phx resume`) |
+
+`repo` is a path, a project name (`MM3`, `CL`, `OCC`, `YTPL2`) or, when left out, the repo of the current directory. The command never answers owner questions, edits a repo or stops a run unless you ask. To remove it: `rm ~/.claude/commands/phx.md`.
+
+## Migrating a repo (Phase 09)
+Repos made with the skill after 2026-10-14 already carry the contract. For an older repo, the `phased-project` skill has a "Migrating to the hands-off contract" checklist (also in the playbook note). MeetingMaster3, chessloopDeploy, OCC and YTPL2 were migrated on 2026-10-26 17:16 CDT with one `chore(phx): adopt hands-off phase contract` commit each; `phx plan <repo>` reports `Contract: 1` for all four. Run `phx preflight` after migrating: the explicit Gate column changes every row's fingerprint, so an earlier record is stale.
 
 ## Per-repo settings (`.phx/config.toml`)
 Optional, committed on `main`, never containing secrets. Unknown keys or wrong types are an error.

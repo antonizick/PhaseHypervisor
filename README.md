@@ -1,6 +1,6 @@
 # PhaseHypervisor (`phx`)
 
-> **Status: pre-release.** `phx run` (Phase 07) and `phx preflight` (Phase 08) work; rollout to existing projects (09) and real-token pilots (10) are still to come.
+> **Status: pre-release.** `phx run` (Phase 07) and `phx preflight` (Phase 08) work; the four existing projects were migrated to the hands-off contract in Phase 09; real-token pilots (10) are still to come.
 
 PhaseHypervisor is a hands-off deployer for implementation plans made with the `phased-project` method. It reads a repo's `<PREFIX>_IMPLEMENTATION_PLAN.md`, asks the owner every foreseeable question once (`phx preflight`), then runs the remaining phases one at a time. Each phase is a fresh headless Claude Code session started through `ai-provider run -p "/phase NN --auto"` on the model the plan names. PHX verifies each phase independently, waits out usage limits and resumes. The supervisor itself is a plain Python program that never calls an LLM.
 
@@ -25,6 +25,8 @@ PHX is built with its own method. Work is split into phases in [PHX_IMPLEMENTATI
 `phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--dry-run] [--require-preflight]` (Phase 07) runs the remaining phases hands-off: one `/phase NN --auto` session at a time on the plan's model, verified after each phase, waiting out usage limits (or resuming at once when you switch to OpenRouter), pausing at Gates and blocks with a desktop notification. `phx status`, `phx log [-f]`, `phx stop`, `phx answer <repo> <#> "<answer>"` and `phx resume` manage a run; `--detach` runs it as a systemd user unit. Install with `uv tool install --editable .`. See [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md).
 
 `phx preflight [<repo>]` (Phase 08) opens one interactive Claude Code session on `opus` that reads the remaining phase prompts, asks you everything it can foresee (in rounds of up to four questions, recommended answer first), records the answers and ADRs, sets Gates, and records `.phx/preflight.json`. `phx run` warns when that record is missing or stale (`--require-preflight` refuses). `--dry-run` shows the prompt and command; `--check` says whether the record is current. See [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md).
+
+`/phx status|run|preflight [repo]` (Phase 09, `~/.claude/commands/phx.md`) drives the CLI from inside a Claude Code session.
 
 ## Development setup
 ```bash

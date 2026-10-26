@@ -12,9 +12,9 @@ Read this file in full before starting any phase. Each phase prompt assumes it.
 1. Read `CLAUDE.md`, `CL_IMPLEMENTATION_PLAN.md` (including the Phase Log and Owner questions), `docs/CL_FINDINGS.md`, and the spec sections named in your phase prompt. Always read the Amendments (spec §9).
 2. Confirm that every phase listed under "Depends on" is `✅ Complete`. If one is not, stop and tell Nick.
 3. Read the Phase Log entries of the dependency phases; they may record deviations that change what you build.
-4. If an owner question this phase needs is still open, ask Nick before doing the affected work.
+4. If an owner question this phase needs is still open, ask Nick before doing the affected work. (Hands-off mode: block-with-question, §1c.)
 5. **Claim the phase on `main`** by following §1a. This is the first file change of every phase session. Do not start the Tasks until the claim is verified.
-6. If the prompt is ambiguous or contradicts the spec, prefer the spec's Amendments. If it is still unclear, ask Nick before guessing on anything user-visible or hard to reverse.
+6. If the prompt is ambiguous or contradicts the spec, prefer the spec's Amendments. If it is still unclear, ask Nick before guessing on anything user-visible or hard to reverse. (Hands-off mode: block-with-question, §1c.)
 
 ## 1a. Claiming a phase (mandatory; other agents may be running in parallel)
 Nick and other agents read the Status column from `main`. A status change made only on a phase branch, or left uncommitted in a worktree, is invisible to them. So every phase is claimed with a commit on `main` **before** any other work.
@@ -35,6 +35,23 @@ If the phase ends `⛔ Blocked`, commit that status to `main` the same way (`cho
 5. **Approval (ADR-0012):** Nick pre-approved pushing, opening and merging PRs when you are confident they are low risk (required CI green, lab run passed, nothing destructive or hard to reverse). State your risk assessment in the PR body. If you have any concern, ask Nick before `git push`, `gh pr create` or merging. PR body: summary, the findings fixed, the lab evidence paths, a test plan, and "🤖 Generated with [Claude Code](https://claude.com/claude-code)". After Nick says OK: `gh pr merge <N> --squash --delete-branch`, then update the clone's `main` and remove the worktree (`git -C /home/nick/Work/chessloop worktree remove /home/nick/Work/chessloop-phase-NN`).
 6. If Nick wants to review later, leave the PR open, mark the phase `⛔ Blocked` with reason "awaiting PR #N review", and say so. Later phases that depend on it must not start until it merges, because `curl | bash` users install from `main`.
 7. Record the PR number and merge commit in the Phase Log and in the `Fix PR` column of `docs/CL_FINDINGS.md`.
+
+## 1c. Hands-off mode: block-with-question (PhaseHypervisor contract 1)
+Applies only in hands-off mode (`/phase NN --auto` or `PHX_AUTO=1`, set only by PhaseHypervisor); manual sessions ignore this section. Wherever a manual session would ask Nick (an open owner question this phase needs, an ambiguity you must not guess, the risk rule in `CLAUDE.md`, or a failure you cannot fix within scope), do this instead, then end the session:
+1. In the worktree, commit all work on the phase branch: `wip(phase-NN): blocked, <short reason>`. Do not merge; keep the branch and worktree.
+2. In the main checkout, in `CL_IMPLEMENTATION_PLAN.md`:
+   - add an Owner questions row `| <next #> | <question> | Open (asked <TS>, Phase NN, auto mode). Proposed default: <default> | Phase NN |` (or, for an existing open question, name this phase in its Status cell and keep it `Open`);
+   - set the phase's Status to `⛔ Blocked`;
+   - add a Phase Log entry `### <TS>: Phase NN: <title> (⛔ Blocked)` with bullets: `- **Timeline:** started <claim TS> (claim commit <hash>) · blocked <TS> to (open)`, then `- **Model:** …`, then `- **Question:** #<id>: <question>`, then what is done, what remains and where to resume.
+3. Commit only that file to `main`: `git commit -m "chore(plan): phase NN blocked" -- CL_IMPLEMENTATION_PLAN.md`, and push `main` if a remote exists.
+4. In the Obsidian note: row `⛔ Blocked`, `updated:` field, and a timestamped log line naming the question.
+5. Final message: what was done, the question and its proposed default, then the `PHX-RESULT` line with `"status":"blocked"` and the question IDs (see `/phase`).
+
+A question is **open** while its Status cell starts with `Open`; `Answered …`, `Decided …` and `Deferred …` are not open.
+
+**Resuming** a `⛔ Blocked` phase in hands-off mode: if a question needed by it is still open, refuse without changing anything. Otherwise set the row to `🔄 In progress`, change `blocked <TS> to (open)` to `blocked <TS> to <TS now>` in its Timeline, commit only the plan file to `main` (`chore(plan): resume phase NN`), update the Obsidian note, then run `git merge main` in the worktree, read the answer and continue as a normal resume.
+
+**Product PRs (§1b) in hands-off mode.** Push, open and merge a product PR only when ADR-0012's low-risk test is met (required CI green, clean-VM lab run passed, nothing destructive or hard to reverse); otherwise block-with-question. Never change GitHub repo settings. The planning repo has no remote and stays local.
 
 ## 2. Target repository layout (planning repo; keep this section in sync)
 ```
@@ -86,6 +103,6 @@ Product repo layout: see its README; Phase 10 restructures `docs/`.
 - [ ] Later phase prompts corrected if your work changed their assumptions.
 - [ ] Obsidian project note updated (status icons and log line).
 - [ ] OSMods documentation updated if the host system was modified.
-- [ ] Planning work committed on the phase branch. Ask Nick whether to merge to `main`. Merge from the main checkout. Conflicts in `CL_IMPLEMENTATION_PLAN.md` and `docs/CL_FINDINGS.md` are expected when phases ran in parallel: keep every row and entry from both sides, and use the branch's final status for this phase's row. Then `git worktree remove ../chessloopDeploy-phase-NN` and `git branch -d phase-NN-<slug>`.
+- [ ] Planning work committed on the phase branch. Once the phase is `✅ Complete` and every check passes, merge it into `main` without asking (fast-forward where possible), from the main checkout. Conflicts in `CL_IMPLEMENTATION_PLAN.md` and `docs/CL_FINDINGS.md` and the changelog are expected when phases ran in parallel: keep every row and entry from both sides, and use the branch's final status for this phase's row. The planning repo has no remote and stays local, so there is nothing to push. Then `git worktree remove ../chessloopDeploy-phase-NN` and `git branch -d phase-NN-<slug>`. Do not merge a `⛔ Blocked` phase or one with failing checks. Making a repo public or publishing a release needs Nick's explicit confirmation (hands-off mode: block-with-question, §1c).
 - [ ] Product PR handled per §1b (pushed, opened and merged only with Nick's OK; or left open and the phase marked Blocked).
-- [ ] Final message to Nick: what was built, how to try it, what's next, and any open questions.
+- [ ] Final message to Nick: what was built, how to try it, what's next, and any open questions. In hands-off mode, its last line is the `PHX-RESULT` line (see `/phase`).

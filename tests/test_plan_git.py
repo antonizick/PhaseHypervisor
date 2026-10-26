@@ -58,13 +58,13 @@ def test_real_plans(
 ) -> None:
     plan = load_plan(make_repo(fixture))
     assert plan.plan_file == plan_file and plan.prefix == plan_file.split("_")[0]
-    assert plan.contract is None  # not yet migrated (Phase 09)
+    assert plan.contract == 1  # migrated by Phase 09
     assert plan.test_commands == tests
     ids = [p.id for p in plan.phases]
     assert ids == sorted(ids, key=lambda i: (int(i[:2]), i[2:]))
     assert all(p.alias in {"opus", "sonnet"} for p in plan.phases)
     rel = plan.phase(release)
-    assert (rel.gate, rel.gate_source) == (Gate.REVIEW, "inferred")
+    assert (rel.gate, rel.gate_source) == (Gate.REVIEW, "column")
     assert [q.id for q in plan.questions if q.open] == open_ids
     e = next_eligible(plan)
     assert (e.next.id if e.next else None) == next_id
@@ -288,9 +288,9 @@ def test_phx_plan_human(make_repo: RepoFactory, capsys: pytest.CaptureFixture[st
     assert main(["plan", str(repo)]) == 0
     out = capsys.readouterr().out
     assert "Next: 03" in out
-    assert "review (inferred)" in out
+    assert "review (inferred)" not in out and "review" in out
     assert "Open question #14 (needed by 04)" in out
-    assert "Contract: repo not yet migrated" in out
+    assert "Contract: 1" in out
     assert "Test command (shared-instructions): make check" in out
     assert git(repo, "rev-parse", "HEAD") == head and git(repo, "status", "--porcelain") == ""
 

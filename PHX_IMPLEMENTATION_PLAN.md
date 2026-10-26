@@ -91,7 +91,7 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 - 2026-10-26 08:41 CDT: Nick answered owner question 1 (MIT) and set PHX as additive and opt-in (ADR-0011, spec A10, R15).
 
 ### 2026-10-26 08:51 CDT: Phase 01: Repository foundation & governance (✅ Complete)
-- **Timeline:** started 2026-10-26 08:50 CDT (claim commit 792294d) · finished 2026-10-26 08:51 CDT · merged MERGED_TS
+- **Timeline:** started 2026-10-26 08:50 CDT (claim commit 792294d) · finished 2026-10-26 08:51 CDT · merged 2026-10-26 08:51 CDT
 - Built: LICENSE (MIT), NOTICE, THIRD_PARTY_NOTICES, README, SECURITY (S1–S5), CONTRIBUTING, CODE_OF_CONDUCT (Contributor Covenant 2.1 by reference), CHANGELOG, .gitignore, .editorconfig, `.github/` (bug and feature issue templates, PR template, Dependabot for github-actions and uv, placeholder CI), `docs/PHX_ARCHITECTURE.md` skeleton. Private repo `antonizick/PhaseHypervisor` created (visibility checked) and `main` pushed.
 - Deviations: the prompt's copyright holder "Nick Antoncic" is a misspelling; the licence and notices use "Nick Antonizick" (the owner's name per git config and email). Owner question 1 was already decided (MIT), so no default was needed. No ADR needed.
 - Follow-ups: Phase 02 replaces the placeholder CI and fills THIRD_PARTY_NOTICES with dev tools; prompt 01 should have its copyright spelling fixed (left as is, historical).

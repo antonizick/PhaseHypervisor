@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Fake `claude` for PHX tests: replays a stream-json fixture, never calls an API.
+
+Environment (all optional):
+  PHX_FAKE_STREAM       fixture .jsonl to replay ({{session_id}} is replaced by the
+                        --session-id / --resume value); unset: a minimal clean stream
+  PHX_FAKE_EXIT         exit code (default 0)
+  PHX_FAKE_DELAY        seconds to sleep before each line (default 0)
+  PHX_FAKE_HANG         seconds to sleep after the stream, before exiting (default 0)
+  PHX_FAKE_STDERR       text written to stderr before the stream
+  PHX_FAKE_IGNORE_TERM  "1": ignore SIGTERM (to test the SIGKILL escalation)
+  PHX_FAKE_ARGV_LOG     file to append {"argv": [...], "env": {...}} to, one JSON line
+                        per call; env holds PHX_AUTO, ANTHROPIC_MODEL and ANTHROPIC_BASE_URL
+"""
+
+import json
+import os
+import signal
+import sys
+import time
+
+args = sys.argv[1:]
+if os.environ.get("PHX_FAKE_IGNORE_TERM") == "1":
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+log = os.environ.get("PHX_FAKE_ARGV_LOG")
+if log:
+    keys = ("PHX_AUTO", "ANTHROPIC_MODEL", "ANTHROPIC_BASE_URL")
+    with open(log, "a", encoding="utf-8") as fh:
+        record = {"argv": args, "env": {k: os.environ.get(k) for k in keys}, "cwd": os.getcwd()}
+        fh.write(json.dumps(record) + "\n")
+
+if "--output-format" in args and "stream-json" in args and "-p" in args and "--verbose" not in args:
+    print(
+        "Error: When using --print, --output-format=stream-json requires --verbose", file=sys.stderr
+    )
+    sys.exit(1)
+
+session = "00000000-0000-4000-8000-00000000fake"
+for flag in ("--session-id", "--resume"):
+    if flag in args:
+        session = args[args.index(flag) + 1]
+
+if os.environ.get("PHX_FAKE_STDERR"):
+    sys.stderr.write(os.environ["PHX_FAKE_STDERR"] + "\n")
+    sys.stderr.flush()
+
+stream = os.environ.get("PHX_FAKE_STREAM")
+if stream:
+    with open(stream, encoding="utf-8") as fh:
+        lines = fh.read().replace("{{session_id}}", session).splitlines(keepends=True)
+else:
+    lines = [
+        json.dumps({"type": "system", "subtype": "init", "session_id": session}) + "\n",
+        json.dumps(
+            {
+                "type": "result",
+                "subtype": "success",
+                "is_error": False,
+                "result": "ok",
+                "session_id": session,
+                "total_cost_usd": 0,
+                "usage": {},
+            }
+        )
+        + "\n",
+    ]
+delay = float(os.environ.get("PHX_FAKE_DELAY", "0"))
+for line in lines:
+    if delay:
+        time.sleep(delay)
+    sys.stdout.write(line)
+    sys.stdout.flush()
+hang = float(os.environ.get("PHX_FAKE_HANG", "0"))
+if hang:
+    time.sleep(hang)
+sys.exit(int(os.environ.get("PHX_FAKE_EXIT", "0")))

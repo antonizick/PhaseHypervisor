@@ -16,6 +16,8 @@ class Config:
     poll_interval_s: int = 300
     limit_poll_interval_s: int = 900
     triage: bool = True
+    idle_timeout_s: int = 1800  # no stream events for this long: kill the session
+    wall_timeout_s: int = 21600  # hard cap on one session
 
 
 def default_state_root() -> Path:

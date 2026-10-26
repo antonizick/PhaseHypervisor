@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# uv / virtualenvs
+.venv/
+venv/
+
+# PHX runtime state and logs (live in ~/.local/state/phx/, never in the repo)
+.phx/state*
+.phx/*.lock
+run.jsonl
+sessions/
+*.session.jsonl
+
+# Secrets and personal data (never commit)
+.env
+.env.*
+*.key
+*.pem
+openrouter.key
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

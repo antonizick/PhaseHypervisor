@@ -1,0 +1,17 @@
+# Placeholder: Phase 02 adds the real jobs (uv sync, pytest, ruff, mypy, secret scan).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "CI jobs are added in Phase 02."

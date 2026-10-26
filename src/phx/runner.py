@@ -20,7 +20,7 @@ import time
 import uuid
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import IO, Any
 
@@ -75,6 +75,8 @@ def find_launcher(env: Mapping[str, str] | None = None, home: Path | None = None
         if local.is_file() and os.access(local, os.X_OK):
             found = str(local)
     if found:
+        # Omarchy's PATH has ~/.local/share/../bin; resolve the directory, keep the name
+        found = str(Path(found).parent.resolve() / Path(found).name)
         return Launcher((found, "run"), found)
     claude = shutil.which("claude", path=path)
     if claude:
@@ -238,6 +240,31 @@ class Usage:
             duration_api_ms=opt(result.get("duration_api_ms")),
             num_turns=opt(result.get("num_turns")),
             models=models if isinstance(models, dict) else {},
+        )
+
+    @classmethod
+    def from_messages(
+        cls, messages: Mapping[str, Mapping[str, Any]], result: dict[str, Any] | None
+    ) -> "Usage":
+        """``from_result``, or the sum of per-message usage when the result has no tokens.
+
+        A stopped, killed or limit-hit session ends without a ``result`` event (or with one
+        that reports zeros) although its turns spent tokens (Phase 10 pilot). ``messages``
+        is the last ``usage`` seen per assistant message ID; cost stays the result's.
+        """
+        base = cls.from_result(result)
+        if base.total_tokens or not messages:
+            return base
+
+        def total(key: str) -> int:
+            return sum(v for u in messages.values() if isinstance(v := u.get(key), int) and v >= 0)
+
+        return replace(
+            base,
+            input_tokens=total("input_tokens"),
+            output_tokens=total("output_tokens"),
+            cache_creation_input_tokens=total("cache_creation_input_tokens"),
+            cache_read_input_tokens=total("cache_read_input_tokens"),
         )
 
     @property
@@ -409,6 +436,7 @@ def run_session(
     stderr: deque[str] = deque(maxlen=_STDERR_LINES)
     recent: deque[dict[str, Any]] = deque(maxlen=_LAST_EVENTS)
     result: dict[str, Any] | None = None
+    per_message: dict[str, Mapping[str, Any]] = {}
     last_event = started
     last_event_wall: float | None = None
     events = 0
@@ -459,6 +487,10 @@ def run_session(
             recent.append(event)
             if event.get("type") == "result":
                 result = event
+            elif event.get("type") == "assistant":
+                message = event.get("message")
+                if isinstance(message, dict) and isinstance(message.get("usage"), dict):
+                    per_message[str(message.get("id"))] = message["usage"]
             if on_event is not None:
                 on_event(event)
     finally:
@@ -469,7 +501,7 @@ def run_session(
             _kill_group(proc, timeouts.term_grace_s)
             exit_code = proc.returncode
 
-    usage = Usage.from_result(result)
+    usage = Usage.from_messages(per_message, result)
     stderr_tail = "\n".join(stderr)
     classification = classify(
         exit_code,

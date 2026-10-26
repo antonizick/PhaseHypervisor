@@ -50,6 +50,7 @@ from phx.recover import (
     check_resumable,
     continue_prompt,
     handle_outcome,
+    last_session_end,
     phase_prompt,
 )
 from phx.runner import (
@@ -65,6 +66,7 @@ from phx.state import Pause, RunState, RunStatus, Wait, load_state, now_ts, save
 from phx.vault import append_summary
 from phx.verify import UnsupportedCommand, capture_baseline, parse_command
 
+DEPS_WAIT = "dependencies not complete"
 EXIT_FINISHED = 0
 EXIT_ERROR = 1
 EXIT_PAUSED = 3
@@ -415,6 +417,11 @@ class Supervisor:
             reasons=elig.reasons,
             open_questions=[q.id for q in plan.questions if q.open],
         )
+        done = {p.id for p in plan.phases if p.status is Status.COMPLETE}
+        for pid in sorted(done & self.state.sessions.keys()):
+            # finished outside PHX (by hand after a stop): never resume that session later
+            del self.state.sessions[pid]
+            self.log.event("session_dropped", phase=pid, reason=f"phase {pid} is ✅ Complete")
         choice = self._choose(plan, elig.next, elig.resume, live_check=live_check)
         until = self.options.until
         if (
@@ -476,9 +483,21 @@ class Supervisor:
         if resume:
             p = resume[0]
             if p.gate is Gate.OWNER:
-                return self._owner_gate(p)
+                return End(
+                    EndKind.PAUSED,
+                    f"phase {p.id} has Gate owner and is 🔄 In progress (being run by hand?): "
+                    f"finish it with /phase {p.id}, then phx resume",
+                    "owner_gate",
+                    p.id,
+                )
             if live_check:
-                r = check_resumable(self.repo, p.id, proc_root=self.proc_root, exclude=self.exclude)
+                r = check_resumable(
+                    self.repo,
+                    p.id,
+                    since=last_session_end(self.state_dir, p.id),
+                    proc_root=self.proc_root,
+                    exclude=self.exclude,
+                )
                 self.log.event("resume_check", phase=p.id, reason=r.reason, resumable=r.resumable)
                 if not r.resumable:
                     return End(EndKind.PAUSED, r.reason, "live_session", p.id)
@@ -539,7 +558,15 @@ class Supervisor:
         if not remaining:
             return End(EndKind.FINISHED, "every phase is ✅ Complete", "all_complete")
         reasons = next_eligible(plan).reasons
-        why = "; ".join(f"{p.id}: {reasons.get(p.id, STATUS_LABELS[p.status])}" for p in remaining)
+        parts = [
+            f"{p.id}: {reasons.get(p.id, STATUS_LABELS[p.status])}"
+            for p in remaining
+            if not reasons.get(p.id, "").startswith(DEPS_WAIT)
+        ]
+        waiting = len(remaining) - len(parts)
+        if waiting:  # later phases waiting on these add nothing but length (Phase 10 pilot)
+            parts.append(f"{waiting} later phase(s) wait on dependencies")
+        why = "; ".join(parts)
         open_ids = tuple(q.id for q in plan.questions if q.open)
         return End(
             EndKind.PAUSED,

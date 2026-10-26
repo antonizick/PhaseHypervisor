@@ -18,7 +18,7 @@ from typing import Any
 
 from phx.classify import Classification, ExitClass
 from phx.logging import EventLog
-from phx.paths import Config
+from phx.paths import Config, sessions_dir
 from phx.plan import MAIN, PlanError, Status, load_live, load_plan, set_status_cell, show_main
 from phx.runner import SessionOutcome
 from phx.verify import Baseline, Outcome, Verdict, verify_phase, wip_blocked
@@ -55,6 +55,8 @@ class LiveProcess:
     cwd: str
     cmdline: str
     where: str  # "worktree" | "main checkout"
+    started: float | None = None  # epoch seconds, from /proc/<pid>/stat
+    headless: bool = False  # `claude -p "/phase …"`: a phase session, never an idle one
 
 
 @dataclass(frozen=True)
@@ -291,6 +293,34 @@ def _is_claude(comm: str, argv: list[str]) -> bool:
     return bool(argv) and names[0] in ("node", "bun") and any("claude-code" in a for a in argv[1:2])
 
 
+def _is_pty_host(argv: list[str]) -> bool:
+    """``claude bg-pty-host …`` only hosts a background session; that session is its own process."""
+    return len(argv) > 1 and argv[1] == "bg-pty-host"
+
+
+def _is_headless_phase(argv: list[str]) -> bool:
+    return any(a in ("-p", "--print") for a in argv) and any(a.startswith("/phase") for a in argv)
+
+
+def _start_time(proc_root: Path, stat: str | None) -> float | None:
+    """Process start as epoch seconds (``starttime`` ticks after ``btime``), or None."""
+    btime = next(
+        (
+            line.split()[1]
+            for line in (_read(proc_root / "stat") or "").splitlines()
+            if line.startswith("btime ")
+        ),
+        None,
+    )
+    if not stat or ")" not in stat or btime is None:
+        return None
+    try:
+        ticks = int(stat.rsplit(")", 1)[1].split()[19])
+        return int(btime) + ticks / os.sysconf("SC_CLK_TCK")
+    except (IndexError, ValueError, OSError):
+        return None
+
+
 def _ancestors(proc_root: Path) -> set[int]:
     """This process and its parents (a `phx` started from inside Claude Code is not a rival)."""
     pids: set[int] = set()
@@ -334,7 +364,7 @@ def find_claude_processes(
         if raw is None:
             continue
         argv = [a for a in raw.split("\0") if a]
-        if not _is_claude(_read(base / "comm") or "", argv):
+        if not _is_claude(_read(base / "comm") or "", argv) or _is_pty_host(argv):
             continue
         try:
             cwd = Path(os.readlink(base / "cwd"))
@@ -342,29 +372,74 @@ def find_claude_processes(
             continue
         for root, label in roots:
             if cwd == root or cwd.is_relative_to(root):
-                found.append(LiveProcess(pid, str(cwd), " ".join(argv)[:200], label))
+                found.append(
+                    LiveProcess(
+                        pid,
+                        str(cwd),
+                        " ".join(argv)[:200],
+                        label,
+                        _start_time(proc_root, _read(base / "stat")),
+                        _is_headless_phase(argv),
+                    )
+                )
                 break
     found.sort(key=lambda p: (p.where != "worktree", p.pid))
     return found
+
+
+def phase_activity(repo: Path, phase_id: str) -> float | None:
+    """Latest sign of work on a phase: its branch tip's commit time or a changed file's mtime."""
+    branches, trees = load_live(repo).for_phase(phase_id)
+    times: list[float] = []
+    for branch in branches:
+        out = _run_git(repo, "log", "-1", "--format=%ct", branch, "--").stdout.strip()
+        if out.isdigit():
+            times.append(float(out))
+    for tree in trees:
+        status = _run_git(Path(tree.path), "status", "--porcelain", "-z", "--untracked-files=all")
+        for entry in status.stdout.split("\0"):
+            if len(entry) > 3:
+                try:
+                    times.append((Path(tree.path) / entry[3:]).stat().st_mtime)
+                except OSError:
+                    continue
+    return max(times, default=None)
 
 
 def live_sessions(
     repo: Path,
     phase_id: str,
     *,
+    since: float | None = None,
     proc_root: Path = Path("/proc"),
     exclude: Collection[int] | None = None,
+    ignored: list[LiveProcess] | None = None,
 ) -> list[LiveProcess]:
-    """Claude processes that may be running ``phase_id``: in its worktree or the main checkout.
+    """Claude processes that may be running ``phase_id``.
 
-    The main checkout counts because Claude Code keeps its process cwd where it started
-    (the main checkout, per the claim protocol) while its tools work in the worktree.
+    A process in the phase's worktree always counts. One in the main checkout counts too,
+    because Claude Code keeps its process cwd where it started while its tools work in
+    the worktree, but only when it is a headless ``/phase`` session or the phase's branch
+    or worktree changed after the process started and after ``since`` (when PHX's own last
+    session for the phase ended). An idle interactive session, or the one driving ``phx``,
+    is not a rival (Phase 10 pilot, ADR-0019); those go to ``ignored`` when given.
     """
     repo = repo.resolve()
     _branches, trees = load_live(repo).for_phase(phase_id)
     places = {w.path: "worktree" for w in trees}
     places[str(repo)] = "main checkout"
-    return find_claude_processes(places, proc_root=proc_root, exclude=exclude)
+    found = find_claude_processes(places, proc_root=proc_root, exclude=exclude)
+    if all(p.where == "worktree" or p.headless for p in found):
+        return found
+    activity = phase_activity(repo, phase_id)
+    live: list[LiveProcess] = []
+    for p in found:
+        after = max(since or 0.0, p.started or 0.0)
+        if p.where == "worktree" or p.headless or (activity is not None and activity > after):
+            live.append(p)
+        elif ignored is not None:
+            ignored.append(p)
+    return live
 
 
 def live_reason(phase_id: str, process: LiveProcess) -> str:
@@ -374,6 +449,17 @@ def live_reason(phase_id: str, process: LiveProcess) -> str:
         f"a Claude session (pid {process.pid}) is open in the main checkout; "
         f"it may be running phase {phase_id}"
     )
+
+
+def last_session_end(state: Path, phase_id: str) -> float | None:
+    """When PHX's last session for a phase ended: its transcript's mtime."""
+    times = []
+    for path in sessions_dir(state).glob(f"{phase_id}-*.jsonl"):
+        try:
+            times.append(path.stat().st_mtime)
+        except OSError:
+            continue
+    return max(times, default=None)
 
 
 @dataclass(frozen=True)
@@ -387,16 +473,27 @@ def check_resumable(
     repo: Path,
     phase_id: str,
     *,
+    since: float | None = None,
     proc_root: Path = Path("/proc"),
     exclude: Collection[int] | None = None,
 ) -> Resumability:
     """R14: may PHX resume a ``🔄`` phase? Not while a Claude process may hold it."""
-    live = tuple(live_sessions(repo, phase_id, proc_root=proc_root, exclude=exclude))
+    ignored: list[LiveProcess] = []
+    live = tuple(
+        live_sessions(
+            repo, phase_id, since=since, proc_root=proc_root, exclude=exclude, ignored=ignored
+        )
+    )
     if live:
         return Resumability(False, live_reason(phase_id, live[0]), live)
-    return Resumability(
-        True, f"no live Claude process in phase {phase_id}'s worktree or the main checkout"
-    )
+    reason = f"no live Claude process in phase {phase_id}'s worktree or the main checkout"
+    if ignored:
+        pids = ", ".join(str(p.pid) for p in ignored)
+        reason += (
+            f" (ignored idle session(s) in the main checkout, pid {pids}: "
+            f"no work on phase {phase_id} since they started or PHX's last session)"
+        )
+    return Resumability(True, reason)
 
 
 # --------------------------------------------------------------------------- orchestration
@@ -455,7 +552,13 @@ def handle_outcome(
         and cls.cls in _RETRYABLE
         and verdict.outcome in (Outcome.IN_PROGRESS, Outcome.NOT_STARTED)
     ):
-        live = live_sessions(repo, phase_id, proc_root=proc_root, exclude=exclude)
+        live = live_sessions(
+            repo,
+            phase_id,
+            since=last_session_end(state, phase_id),
+            proc_root=proc_root,
+            exclude=exclude,
+        )
 
     decision = decide(
         phase_id,

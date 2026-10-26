@@ -72,7 +72,7 @@ Run serially in ID order (ADR-0007).
 | # | Question | Status / proposed default | Needed by |
 |---|---|---|---|
 | 1 | Licence for PHX | Decided 2026-10-26 08:41 CDT: MIT | Phase 01 |
-| 2 | Which real plan to pilot hands-off after the sample plan | Open, proposed default the next eligible phase of YTPL2 or OCC (whichever has one), else sample plan only | Phase 10 |
+| 2 | Which real plan to pilot hands-off after the sample plan | Decided 2026-10-26 17:46 CDT: YTPL2 Phase 03 (Domain core, exports & FakeYouTube), `--max-phases 1`. Real preflights only for the pilot repos (PXP sample, YTPL2); other migrated repos get dry runs only | Phase 10 |
 | 3 | Provider and usage-limit behaviour | Decided 2026-10-26 08:35 CDT: follow `ai-provider`; wait, notify, auto-resume (ADR-0005, ADR-0006) | Phase 05 |
 | 5 | Is PHX optional or a replacement? | Decided 2026-10-26 08:41 CDT: additive and opt-in; manual `/phased-project` and `/phase` stay fully supported (ADR-0011) | Phase 03 |
 | 4 | Git/GitHub authority and reach | Decided 2026-10-26 08:35 CDT: push/merge/private repos freely, all phased projects (ADR-0004) | Phase 03 |

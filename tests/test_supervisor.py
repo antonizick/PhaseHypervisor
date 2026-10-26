@@ -252,6 +252,48 @@ def test_owner_gate_is_never_started(h: Callable[..., H]) -> None:
     assert end["rule"] == "owner_gate" and "PHX never starts it" in end["reason"]
 
 
+def test_owner_gate_in_progress_says_finish_it(h: Callable[..., H]) -> None:
+    """Phase 10 pilot: an owner phase claimed by hand must not say "PHX never starts it"."""
+    x = h()
+    x.edit_plan(
+        "| 00 | ⬜ Not started | [SMP_phase-01-hello.md](prompts/SMP_phase-01-hello.md) | auto |",
+        "| 00 | 🔄 In progress | [SMP_phase-01-hello.md](prompts/SMP_phase-01-hello.md) | owner |",
+    )
+    assert x.run() == EXIT_PAUSED
+    end = x.last_event("run_end")
+    assert end["rule"] == "owner_gate" and "is 🔄 In progress" in end["reason"]
+    assert "finish it with /phase 01" in end["reason"] and x.calls() == []
+
+
+def test_waiting_phases_are_summarised(h: Callable[..., H]) -> None:
+    """Phase 10 pilot: the pause reason listed every phase waiting on dependencies."""
+    x = h().all_auto()
+    x.edit_plan(
+        "| Favourite colour? | Open. Proposed default: blue | Phase 02 |",
+        "| Favourite colour? | Open. Proposed default: blue | Phase 01 |",
+    )
+    assert x.run() == EXIT_PAUSED
+    reason = x.last_event("run_end")["reason"]
+    assert reason == (
+        "no phase can start (01: open owner question: #1; 2 later phase(s) wait on dependencies)"
+    )
+
+
+def test_session_of_a_phase_finished_by_hand_is_dropped(h: Callable[..., H]) -> None:
+    """Phase 10 pilot: 05 was stopped, then finished by hand; its session stayed recorded."""
+    from phx.state import RunState
+
+    x = h().all_auto().decide_q1()
+    x.sup()  # creates the state dir
+    save_state(
+        x.state_root / "SMP",
+        RunState(run_id="old", repo=str(x.repo), status=RunStatus.STOPPED, sessions={"00": "s"}),
+    )
+    assert x.run(until="01") == EXIT_FINISHED
+    assert x.last_event("session_dropped")["phase"] == "00"
+    assert "00" not in x.state().sessions
+
+
 def test_pause_after(h: Callable[..., H]) -> None:
     x = h().all_auto().decide_q1()
     assert x.run(pause_after="01") == EXIT_PAUSED

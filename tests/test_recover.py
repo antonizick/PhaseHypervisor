@@ -7,6 +7,8 @@ real ``run_session`` against the fake ``claude`` replaying a stream fixture, the
 
 import json
 import os
+import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,7 @@ from phx.recover import (
     decide,
     find_claude_processes,
     handle_outcome,
+    last_session_end,
     live_sessions,
     phase_prompt,
     repair_blocked,
@@ -391,13 +394,27 @@ def test_verification_never_touches_main_checkout(e: Env) -> None:
 
 
 def fake_proc(
-    root: Path, pid: int, *, comm: str, argv: list[str], cwd: Path | None, ppid: int = 1
+    root: Path,
+    pid: int,
+    *,
+    comm: str,
+    argv: list[str],
+    cwd: Path | None,
+    ppid: int = 1,
+    started: float | None = None,
 ) -> None:
     d = root / str(pid)
     d.mkdir(parents=True)
     (d / "comm").write_text(comm + "\n")
     (d / "cmdline").write_text("\0".join(argv) + "\0")
-    (d / "stat").write_text(f"{pid} ({comm}) S {ppid} 0 0\n")
+    if started is None:
+        (d / "stat").write_text(f"{pid} ({comm}) S {ppid} 0 0\n")
+    else:  # starttime is field 22: ticks after the boot time in <root>/stat
+        btime = int(started) - 1000
+        (root / "stat").write_text(f"cpu  1 2 3\nbtime {btime}\n")
+        ticks = round((started - btime) * os.sysconf("SC_CLK_TCK"))
+        rest = " ".join(["0"] * 15)
+        (d / "stat").write_text(f"{pid} ({comm}) S {ppid} 0 0 {rest} {ticks} 0 0\n")
     if cwd is not None:
         (d / "cwd").symlink_to(cwd)
 
@@ -446,6 +463,58 @@ def test_live_sessions_and_check_resumable(e: Env) -> None:
     assert [p.where for p in live] == ["worktree", "main checkout"]
     r = check_resumable(e.sc.repo, "05", proc_root=e.proc, exclude=())
     assert r.reason.startswith("another session is running phase 05 (pid 78")
+
+
+def test_pty_host_and_start_time(tmp_path: Path) -> None:
+    """Phase 10 pilot: a `claude bg-pty-host` wrapper is not a session; start time is read."""
+    proc = tmp_path / "proc"
+    work = tmp_path / "work"
+    work.mkdir()
+    host = ["claude", "bg-pty-host", "--bg-pty-host", "/tmp/x.sock", "--", "/x/claude"]
+    fake_proc(proc, 20, comm="claude", argv=host, cwd=work)
+    fake_proc(proc, 21, comm="claude", argv=["claude"], cwd=work, started=1_800_000_000.0)
+    fake_proc(proc, 22, comm="claude", argv=["claude", "-p", "/phase 05 --auto"], cwd=work)
+    found = find_claude_processes({str(work): "main checkout"}, proc_root=proc, exclude=())
+    assert [p.pid for p in found] == [21, 22]
+    assert found[0].started == pytest.approx(1_800_000_000.0, abs=0.02)
+    assert not found[0].headless and found[1].headless and found[1].started is None
+
+
+def test_idle_main_checkout_session_is_not_a_rival(e: Env) -> None:
+    """Phase 10 pilot: Nick's idle Claude Code in the main checkout blocked every resume."""
+    e.sc.claim().work(commit=False)
+    now = time.time()
+    fake_proc(e.proc, 81, comm="claude", argv=["claude"], cwd=e.sc.repo, started=now + 60)
+    r = check_resumable(e.sc.repo, "05", proc_root=e.proc, exclude=())
+    assert r.resumable and "ignored idle session(s) in the main checkout, pid 81" in r.reason
+    # PHX's own last session ended after the work: an older session is idle too.
+    shutil.rmtree(e.proc)
+    fake_proc(e.proc, 82, comm="claude", argv=["claude"], cwd=e.sc.repo, started=now - 600)
+    assert not check_resumable(e.sc.repo, "05", proc_root=e.proc, exclude=()).resumable
+    assert check_resumable(e.sc.repo, "05", since=now + 60, proc_root=e.proc, exclude=()).resumable
+    # Work after both: a manual /phase 05 in that session. It counts.
+    (e.sc.worktree / "later.txt").write_text("x")
+    os.utime(e.sc.worktree / "later.txt", (now + 120, now + 120))
+    r = check_resumable(e.sc.repo, "05", since=now + 60, proc_root=e.proc, exclude=())
+    assert not r.resumable and "open in the main checkout" in r.reason
+    # A headless phase session in the main checkout always counts.
+    shutil.rmtree(e.proc)
+    argv = ["claude", "-p", "/phase 05 --auto"]
+    fake_proc(e.proc, 83, comm="claude", argv=argv, cwd=e.sc.repo, started=now + 600)
+    assert not check_resumable(
+        e.sc.repo, "05", since=now + 600, proc_root=e.proc, exclude=()
+    ).resumable
+
+
+def test_last_session_end(tmp_path: Path) -> None:
+    assert last_session_end(tmp_path, "05") is None
+    (tmp_path / "sessions").mkdir()
+    for n, t in ((1, 100.0), (2, 300.0)):
+        f = tmp_path / "sessions" / f"05-{n}.jsonl"
+        f.write_text("")
+        os.utime(f, (t, t))
+    (tmp_path / "sessions" / "05a-1.jsonl").write_text("")
+    assert last_session_end(tmp_path, "05") == 300.0
 
 
 def test_decide_live_in_main_checkout_reason() -> None:

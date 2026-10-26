@@ -85,6 +85,18 @@ def test_find_launcher_prefers_ai_provider_on_path(env: dict[str, str]) -> None:
     assert launcher.warning is None
 
 
+def test_find_launcher_normalises_dotdot_path(tmp_path: Path) -> None:
+    """Phase 10 pilot: Omarchy's PATH has ~/.local/share/../bin; logs showed it verbatim."""
+    (tmp_path / "share").mkdir()
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    tool = bin_dir / "ai-provider"
+    tool.write_text("#!/bin/sh\n")
+    tool.chmod(0o755)
+    launcher = find_launcher({"PATH": f"{tmp_path}/share/../bin"}, home=tmp_path)
+    assert launcher.prefix == (str(tool.resolve()), "run")
+
+
 def test_find_launcher_local_bin(tmp_path: Path) -> None:
     home = tmp_path / "home"
     local = home / ".local" / "bin" / "ai-provider"
@@ -378,6 +390,32 @@ def test_usage_from_result_tolerates_junk() -> None:
         {"usage": {"input_tokens": "x", "output_tokens": True}, "total_cost_usd": "1"}
     )
     assert u.total_tokens == 0 and u.cost_usd is None
+
+
+def test_usage_falls_back_to_message_usage() -> None:
+    """Phase 10 pilot: a stopped session has no result event, yet its turns cost tokens."""
+    msgs = {
+        "m1": {"input_tokens": 3, "output_tokens": 50, "cache_read_input_tokens": 1000},
+        "m2": {"input_tokens": 2, "output_tokens": "x", "cache_creation_input_tokens": 400},
+    }
+    u = Usage.from_messages(msgs, None)
+    assert (u.input_tokens, u.output_tokens, u.cache_read_input_tokens) == (5, 50, 1000)
+    assert u.total_tokens == 1455 and u.cost_usd is None
+    zero = {"usage": {"input_tokens": 0}, "total_cost_usd": 0}  # a limit-hit result
+    assert Usage.from_messages(msgs, zero).total_tokens == 1455
+    full = {"usage": {"input_tokens": 9, "output_tokens": 1}, "total_cost_usd": 0.5}
+    assert Usage.from_messages(msgs, full) == Usage.from_result(full)
+    assert Usage.from_messages({}, None) == Usage()
+
+
+def test_limit_session_counts_its_turns(
+    tmp_path: Path, state: Path, log: EventLog, env: dict[str, str]
+) -> None:
+    env |= {"PHX_FAKE_STREAM": str(STREAMS / "usage_limit_session.jsonl"), "PHX_FAKE_EXIT": "1"}
+    out = go(tmp_path, state, log, env)
+    assert out.classification.cls is ExitClass.USAGE_LIMIT
+    assert (out.usage.input_tokens, out.usage.output_tokens) == (12, 40)
+    assert events(state)[-1]["tokens"] == 52
 
 
 def test_timeouts_from_config() -> None:

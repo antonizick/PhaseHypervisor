@@ -1,6 +1,6 @@
 # PHX Architecture
 
-> Skeleton from Phase 01; Phase 02, 04, 05 and 06 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
+> Skeleton from Phase 01; Phase 02, 04, 05, 06 and 07 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
 
 ## Components
 | Component | Module (planned) | Phase | Role |
@@ -10,7 +10,7 @@
 | Plan parser | `plan.py` | 04 | rows, IDs, ordering, deps, status, model alias, gates, owner questions, drift |
 | Session runner | `runner.py`, `classify.py` | 05 | launch via `ai-provider run -p`, stream-json capture, exit classification |
 | Verifier and recovery | `verify.py`, `recover.py`, `triage.py` | 06 | independent post-phase checks, blocked-status repair, retry/resume |
-| Supervisor | `supervisor.py`, `locks.py`, `notify.py`, `vault.py` | 07 | `phx run / status / resume / stop / log / answer`, locks, state, notifications |
+| Supervisor | `supervisor.py`, `locks.py`, `state.py`, `notify.py`, `vault.py`, `detach.py` | 07 | `phx run / status / resume / stop / log / answer`, locks, state, waits, notifications, detached runs, vault summary |
 | Preflight | `preflight.py` | 08 | one interactive question sweep before a hands-off run |
 
 ## Phase 02 modules (built)
@@ -138,25 +138,44 @@ check_resumable(repo, NN) ──► Resumability   R14: before resuming a 🔄 p
 
 **Triage** (`triage.summarize`): `haiku`, `--tools ""`, `--permission-mode default`, `--max-turns 1`, cwd = state dir, no `PHX_AUTO`; prompt = verdict report + the phase's last messages from its redacted transcript, marked as data; answer redacted and clipped to 150 words; transcript `sessions/<phase>-triage-<n>.jsonl`; cost and tokens in the `triage` event. Best effort: never raises.
 
-## Control flow of `phx run`
+## Phase 07: supervisor (`supervisor.py`, `locks.py`, `state.py`, `notify.py`, `vault.py`, `detach.py`, built)
 ```
-phx run <repo>
-  │  lock (machine-wide + per-repo)
+phx run <repo>                       (cli._cmd_run: S1 checks, signal handlers → request_stop)
+  │  --detach ─► detach.detach: systemd-run --user --unit phx-<repo> --collect … -- python -m phx run …
   ▼
-parse plan on main ──► pick next eligible phase (status ⬜, deps ✅, gate)
-  │
-  ▼
-ai-provider run -p "/phase NN --auto"   (model alias from the plan; fresh session)
-  │        └─ usage limit? ─► wait, notify, resume same session
-  ▼
-classify exit (complete / blocked / refused / no_result / usage_limit / auth / provider / timeout / crash)
-  │
-  ▼
-verify independently (plan status on main, merge, tests, docs)
-  │        └─ failed? ─► recover / retry / block with the question recorded
-  ▼
-gate (auto continues · review/owner pauses) ─► next phase, or stop when none remain
+Supervisor.run
+  RunLock: $XDG_RUNTIME_DIR/phx/phx.lock + <repo-name>.lock (flock, JSON body, contract §8)
+  state.json: refuse if paused (unless phx resume); carry sessions, wait, recoveries from the last run
+  loop ─────────────────────────────────────────────────────────────────────────────┐
+    load_plan + check_contract (first round: config from main, test-command warnings) │
+    _select: pending wait → 🔄 (check_resumable; --resume recorded session | fresh) │
+             → ⛔ (pause if a question is open | fresh) → next_eligible → finished/pause
+    Gate owner → pause · require_alias → pause on unknown model                      │
+    _run_phase:                                                                       │
+      capture_baseline → run_session(cancel=stop_event, on_start=record session ID)   │
+      stopped? → end (phase stays 🔄)                                                 │
+      handle_outcome → Decision                                                       │
+        next_phase ─► notify, Gate review / --pause-after / --until / --max-phases ───┘
+        pause      ─► end (notify: blocked + triage summary | failed | paused)
+        wait       ─► _wait (wall-clock, 60 s steps; provider check every poll_interval_s;
+                      probe at wake) ─► run_session(resume=session, continue prompt)
+        resume_session / fresh_session ─► recoveries += 1, launch again
+  _finish: state.json, run_end, notification, vault.append_summary, exit 0/1/3/4
 ```
+
+| Module | Role |
+|---|---|
+| `locks.py` | `RunLock` (machine-wide `phx.lock` then `<repo-name>.lock`, exclusive `flock`, 2 s retry, one-line JSON body `pid`/`repo`/`started`/`phase`/`unit`, `update(phase=…)`, release truncates); `running(repo)` reads a held lock (shared probe, like the contract's shell check); `main_checkout`, `repo_name` (`git rev-parse --git-common-dir`). Files are never deleted. |
+| `state.py` | `RunState` (run ID, status `running`/`waiting`/`paused`/`stopped`/`finished`/`failed`, PID, unit, phase, attempt, recoveries, session ID, last class, provider, heartbeat, `Wait`, `Pause`, `sessions` phase → last PHX session, per-phase `PhaseTotals` sessions/tokens/cost/wait/outcome, totals, completed phases, end reason); `save_state` writes temp + fsync + rename, mode 0600. |
+| `supervisor.py` | `Supervisor(repo, options=RunOptions(pause_after, max_phases, until, dry_run, resume), state_root, env, clock, notifier, unit, proc_root, exclude, triage, vault)`. `run()` → exit code. `request_stop()` from signal handlers. `Clock` protocol (`now`, `sleep(seconds, stop)`) so tests run waits on a fake clock. Dry run simulates completions without lock, state or launches. |
+| `notify.py` | `Notifier.send(Note)`: `notify-send --app-name=phx --urgency=… --hint=boolean:suppress-sound:true`; skipped (logged) without display, bus or binary. Builders: `phase_complete`, `blocked`, `waiting`, `provider_switch`, `verification_failed`, `paused`, `finished`. |
+| `vault.py` | `note_path` (CLAUDE.md on `main`: "Obsidian project note \`…\`"), `summary_line`, `append_line` (end of `## Log`, `updated:`), `append_summary` (atomic write; skipped and logged when no note or no Log section). |
+| `detach.py` | `unit_name`, `detach_argv` (env allowlist, `KillMode=mixed`, `TimeoutStopSec=90`, `PHX_UNIT`), `detach` (waits up to 10 s for the lock). |
+| `cli.py` | `run`/`resume`, `status` (`status_report`, all repos without an argument), `stop` (SIGTERM + wait for the lock), `log` (`-f`, `--json`, `-n`), `answer` (`answer_question`, `plan.set_question_status`). |
+
+Phase 05/06 additions used here: `run_session(cancel=…, on_start=…)`; `classify(timed_out="stopped")` → `timeout` kind `stopped`; `plan.set_question_status`.
+
+Test doubles: `tests/fakes/fake_agent.py` makes the fake `claude` a scripted phase agent (`PHX_FAKE_AGENT=<scenario.json>`: per phase a list of actions `complete`, `block:Q`, `limit[:s]`, `crash`, `hang`, `refuse`, `noop`; `probe` and `triage` keys) that claims, works in a worktree, merges or blocks for real; `tests/fakes/notify-send` records calls; `PHX_FAKE_PROVIDER_FILE` lets a test flip `ai-provider get` mid-wait.
 
 ## Interface with phase sessions
 PHX and a phase session talk only through the repo and one line of output, defined in [PHX_AUTO_MODE_CONTRACT.md](PHX_AUTO_MODE_CONTRACT.md) (contract version 1, Phase 03):

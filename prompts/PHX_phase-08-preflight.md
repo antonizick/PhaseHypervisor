@@ -19,7 +19,7 @@
    - commit `docs(plan): phx preflight <TS>` to `main` (claim protocol rules: main checkout, plan file only plus the decisions file);
    - write `.phx/preflight.json` (timestamp, plan hash, phases covered, unresolved items) and commit it.
 2. `preflight.py`: launch the session **interactively** (not `-p`) through `ai-provider run` with `--model opus` and the prompt via `--append-system-prompt-file` or an initial message (check which works for an interactive start), in the repo's main checkout; refuse if a phase is `🔄` (offer `phx status`).
-3. Staleness: `phx run` warns (and with `--require-preflight` refuses) if `.phx/preflight.json` is missing or its plan hash is older than the plan's last change to the phase table or Owner questions.
+3. Staleness: `phx run` warns (and with `--require-preflight` refuses) if `.phx/preflight.json` is missing or its plan hash is older than the plan's last change to the phase table or Owner questions. (Phase 07 note: put the check in `Supervisor._loop`'s first round, next to `_check_test_commands`, read the file from `main` like `plan_config`, add the flag to `RunOptions` and to the `run`/`resume` parser in `cli.build_parser`, and log it as a `warning` or `run_end` with rule `preflight_missing`.)
 4. A preflight also works mid-plan: it covers only phases not yet complete.
 
 ## Out of scope

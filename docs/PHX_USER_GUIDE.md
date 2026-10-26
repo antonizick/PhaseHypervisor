@@ -1,6 +1,115 @@
 # PHX User Guide
 
-> Stub from Phase 04. Phase 07 adds `run`, `status`, `resume`, `stop`, `log` and `answer`; Phase 08 adds `preflight`. PHX is optional (ADR-0011): manual `/phase` keeps working exactly as before.
+PHX runs the remaining phases of a phased-project plan for you, one at a time, each in a fresh headless Claude Code session on the model the plan names, and checks each phase itself. It is optional (ADR-0011): manual `/phase` keeps working exactly as before, and you can switch between the two at any phase boundary. `phx preflight` (asking every foreseeable question up front) arrives in Phase 08.
+
+## Install
+```bash
+uv tool install --editable /home/nick/Work/PhaseHypervisor   # puts `phx` in ~/.local/bin
+phx --version
+```
+The install follows the repo's main checkout, so merged phases take effect without reinstalling (ADR-0016). Undo: `uv tool uninstall phx`. Without installing: `cd /home/nick/Work/PhaseHypervisor && uv run phx …`, or `cd src && python3 -m phx …`.
+
+## Quick start
+```bash
+phx plan ~/Work/YTPL2              # what PHX sees: next phase, Gates, open questions
+phx run ~/Work/YTPL2 --dry-run     # what it would run, in order; launches nothing
+phx run ~/Work/YTPL2 --detach      # run hands-off in the background
+phx status ~/Work/YTPL2            # where it is, what it waits for, tokens and cost so far
+phx log ~/Work/YTPL2 -f            # follow every decision as it happens
+```
+The repo must carry the hands-off contract (`PHX-CONTRACT: 1` in `.claude/commands/phase.md`; Phase 09 migrates the existing projects) and live under `~/Work` (spec S1; the variable `PHX_WORK_ROOT` overrides that root).
+
+## `phx run`: run a plan hands-off
+```bash
+phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--dry-run]
+```
+Each round, PHX re-reads the plan from `main` and picks, in this order:
+1. a usage-limit wait left by an earlier run (it finishes the wait, then resumes that session);
+2. a `🔄 In progress` phase, whoever started it: PHX first makes sure no Claude Code session is open in its worktree or in the main checkout, then resumes the session it recorded for that phase (`--resume`), or starts `/phase NN --auto`, whose own resume logic takes over;
+3. a `⛔ Blocked` phase: it pauses while an owner question that phase needs is open; once answered, `/phase NN --auto` resumes it;
+4. the next eligible phase (`⬜`, dependencies `✅`, no open question needing it).
+
+Gates (spec R12): `owner` phases are never started (PHX pauses and tells you to run them yourself with `/phase NN`); `review` phases run, then PHX pauses so you can look before the next one; `auto` phases just run. After each session PHX verifies the phase on `main` (Phase 06) and decides: next phase, pause, wait for a usage limit, resume the same session, or retry fresh.
+
+Options:
+- `--detach`: run as the transient systemd user unit `phx-<repo>`; the command returns once the supervisor holds its lock. It survives closing the terminal; with `Linger=no` (this machine's setting) it stops when you log out completely. `systemctl --user status phx-<repo>` shows the unit.
+- `--pause-after NN`: pause after phase NN completes.
+- `--until NN`: run up to and including NN, start nothing later, then finish.
+- `--max-phases N`: finish after N phases complete in this run.
+- `--dry-run`: print the phases it would run in order (assuming each completes), with the exact launch command, and where it would stop. Launches nothing, takes no lock, writes no state.
+
+Exit status: `0` finished (nothing left, or `--until`/`--max-phases` reached), `1` error (another supervisor running, plan or contract problem, repo outside `~/Work`, internal error), `3` paused, `4` stopped.
+
+Only one supervisor runs on the machine at a time (ADR-0007). While it runs, a manual `/phase` in that repo sees its lock and stops instead of claiming (contract §8).
+
+## When a run pauses
+A pause is remembered in `state.json` until you clear it with `phx resume`; `phx run` on a paused repo refuses and repeats the reason. `phx status` and the notification say why:
+
+| Pause | What to do |
+|---|---|
+| Phase NN blocked on question #Q | `phx answer <repo> Q "<answer>"`, then `phx resume <repo>` |
+| No phase can start (open question needed by the next phase) | answer it, then `phx resume` |
+| Gate review after NN | review the phase's work, then `phx resume` |
+| Gate owner on NN | run `/phase NN` yourself, then `phx resume` |
+| `--pause-after NN` | `phx resume` |
+| Verification failed / needs review | read `phx status` and `phx log`, fix the repo (or finish the phase by hand), then `phx resume` |
+| A Claude session is open in the worktree or main checkout | close it (or wait for it), then `phx resume` |
+| Authentication or provider error | log in again or fix the provider, then `phx resume` |
+| Timeout or crash twice | PHX already resumed once and retried once; check the log, then `phx resume` |
+
+## `phx resume`: clear a pause and carry on
+```bash
+phx resume [<repo>] [same options as run]
+```
+Clears the recorded pause, then runs exactly like `phx run` (including `--detach`).
+
+## `phx answer`: answer an owner question
+```bash
+phx answer ~/Work/YTPL2 6 "Use the blue theme"
+```
+Writes `Answered <timestamp>: <answer>` into that question's Status cell in the plan on `main`, commits only the plan file (`docs(plan): answer owner question 6`) and pushes when the repo has an `origin`. It refuses while a supervisor is running on the repo, when the main checkout is not on `main` or has uncommitted plan changes, and for a question that is not open (`--force` overwrites one). A `|` in the answer is escaped. Editing the plan by hand works just as well.
+
+## `phx status`: where is it?
+```bash
+phx status ~/Work/YTPL2    # one repo: supervisor PID/unit, last run, phase, wait time left, pause reason, tokens and cost per phase, plan summary, open questions
+phx status                 # every repo PHX has run
+phx status ~/Work/YTPL2 --json
+```
+"supervisor gone" means the last run was running or waiting when its process died (crash, kill, reboot); the next `phx run` carries on from `state.json`.
+
+## `phx stop`: stop cleanly
+```bash
+phx stop ~/Work/YTPL2 [--timeout 120]
+```
+Sends SIGTERM to the supervisor (foreground or detached) and waits for it to exit. The supervisor stops the running session's process group, logs the stop and writes the run summary; the phase stays `🔄` with its session ID recorded, so the next `phx run` (or `phx resume`) continues that same session. A usage-limit wait is kept and continues on the next run. Ctrl-C on a foreground `phx run` does the same. To finish the phase by hand instead, stop PHX first, then run `/phase NN`.
+
+## `phx log`: what happened and why
+```bash
+phx log ~/Work/YTPL2            # last 40 events, one line each
+phx log ~/Work/YTPL2 -f         # follow
+phx log ~/Work/YTPL2 -n 0 --json   # everything, raw JSON
+```
+`~/.local/state/phx/<repo-name>/run.jsonl` holds every decision with its reason: `run_start`, `plan` (next eligible phase and why each other phase waits), `select` (what runs and why), `launch` (full command line, provider), `session_end` (exit class, tokens, cost), `verify`, `decision`, `retry`, `wait_start`, `provider_check`, `provider_switch`, `wake`, `probe`, `wait_extend`, `wait_end`, `notify`, `run_end` (finished, paused, stopped or failed, with the reason and totals), `vault`. Session transcripts are in `sessions/<phase>-<n>.jsonl` beside it, and the current state in `state.json`. Everything is redacted before it is written.
+
+## Usage limits and switching provider
+When a Pro 5-hour or weekly limit stops a phase, PHX records the stop, notifies you with the resume time and waits: until the announced reset time plus 2 minutes, or 30 min, 1 h, 2 h, 4 h, then every 6 h when no reset time is given. Then one tiny `haiku` probe checks that capacity is back and the **same session** resumes (`--resume`). The wait survives suspend, `phx stop` and restarts.
+
+To resume sooner, switch to OpenRouter with **Super+Alt+A**: PHX checks `ai-provider get` every 5 minutes (`poll_interval_s`) during a wait and resumes at once on OpenRouter. It never switches provider by itself (ADR-0006).
+
+## Notifications
+Desktop notifications (silent, never spoken) for: phase complete, blocked (with a short haiku summary of why), usage-limit wait (with the resume time), provider switch noticed, verification failure, other pauses and run finished. Without a display they are skipped and logged.
+
+## Obsidian run summary
+At the end of every run (finished, paused or stopped), PHX appends one line to the project note named in the repo's `CLAUDE.md` ("The Obsidian project note `…`"): outcome, then per phase the result, tokens, cost, sessions and waits. It changes only that note's `## Log` section and `updated:` field.
+
+## Troubleshooting
+- **"another phx supervisor holds the … lock"**: one supervisor at a time per machine. `phx status` shows which; `phx stop <that repo>` stops it.
+- **"repo not yet migrated"**: the repo's `phase.md` lacks `PHX-CONTRACT: 1` (Phase 09).
+- **"run is paused"**: see "When a run pauses"; `phx resume` clears it.
+- **"is outside …/Work"**: PHX runs only repos under `~/Work` (spec S1).
+- **A warning about the test command**: verification runs it without a shell; set `test_command` in `.phx/config.toml` to a script (ADR-0015).
+- **The detached unit is gone**: it is collected when it ends; `phx log` and `phx status` still have everything. `journalctl --user -u phx-<repo>` shows its stdout.
+- **Lock files** in `$XDG_RUNTIME_DIR/phx/` stay after a run; an unlocked file means "not running".
 
 ## `phx plan`: see what PHX sees
 ```bash
@@ -33,7 +142,8 @@ Optional, committed on `main`, never containing secrets. Unknown keys or wrong t
 | `max_budget_usd` | none | Passed as `--max-budget-usd` **only when the provider is OpenRouter** (spec R9) |
 | `idle_timeout_s` | `1800` | A phase session that emits no stream event for this long is stopped (SIGTERM, then SIGKILL) and classified `timeout` (Phase 05) |
 | `wall_timeout_s` | `21600` | Hard cap on one phase session (Phase 05) |
-| `poll_interval_s`, `limit_poll_interval_s` | `300`, `900` | Supervisor timing (Phase 07) |
+| `poll_interval_s` | `300` | How often a usage-limit wait re-checks `ai-provider get` for a switch to OpenRouter (Phase 07) |
+| `limit_poll_interval_s` | `900` | After a known reset time has passed and the probe still hits the limit, how often to probe again (Phase 07) |
 | `triage` | `true` | When a phase blocks, needs review or fails verification, one tool-less `haiku` turn writes a ≤ 150-word summary for the notification and `run.jsonl` (Phase 06) |
 
 Session transcripts land in `~/.local/state/phx/<repo-name>/sessions/<phase>-<n>.jsonl` (redacted), and every launch and its classified ending in `run.jsonl` beside it.

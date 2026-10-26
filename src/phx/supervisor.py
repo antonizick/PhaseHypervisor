@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import uuid
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, replace
@@ -287,7 +288,21 @@ class Supervisor:
                 reason=f"pause cleared: {cleared}" if cleared else "nothing was paused",
             )
         self._save()
-        end = self._loop()
+        try:
+            end = self._loop()
+        except Exception as exc:  # log it, leave state.json truthful, then end the run
+            self.log.event(
+                "supervisor_error",
+                phase=self.state.phase,
+                reason=f"{type(exc).__name__}: {exc}",
+                traceback=traceback.format_exc(limit=8),
+            )
+            end = End(
+                EndKind.FAILED,
+                f"supervisor error: {type(exc).__name__}: {exc}",
+                "supervisor_error",
+                self.state.phase,
+            )
         return self._finish(end)
 
     def _loop(self) -> End:
@@ -409,7 +424,7 @@ class Supervisor:
                 row = plan.phase(wait.phase)
             except KeyError:
                 row = None
-            if row is not None and row.status is Status.IN_PROGRESS:
+            if row is not None and row.status in (Status.IN_PROGRESS, Status.NOT_STARTED):
                 return Selection(
                     row,
                     wait.prompt or continue_prompt(row.id),

@@ -617,6 +617,41 @@ def test_phx_stop_command_against_a_real_process(
     assert "PHX-RUNNING" not in check.stdout and check.stdout.strip().endswith("done")
 
 
+def test_unexpected_error_is_logged_and_ends_the_run(
+    h: Callable[..., H], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    x = h()
+
+    def boom(*_a: Any, **_k: Any) -> Any:
+        raise OSError("disk full")
+
+    monkeypatch.setattr("phx.supervisor.capture_baseline", boom)
+    assert x.run() == EXIT_ERROR
+    assert "OSError: disk full" in x.last_event("supervisor_error")["reason"]
+    assert x.last_event("run_end")["rule"] == "supervisor_error"
+    assert x.state().status == RunStatus.FAILED and running(x.repo, x.env) is None
+
+
+def test_limit_before_claim_wait_survives_restart(h: Callable[..., H]) -> None:
+    x = h(**{"probe": ["ok"]})
+    from phx.state import RunState, Wait
+
+    save_state(
+        x.state_root / "SMP",
+        RunState(
+            run_id="old",
+            repo=str(x.repo),
+            status=RunStatus.WAITING,
+            phase="01",
+            wait=Wait("01", "s-0", "Continue phase 01", x.clock.now() + 600, "limit"),
+        ),
+    )
+    assert x.run(until="01") == EXIT_FINISHED
+    assert x.events("select")[0]["rule"] == "pending_wait"
+    assert x.calls("01")[0]["resume"] and x.calls("01")[0]["session"] == "s-0"
+    assert x.clock.slept >= 600
+
+
 # --------------------------------------------------------------------------- refusals
 
 

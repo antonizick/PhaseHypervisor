@@ -19,6 +19,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0013 | 2026-10-26 09:21 CDT | Plan parser heuristics: Gate outside eligibility, ⛔ exempt from drift, first-clause test command, publishing inference, config read from main | Accepted | 04 |
 | ADR-0014 | 2026-10-26 10:20 CDT | Session runner and classifier: signal priority, `no_result` class, OpenRouter 429 as provider error, allowlisted provider snapshot, context-free probe | Accepted | 05 |
 | ADR-0015 | 2026-10-26 15:33 CDT | Verifier and recovery: shell-free test commands, verdict outcomes, retry ladder, live sessions in the main checkout, tool-less triage | Accepted | 06 |
+| ADR-0016 | 2026-10-26 16:28 CDT | Supervisor: pauses cleared only by `phx resume`, suspend-safe limit waits, graceful stop, detach env allowlist, work-root guard, `uv tool install --editable` | Accepted | 07 |
 
 ---
 
@@ -192,4 +193,26 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | B. Worktree only (spec R15 text) | No false positives | Misses every real session |
 
 **Consequences.** Phase 07 calls `capture_baseline` before each launch, `handle_outcome` after it, keeps the recovery count and session ID in `state.json`, calls `check_resumable` before resuming a `🔄` phase (R14) and puts `Decision.summary` in the notification. Phase 11 threat-models the interpreter and the triage prompt. Spec amendment R18.
+
+## ADR-0016: Supervisor loop, state and installation
+**Recorded.** 2026-10-26 16:28 CDT (Phase 07)
+**Context.** Phase 07 builds the supervisor (`phx run / resume / status / stop / log / answer`) on top of Phases 04 to 06. The prompt leaves open what `phx run` does with an earlier pause, how a wait survives suspend and restarts, what `phx stop` leaves behind, which environment a detached unit gets, how `limit_poll_interval_s` is used, how S1's "repos under /home/nick/Work" is enforced, and asks for an ADR on installing `phx` for daily use.
+**Decision.**
+- **A pause is sticky.** Any pause (block, review Gate, `--pause-after`, owner Gate, verification failure, live session, nothing eligible) is stored in `state.json`. `phx run` refuses while it is set (exit 3) and says why; only `phx resume` clears it, then runs exactly like `phx run`. `--until NN` and `--max-phases N` end the run as `finished`, not paused. A phase reported `✅` by a resumed run is gated like any other.
+- **What runs next**, in order: a pending usage-limit wait from an earlier supervisor (its phase still `⬜`/`🔄`); a `🔄` phase (after `check_resumable`; `--resume` of the session PHX recorded for it, else a fresh `/phase NN --auto`; more than one `🔄` pauses); a `⛔` phase (pause while an owner question needs it, else a fresh `/phase NN --auto`, contract §4.3); the next eligible phase. Gate `owner` pauses before launch, `review` pauses after. Nothing eligible but phases remain: pause with every phase's reason. The session ID is written to `state.json` as soon as the process starts (`run_session(on_start=…)`), so a supervisor killed mid-phase can be resumed with `--resume`.
+- **Usage-limit waits (ADR-0006).** Wake at `reset_at` + 2 min, or after the back-off 30 min, 1 h, 2 h, 4 h, 6 h, 6 h… when no reset time is given. The wake time is a wall-clock epoch stored in `state.json`; the supervisor sleeps at most 60 s at a time and re-reads the wall clock, so a suspend or a restart only shortens or resumes the wait. `ai-provider get` is checked at once and then every `poll_interval_s` (300 s); a change to `openrouter` resumes at once without a probe. After a timed wait one `haiku` probe decides: clean → resume; limit with a new reset time → wait for it; limit after a known reset time passed → re-probe every `limit_poll_interval_s` (900 s); limit without one → next back-off step; auth error → pause. A usage-limit resume does not count as a recovery.
+- **Stop is graceful.** `phx stop` sends SIGTERM to the PID in the repo lock and waits for the lock to be released (`--timeout`, default 120 s). SIGTERM, SIGINT and SIGHUP set a stop event; a running session's process group is stopped like a timeout (`run_session(cancel=…)`, class `timeout`, kind `stopped`), nothing is verified or retried, `run_end` and the vault summary are written, and the phase stays `🔄` with its session recorded. A wait is kept and continues on the next run. Exit codes: 0 finished, 1 error (lock busy, plan/contract error, supervisor error), 3 paused, 4 stopped.
+- **Detached runs** use `systemd-run --user --unit phx-<repo> --collect` with `KillMode=mixed` (SIGTERM to `phx` only; it stops its own session) and `TimeoutStopSec=90`, and pass only an allowlist of variables: `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TZ`, `XDG_*` dirs, `DISPLAY`, `WAYLAND_DISPLAY`, `DBUS_SESSION_BUS_ADDRESS`, `PHX_WORK_ROOT`, plus `PHX_UNIT`. Secrets in the launching shell never reach the unit. The reference machine has `Linger=no`: the unit survives closing a terminal (checked) but not the end of Nick's last login session; PHX does not change linger.
+- **Work-root guard (S1).** `phx run`/`resume` refuse a repo outside `$PHX_WORK_ROOT`, default `~/Work`, and refuse to run as root. The variable exists for tests and pilots; Phase 11 reviews it.
+- **Answers** (`phx answer`) follow the repair's preconditions (main checkout on `main`, plan file clean and equal to `main`, no supervisor running), escape `|`, refuse a question that is not open unless `--force`, commit only the plan file (`docs(plan): answer owner question N`) and push when `origin` exists.
+- **Notifications** go through `notify-send` with `--hint=boolean:suppress-sound:true` and never speak; without a display, a bus or `notify-send` they are skipped and logged.
+- **Install: `uv tool install --editable /home/nick/Work/PhaseHypervisor`.**
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. `uv tool install --editable` from the main checkout (chosen) | Standard; `phx` lands in `~/.local/bin` (already on PATH); an isolated venv; follows `main` as phases merge, with no reinstall; `uv tool uninstall phx` undoes it | The installed `phx` changes when `main` changes (only by verified merges); the venv's Python comes from uv |
+| B. A shell shim `~/.local/bin/phx` running `python3 -m phx` with `PYTHONPATH` | No uv involvement, one small file | Hand-written file to maintain; uses whatever `python3` is first on PATH |
+| C. `uv tool install` (non-editable) | Pinned code, unaffected by later merges | Needs a reinstall after every phase; easy to run stale code |
+
+**Consequences.** Phase 08 adds the preflight staleness warning where the test-command warnings are emitted (first loop iteration). Phase 10's simulated limit must run in the foreground or through shims, because a detached unit does not receive `PHX_FAKE_*` variables. Phase 11 threat-models the work-root override, the detach allowlist and the `phx answer` write path. Spec amendment R19.
 

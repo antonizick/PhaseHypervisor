@@ -16,7 +16,8 @@ PHX is safe to leave running: the threat model is written down, risks are mitiga
    - secrets in logs and session transcripts;
    - lock and state races;
    - systemd-run environment exposure;
-   - the `phx answer` write path;
+   - the `phx answer` write path (Phase 07: `cli.answer_question`, refuses while the lock is held);
+   - the S1 guard and its `PHX_WORK_ROOT` override, the `--detach` environment allowlist (`detach.ENV_ALLOWLIST`), stale lock files left in `$XDG_RUNTIME_DIR/phx/` by design, and signal handling during `state.json` writes (ADR-0016);
    - git operations on the wrong repo or branch;
    - runaway spend on OpenRouter;
    - a malicious or broken `ai-provider` on PATH.

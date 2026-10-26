@@ -13,7 +13,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0007 | 2026-10-26 08:35 CDT | Strictly one phase at a time | Accepted | 00 |
 | ADR-0008 | 2026-10-26 08:35 CDT | No default milestone checkpoints; per-phase Gate (auto/review/owner) and `--pause-after` | Accepted | 00 |
 | ADR-0009 | 2026-10-26 08:35 CDT | Headless usage-limit stop is recognisable from stream-json/exit status | Proposed (verify in 05) | 00 |
-| ADR-0010 | 2026-10-26 08:35 CDT | Python ≥ 3.12, standard library only at runtime | Proposed (verify in 02) | 00 |
+| ADR-0010 | 2026-10-26 08:35 CDT | Python ≥ 3.12, standard library only at runtime | Accepted (2026-10-26 08:55 CDT, Phase 02) | 00, 02 |
 | ADR-0011 | 2026-10-26 08:41 CDT | PHX is additive and opt-in; manual /phased-project and /phase stay unchanged and fully supported | Accepted | 00 |
 
 ---
@@ -82,10 +82,11 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 **Decision (proposed).** Phase 05 collects real or documented samples, writes the classifier against them with fixtures, and falls back to timed back-off probes when no reset time can be parsed.
 **Consequences.** Until verified, the back-off path is the safety net.
 
-## ADR-0010: Standard-library-only runtime (Proposed)
+## ADR-0010: Standard-library-only runtime (Accepted)
 **Recorded.** 2026-10-26 08:35 CDT (Phase 00)
 **Context.** PHX must keep running unattended for days; dependencies are a failure surface. The host Python is 3.14.8; `tomllib`, `json`, `subprocess`, `argparse` and `fcntl` cover the needs.
-**Decision (proposed).** Runtime uses only the standard library, Python ≥ 3.12. Dev tools via `uv`. Phase 02 confirms.
+**Decision.** Runtime uses only the standard library, Python ≥ 3.12. Dev tools via `uv`.
+**Confirmed.** 2026-10-26 08:55 CDT (Phase 02). `pyproject.toml` has `dependencies = []`; `python3 -m phx --version` runs from `src/` on the host Python 3.14.8 with no install. Stdlib modules later phases rely on, all present in 3.12 and 3.14: `argparse`, `json`, `tomllib`, `subprocess`, `signal`, `fcntl`, `shutil`, `datetime`, `zoneinfo`, `uuid`, `pathlib`, `dataclasses`, `re`, `os`, `time`. Phase 02 already uses `argparse`, `tomllib`, `json`, `os`, `re`, `dataclasses`, `pathlib`, `time`. No gap found; nothing needs a third-party package.
 
 ## ADR-0011: PHX is additive and opt-in
 **Recorded.** 2026-10-26 08:41 CDT (Phase 00)

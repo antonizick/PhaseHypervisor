@@ -18,7 +18,18 @@ PHX is built with its own method. Work is split into phases in [PHX_IMPLEMENTATI
 | [CLAUDE.md](CLAUDE.md) | Rules for AI agents working in this repo |
 
 ## Usage
-Not available yet. The `phx` command arrives in Phase 02 (skeleton) and Phase 07 (`phx run`); see the plan.
+The `phx` command exists as a skeleton (Phase 02): `phx --help` lists the subcommands, and each one exits with "not implemented yet (Phase NN)" until its phase lands (`plan` in 04, `run` and friends in 07, `preflight` in 08).
+
+## Development setup
+```bash
+uv sync                      # create .venv and install the dev tools
+uv run phx --help
+uv run pytest
+uv run ruff check . && uv run ruff format --check .
+uv run mypy src
+uv run pre-commit install    # ruff + detect-secrets on each commit
+```
+The runtime needs no install: `cd src && python3 -m phx --version` works on any Python 3.12+.
 
 ## Requirements (target)
 Linux, Python 3.12+, [uv](https://docs.astral.sh/uv/), Claude Code and the local `ai-provider` switch script. Runtime code uses the Python standard library only.

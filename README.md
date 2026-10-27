@@ -1,6 +1,6 @@
 # PhaseHypervisor (`phx`)
 
-> **Status: v0.1.0 (released 2026-10-27 04:39 CDT, private repo).** `phx preflight`, `phx run` and the rest of the CLI work end to end: piloted on real sessions (`docs/PHX_PILOT_REPORT.md`), hardened against a written threat model (`docs/PHX_THREAT_MODEL.md`), and summed up in `docs/PHX_FINAL-REPORT.md` (Definition of done, measured results, known limitations, build timeline). The repo is private; making it public or publishing a GitHub Release needs the owner's confirmation.
+> **Status: v0.1.0 (released 2026-10-27 04:39 CDT, public repo since 2026-10-27 04:59 CDT).** `phx preflight`, `phx run` and the rest of the CLI work end to end: piloted on real sessions (`docs/PHX_PILOT_REPORT.md`), hardened against a written threat model (`docs/PHX_THREAT_MODEL.md`), and summed up in `docs/PHX_FINAL-REPORT.md` (Definition of done, measured results, known limitations, build timeline). Publishing a GitHub Release object still needs the owner's confirmation.
 
 PhaseHypervisor is a hands-off deployer for implementation plans made with the `phased-project` method. It reads a repo's `<PREFIX>_IMPLEMENTATION_PLAN.md`, asks the owner every foreseeable question once (`phx preflight`), then runs the remaining phases one at a time. Each phase is a fresh headless Claude Code session started through `ai-provider run -p "/phase NN --auto"` on the model the plan names. PHX verifies each phase independently, waits out usage limits and resumes. The supervisor itself is a plain Python program that never calls an LLM.
 

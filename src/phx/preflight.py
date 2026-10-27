@@ -716,7 +716,13 @@ def record(
     base = _git(repo, "rev-parse", "--short", MAIN).stdout.strip() or None
     data = build_record(plan, ts=ts, session_id=session_id, unresolved=unresolved, base_commit=base)
     path = repo / PREFLIGHT_FILE
+    # Repo content must not redirect this write (Phase 11 security review): no symlinked
+    # .phx/ or preflight.json, so the record lands only inside the checkout.
+    if path.parent.is_symlink() or path.is_symlink():
+        raise PreflightRefused(f"{PREFLIGHT_FILE} or its directory is a symlink; refusing to write")
     path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.resolve().is_relative_to(repo.resolve()):
+        raise PreflightRefused(f"{PREFLIGHT_FILE} resolves outside {repo}; refusing to write")
     before = show_main(repo, PREFLIGHT_FILE)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     added = _git(repo, "add", "--", PREFLIGHT_FILE)

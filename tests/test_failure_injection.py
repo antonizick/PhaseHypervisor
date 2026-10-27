@@ -368,3 +368,25 @@ def test_git_index_lock_blocks_preflight_record_cleanly(x: H) -> None:
     with pytest.raises(PreflightRefused):
         record(x.repo, env=x.env)
     assert git(x.repo, "status", "--porcelain") == "" and first.commit
+
+
+def test_preflight_record_refuses_symlinks(x: H, tmp_path: Path) -> None:
+    """A committed symlink must not redirect `phx preflight --record` (security review)."""
+    from phx.preflight import PREFLIGHT_FILE, PreflightRefused, record
+
+    victim = tmp_path / "bashrc"
+    victim.write_text("keep me\n")
+    (x.repo / ".phx").mkdir()
+    (x.repo / PREFLIGHT_FILE).symlink_to(victim)
+    git(x.repo, "add", "-A")
+    git(x.repo, "commit", "-q", "-m", "evil link")
+    with pytest.raises(PreflightRefused, match="symlink"):
+        record(x.repo, env=x.env)
+    assert victim.read_text() == "keep me\n"
+    git(x.repo, "rm", "-q", "-r", ".phx")
+    (x.repo / ".phx").symlink_to(tmp_path)
+    git(x.repo, "add", ".phx")
+    git(x.repo, "commit", "-q", "-m", "evil dir")
+    with pytest.raises(PreflightRefused, match="symlink"):
+        record(x.repo, env=x.env)
+    assert not (tmp_path / "preflight.json").exists()

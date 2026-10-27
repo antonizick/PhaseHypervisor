@@ -15,9 +15,10 @@ _PATTERNS: tuple[re.Pattern[str], ...] = (
 # NAME=value, NAME: value and the JSON forms "NAME": "value" and \"NAME\": \"value\" (a
 # JSON string inside a stream-json line), for any upper-case name ending in a secret word
 # (ANTHROPIC_AUTH_TOKEN, ANTHROPIC_API_KEY, OPENROUTER_API_KEY, GH_TOKEN, …). Quotes are
-# kept, so a redacted JSON line stays valid JSON (Phase 11 audit).
+# kept, so a redacted JSON line stays valid JSON, and a name right after an escaped
+# newline (multi-line tool output in a JSON string) still counts (Phase 11 review).
 _ASSIGNMENTS = re.compile(
-    r"\b([A-Z][A-Z0-9_]*(?:TOKEN|API_KEY|SECRET|PASSWORD))"
+    r"(?:(?<![A-Za-z0-9_])|(?<=\\[ntr]))([A-Z][A-Z0-9_]*(?:TOKEN|API_KEY|SECRET|PASSWORD))"
     r"((?:\\?[\"'])?\s*[=:]\s*)"
     r"(\[REDACTED\]|\\\"(?:[^\"\\]|\\[^\"])*\\\"|\"(?:[^\"\\]|\\.)*\"|'[^']*'|[^\s,;}\]\"'\\]+)"
 )

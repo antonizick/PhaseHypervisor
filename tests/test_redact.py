@@ -89,3 +89,13 @@ def test_no_false_positives(text: str) -> None:
 def test_idempotent() -> None:
     once = redact_text(f'GH_TOKEN=abc "OPENROUTER_API_KEY": "x" {"sk-or-v1-" + "f" * 20}')
     assert redact_text(once) == once and once.count(REDACTED) == 3
+
+
+def test_names_after_escaped_newlines() -> None:
+    """Multi-line `env` output inside a JSON string (Phase 11 security review)."""
+    import json
+
+    line = json.dumps({"content": "PATH=/usr/bin\nANTHROPIC_AUTH_TOKEN=abc123\tGH_TOKEN=xyz"})
+    out = redact_text(line)
+    assert "abc123" not in out and "xyz" not in out
+    assert json.loads(out)["content"].splitlines()[0] == "PATH=/usr/bin"

@@ -26,6 +26,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0020 | 2026-10-26 23:35 CDT | Manual `/phase` PHX check is fail-closed (`PHX-CHECK-DONE` sentinel); contract stays version 1 | Accepted | 11 |
 | ADR-0021 | 2026-10-26 23:35 CDT | Hardening from the threat model: confined vault and record writes, full-disk tolerance, pauses kept on refused resumes, claim commit as activity, dry-run test check | Accepted | 11 |
 | ADR-0022 | 2026-10-27 05:16 CDT | Share the method: the repo is the source of the `phased-project` skill and `/phx`, shipped as a Claude Code plugin plus manual fallback, with a new public getting-started guide | Accepted | 12a (planning) |
+| ADR-0023 | 2026-10-27 05:28 CDT | Phase 12a pre-decisions: symlinked live install, appended settings section, handle-only manifest metadata, sandboxed `uv tool install` check, version bump only on tag approval, `v0.2.0` tag scheme, namespaced plugin names accepted | Accepted | 12a (preflight) |
 
 ---
 
@@ -352,3 +353,33 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 **Decision.** A, A, A. Personal values move into an optional "Phased-project settings" section of the user's global `CLAUDE.md`, and `examples/CLAUDE.user.md` gives new users that section plus the standing rules. Phase 12a decides, and records in its own ADR, how plugin namespacing works, whether Nick's install uses symlinks or the plugin, and the exact settings format.
 
 **Consequences.** From Phase 12a on, skill and template changes are made in `plugins/phased-project/` in this repo. They are mirrored in `docs/PHX_GETTING_STARTED.md` and in Nick's playbook note (`CLAUDE.md` rule 7 changes). Everything committed to the plugin is public on push, so a deny-list test guards against personal text. The hands-off contract stays version 1 (ADR-0012), and manual use without `phx` stays fully supported (ADR-0011). Tagging a plugin or app version, or creating a GitHub Release, still needs Nick's confirmation (ADR-0004).
+
+## ADR-0023: Phase 12a pre-decisions from the preflight
+**Recorded.** 2026-10-27 05:28 CDT (phx preflight)
+
+**Context.** Phase 12a (ADR-0022) left several choices to the phase, and some of its tasks touch Nick's live setup or a public repo. Without these answers, a hands-off run would block or guess. Nick answered them in the preflight. Owner questions 6 to 12 record each answer.
+
+**Options considered.**
+
+| Question | Option | Pros | Cons |
+|---|---|---|---|
+| Nick's live install | **A. Symlinks into the main checkout** | Short names kept; edits land in the repo; easy undo from backups | Not the exact plugin path strangers use; breaks if the checkout moves |
+| | B. Plugin install from the local marketplace | Exactly what others get | Possibly namespaced names; plugin cache between edits and the live copy |
+| | C. Leave it to Nick | No risk to the live setup | Acceptance criterion unmet; follow-up |
+| Global `CLAUDE.md` | **A. Append the settings section after a backup** | Existing rules untouched | Some duplication with the phased-project pointer |
+| | B. Append and tidy duplicates | Shorter file | Rewrites Nick's rules hands-off |
+| | C. Print the block for Nick to paste | Zero risk | Manual step |
+| Manifest author/owner | **A. `antonizick` handle only** | Fits the deny-list; no personal data published | Less personal attribution |
+| | B. Full name / C. full name and email | Fuller attribution | Deny-list exceptions; email published |
+| `uv tool install git+…` check | **A. Scratch `HOME`/`UV_TOOL_DIR`/`UV_TOOL_BIN_DIR` only** | Tests the stranger path; Nick's editable install safe | Needs network |
+| | B. Don't try / C. anywhere, then restore | No network / simplest | Untested path / risks Nick's install |
+| Versioning | **A. Bump to 0.2.0 only when Nick approves the tag** | No version claimed without a release | Bump commit at close-out |
+| | B. Bump now / C. no bump, no tag | Simpler / no release | Version without tag / plugin users track `main` |
+| Tag scheme | **A. `v0.2.0` repo tag only** | Matches `v0.1.0`; one version | No `claude plugin tag` form |
+| | B. Both / C. plugin tag only / D. decide later | Plugin-native tags | Two schemes to keep in step |
+| Namespaced plugin names | **A. Accept and document both forms** | No blocking; honest docs | Longer names for plugin users |
+| | B. Lead with manual install / C. block | Short names / Nick decides | Plugin demoted / stops the run |
+
+**Decision.** A in every row. In task 6 of Phase 12a: back up `~/.claude/skills/phased-project`, `~/.claude/commands/phx.md` and `~/.claude/CLAUDE.md` with timestamps, append the "Phased-project settings" section, then replace the skill and command with symlinks into `/home/nick/Work/PhaseHypervisor/plugins/phased-project/`. Do this only if the task 8 regression diff shows nothing but explained wording changes; otherwise block-with-question. The manifests name `antonizick` (with its GitHub URL) and give no email. The stranger `uv tool install` path is tried only in a scratch environment. The phase ships at 0.1.0. Its close-out asks one question: may it tag `v0.2.0` and create a GitHub Release? On a yes, it bumps `pyproject.toml`, `plugin.json` and CHANGELOG to 0.2.0 in one commit before tagging.
+
+**Consequences.** Phase 12a can run hands-off up to its close-out question. The tag and Release still need Nick's explicit yes at that moment (ADR-0004, ADR-0017: nothing is pre-approved for publishing). The test that the plugin version matches `phx --version` holds at both 0.1.0 and 0.2.0.

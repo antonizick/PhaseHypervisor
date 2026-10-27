@@ -1,7 +1,7 @@
 # PHX: PhaseHypervisor Implementation Plan
 
 **Spec:** [`docs/PHX_SPECIFICATION.md`](docs/PHX_SPECIFICATION.md). **Decisions:** [`docs/PHX_DECISIONS.md`](docs/PHX_DECISIONS.md). **Agent rules:** [`CLAUDE.md`](CLAUDE.md). **Shared phase instructions:** [`prompts/PHX_shared-instructions.md`](prompts/PHX_shared-instructions.md)
-**Last updated:** 2026-10-26 17:17 CDT (Phase 09)
+**Last updated:** 2026-10-27 04:40 CDT (Phase 12)
 
 > ⚠️ **Mandatory:** every agent that works on this project keeps this file accurate. **Before doing any other work, set your phase to `🔄 In progress` and commit that change to `main`** (claim protocol: `prompts/PHX_shared-instructions.md` §1a). Other agents read this table from `main`. At the end, set it to `✅ Complete` or `⛔ Blocked` and add a Phase Log entry. See `CLAUDE.md`.
 
@@ -40,7 +40,7 @@ Each phase is claimed by a `chore(plan): start phase NN` commit on `main` and ru
 | 09 | Roll out to existing projects | Apply the Phase 03 contract and ADR-0004 rules to MM3, CL, OCC and YTPL2 (only when idle), add Gate columns, `phx` user-level slash command, skill "Running hands-off" section | Sonnet 5.5 | 03, 07 | ✅ Complete | [PHX_phase-09-rollout.md](prompts/PHX_phase-09-rollout.md) | review |
 | 10 | Pilot runs & tuning | Dry run on fixtures; a real hands-off run of a throwaway 3-phase sample plan (forced block, resume, simulated limit); one real plan per owner question 2; measure tokens and time; fix what the pilots expose | Opus 5.5 | 08, 09 | ✅ Complete | [PHX_phase-10-pilot-runs.md](prompts/PHX_phase-10-pilot-runs.md) | review |
 | 11 | Hardening, security review & QA | Threat model (bypass permissions, injection via repo text, secrets in logs, lock races), scanners, coverage, failure-injection tests, docs pass, close all follow-ups | Opus 5.5 | 10 | ✅ Complete | [PHX_phase-11-hardening-qa.md](prompts/PHX_phase-11-hardening-qa.md) | auto |
-| 12 | Release v0.1.0 | Final docs, CHANGELOG, version and tag, push to the private GitHub repo, final report with timeline, MVP sign-off; making the repo public or a GitHub release stops for Nick | Sonnet 5.5 | 11 | 🔄 In progress | [PHX_phase-12-release.md](prompts/PHX_phase-12-release.md) | review |
+| 12 | Release v0.1.0 | Final docs, CHANGELOG, version and tag, push to the private GitHub repo, final report with timeline, MVP sign-off; making the repo public or a GitHub release stops for Nick | Sonnet 5.5 | 11 | ✅ Complete | [PHX_phase-12-release.md](prompts/PHX_phase-12-release.md) | review |
 
 ### Model rationale
 - **Opus 5.5** (`/model claude-opus-5-5`): the `/phase` contract and skill changes (every future project depends on them), plan parsing, process supervision and exit classification, verification and recovery logic, the supervisor state machine, preflight prompt design, the pilots and the security review.
@@ -55,18 +55,18 @@ Each phase is claimed by a `chore(plan): start phase NN` commit on `main` and ru
 ```
 Run serially in ID order (ADR-0007).
 
-### Definition of done (checked in the final phase)
-- [ ] `phx preflight <repo>` asks foreseeable questions once and records them in the plan and ADRs.
-- [ ] `phx run <repo>` runs every remaining `auto` phase of a plan serially, each on its listed model via `ai-provider`, with no human input, and verifies each one independently.
-- [ ] `phx run` resumes a plan already underway (manual or PHX-started), including a `🔄` phase.
-- [ ] A blocked phase records its question, notifies Nick, and continues after `phx answer` + `phx resume`.
-- [ ] A Pro usage limit is detected, logged, waited out and resumed in the same session; toggling to OpenRouter during the wait resumes at once.
-- [ ] Supervisor costs zero tokens; per-phase token/cost totals are logged; triage uses haiku only on failures.
-- [ ] `run.jsonl` explains every decision; secrets are redacted (tested).
-- [ ] `--detach` survives closing the terminal; `phx stop` stops cleanly.
-- [ ] Skill templates, playbook note and MM3/CL/OCC/YTPL2 carry the auto-mode contract and ADR-0004 rules.
-- [ ] With auto mode off, `/phased-project`, `/phase` and `/phase-add` behave exactly as before (ADR-0011); a plan can be handed manual → PHX → manual without problems.
-- [ ] Tests, lint, type checks pass in CI; repo pushed to a private GitHub repo.
+### Definition of done (checked in Phase 12; evidence in `docs/PHX_FINAL-REPORT.md` §2)
+- [x] `phx preflight <repo>` asks foreseeable questions once and records them in the plan and ADRs.
+- [x] `phx run <repo>` runs every remaining `auto` phase of a plan serially, each on its listed model via `ai-provider`, with no human input, and verifies each one independently.
+- [x] `phx run` resumes a plan already underway (manual or PHX-started), including a `🔄` phase.
+- [x] A blocked phase records its question, notifies Nick, and continues after `phx answer` + `phx resume`.
+- [x] A Pro usage limit is detected, logged, waited out and resumed in the same session; toggling to OpenRouter during the wait resumes at once.
+- [x] Supervisor costs zero tokens; per-phase token/cost totals are logged; triage uses haiku only on failures.
+- [x] `run.jsonl` explains every decision; secrets are redacted (tested).
+- [x] `--detach` survives closing the terminal; `phx stop` stops cleanly.
+- [x] Skill templates, playbook note and MM3/CL/OCC/YTPL2 carry the auto-mode contract and ADR-0004 rules.
+- [x] With auto mode off, `/phased-project`, `/phase` and `/phase-add` behave exactly as before (ADR-0011); a plan can be handed manual → PHX → manual without problems.
+- [x] Tests, lint, type checks pass in CI; repo pushed to a private GitHub repo.
 
 ## Owner questions
 | # | Question | Status / proposed default | Needed by |
@@ -236,3 +236,12 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 - **Later prompts:** `prompts/PHX_phase-12-release.md` now reads the threat model and starts its known limitations from §3.
 - **Tests:** 491 passed, 1 skipped (`PHX_AUDIT_DIR` unset; it passes when set). That is 63 new tests: `test_failure_injection.py` 21, `test_cli_detach.py` 7, `test_redaction_audit.py` 4, plus additions to `test_redact`, `test_recover`, `test_plan`, `test_verify`, `test_triage`, `test_preflight`, `test_supervisor`, `test_supervisor_units` and `test_paths`. ruff check, ruff format --check and mypy --strict src are clean.
 
+### 2026-10-27 04:40 CDT: Phase 12: Release v0.1.0 (✅ Complete)
+- **Timeline:** started 2026-10-27 04:34 CDT (claim commit 2d55bfb) · finished 2026-10-27 04:40 CDT · merged MERGED_TS
+- **Model:** ran as claude-sonnet-5-5 (plan lists Sonnet 5.5)
+- **Built:** version `0.1.0` (`pyproject.toml`, `src/phx/__init__.py`, `uv.lock`); CHANGELOG `[0.1.0]` heading; `docs/PHX_FINAL-REPORT.md` (what was built, Definition of done with evidence, measured pilot results, limitations from threat model §3 and the deferred follow-ups, Mermaid gantt and table of the build timeline); README status and doc table; Definition of done boxes ticked. Outside the repo: playbook note "Released command set", OSMods write-up and index, Obsidian project note (status `complete`).
+- **Definition of done:** all 11 boxes checked with evidence in the report §2. One honest gap is recorded there: no real Pro usage limit or provider toggle has happened (the limit path ran on a real session through a shim; the toggle is covered by tests).
+- **Release:** tag `v0.1.0` pushed to the private `origin` (visibility checked `PRIVATE`). No GitHub Release object was created and the repo was not made public; both need Nick's confirmation (asked in the close-out message).
+- **Deviations:** none. CI runs on pushes to `main`, not on tags, so "CI green on the tag" is the run on the tagged commit.
+- **Follow-ups:** the report's §4 lists L1–L12 (pilot directories to delete, YTPL2 paused, probe/triage cost totals, `--safe-mode`, first real usage limit, preflights for MM3/CL/OCC).
+- **Tests:** 491 passed, 1 skipped; ruff check, ruff format --check and mypy --strict src clean; coverage 95 %.

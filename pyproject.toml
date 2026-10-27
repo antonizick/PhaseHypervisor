@@ -1,6 +1,6 @@
 [project]
 name = "phx"
-version = "0.0.0"
+version = "0.1.0"
 description = "Hands-off deployer for phased-project implementation plans"
 readme = "README.md"
 requires-python = ">=3.12"

@@ -4,7 +4,12 @@ All notable changes to PhaseHypervisor are recorded here. The format follows [Ke
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-27 04:39 CDT
+
+First release: the whole of Phases 00 to 12. Everything below was built in the phases listed.
+
 ### Added
+- Phase 12: release v0.1.0. Version `0.1.0` (`pyproject.toml`, `phx --version`), final report `docs/PHX_FINAL-REPORT.md` (what was built, Definition of done evidence, measured pilot results, known limitations from the threat model and the deferred follow-ups, and the planning and build timeline), README status.
 - Phase 11: threat model `docs/PHX_THREAT_MODEL.md` (20 threats rated, each with its mitigation and test, or an accepted residual risk; no High risk left unmitigated). New failure-injection suite `tests/test_failure_injection.py`: `kill -9` mid-phase and mid-state-write, full state disk, git `index.lock`, push timeout, suspend and a backwards clock during a wait, plan edited mid-run. Redaction audit `tests/redaction_audit.py`, kept as a test; the Phase 10 state audited clean. `phx run --dry-run` runs the test command once in a clean clone and suggests a dependency-installing `test_command` (`--skip-test-check` skips it). `PHX_VAULT_ROOT`. Coverage 95 % overall, 100 % on `plan.py`, `classify.py` and `recover.py`. ADR-0020, ADR-0021; spec amendment R22.
 - Phase 10: real-token pilots. A throwaway plan (`~/Work/tries/phx-pilot`, prefix `PXP`, 9 tiny phases) ran hands-off through a real preflight, an agent-raised block, `phx answer`/`phx resume`, a simulated usage limit on a real session (shim), `phx stop`/`phx resume` and a manual → PHX → manual handover; one real phase (YTPL2 Phase 03, opus) ran hands-off with `--max-phases 1 --require-preflight`. Measured numbers in `docs/PHX_PILOT_REPORT.md`. `/phx resume` verb and an always-`--detach` rule in `~/.claude/commands/phx.md`. ADR-0019; spec amendment R21.
 - Phase 09: rollout. MeetingMaster3, chessloopDeploy, OCC and YTPL2 now carry the hands-off contract (`PHX-CONTRACT: 1`, step 0, the "Hands-off mode" section, block-with-question, Risk rule, ADR-0004 git rules, Gate column, an ADR and a vault log line each; `phx plan` reports `Contract: 1` for all four). User-level slash command `~/.claude/commands/phx.md` (`/phx status|run|preflight [repo]`). The skill and playbook gained a "Migrating to the hands-off contract" checklist. Plan fixtures refreshed to the migrated versions (ADR-0018).

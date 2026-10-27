@@ -1,6 +1,6 @@
 # PhaseHypervisor (`phx`)
 
-> **Status: pre-release.** `phx run` (Phase 07) and `phx preflight` (Phase 08) work; the four existing projects were migrated to the hands-off contract in Phase 09; Phase 10 piloted it on real sessions (`docs/PHX_PILOT_REPORT.md`); Phase 11 hardened it against a written threat model (`docs/PHX_THREAT_MODEL.md`); the v0.1.0 release (12) is next.
+> **Status: v0.1.0 (released 2026-10-27 04:39 CDT, private repo).** `phx preflight`, `phx run` and the rest of the CLI work end to end: piloted on real sessions (`docs/PHX_PILOT_REPORT.md`), hardened against a written threat model (`docs/PHX_THREAT_MODEL.md`), and summed up in `docs/PHX_FINAL-REPORT.md` (Definition of done, measured results, known limitations, build timeline). The repo is private; making it public or publishing a GitHub Release needs the owner's confirmation.
 
 PhaseHypervisor is a hands-off deployer for implementation plans made with the `phased-project` method. It reads a repo's `<PREFIX>_IMPLEMENTATION_PLAN.md`, asks the owner every foreseeable question once (`phx preflight`), then runs the remaining phases one at a time. Each phase is a fresh headless Claude Code session started through `ai-provider run -p "/phase NN --auto"` on the model the plan names. PHX verifies each phase independently, waits out usage limits and resumes. The supervisor itself is a plain Python program that never calls an LLM.
 
@@ -17,6 +17,8 @@ PHX is built with its own method. Work is split into phases in [PHX_IMPLEMENTATI
 | [docs/PHX_ARCHITECTURE.md](docs/PHX_ARCHITECTURE.md) | Components and control flow |
 | [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md) | How to use `phx` (grows with each phase) |
 | [docs/PHX_THREAT_MODEL.md](docs/PHX_THREAT_MODEL.md) | Threats, ratings, mitigations and their tests, accepted risks (Phase 11) |
+| [docs/PHX_PILOT_REPORT.md](docs/PHX_PILOT_REPORT.md) | Measured results of the real-token pilots (Phase 10) |
+| [docs/PHX_FINAL-REPORT.md](docs/PHX_FINAL-REPORT.md) | v0.1.0 final report: Definition of done evidence, results, limitations, timeline (Phase 12) |
 | [docs/PHX_AUTO_MODE_CONTRACT.md](docs/PHX_AUTO_MODE_CONTRACT.md) | Hands-off `/phase NN --auto` contract (version 1) shared by PHX and every phase command |
 | [CLAUDE.md](CLAUDE.md) | Rules for AI agents working in this repo |
 

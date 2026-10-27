@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from phx.logging import EventLog
+from phx.paths import env_root
 from phx.plan import show_main
 from phx.state import RunState, now_ts
 
@@ -106,10 +107,7 @@ def append_line(text: str, line: str, ts: str) -> str | None:
 
 def vault_root(env: Mapping[str, str] | None = None) -> Path:
     """``$PHX_VAULT_ROOT``, else ``~/Documents`` (Nick's Obsidian vault)."""
-    env = os.environ if env is None else env
-    root = env.get("PHX_VAULT_ROOT")
-    home = env.get("HOME")
-    return Path(root) if root else (Path(home) if home else Path.home()) / "Documents"
+    return env_root(os.environ if env is None else env, "PHX_VAULT_ROOT", "Documents")
 
 
 def append_summary(

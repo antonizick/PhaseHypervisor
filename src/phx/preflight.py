@@ -723,12 +723,12 @@ def record(
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.resolve().is_relative_to(repo.resolve()):
         raise PreflightRefused(f"{PREFLIGHT_FILE} resolves outside {repo}; refusing to write")
-    before = show_main(repo, PREFLIGHT_FILE)
+    before = path.read_text(encoding="utf-8") if path.is_file() else None
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     added = _git(repo, "add", "--", PREFLIGHT_FILE)
     message = f"chore(phx): record preflight {ts}"
     commit = _git(repo, "commit", "-q", "-m", message, "--", PREFLIGHT_FILE)
-    if added.returncode != 0 or commit.returncode != 0:
+    if commit.returncode != 0:
         # leave main's checkout as it was (Phase 11: git lock contention)
         _git(repo, "reset", "-q", "--", PREFLIGHT_FILE)
         if before is None:

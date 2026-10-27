@@ -407,6 +407,21 @@ def _inside(path: Path, root: Path) -> bool:
     return path == root or path.is_relative_to(root)
 
 
+_RUNNING_GROUPS: set[int] = set()  # process groups of test commands now running
+
+
+def stop_running_tests() -> None:
+    """SIGTERM every running test command's process group (``phx stop``, Ctrl+C).
+
+    Test commands run in their own session (so a timeout can kill the whole group),
+    which also keeps the terminal's Ctrl+C from reaching them; the supervisor's stop
+    request forwards it here instead.
+    """
+    for pgid in list(_RUNNING_GROUPS):
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(pgid, signal.SIGTERM)
+
+
 def _run_group(
     argv: list[str], cwd: Path, env: Mapping[str, str], timeout: float
 ) -> subprocess.CompletedProcess[str]:
@@ -426,6 +441,7 @@ def _run_group(
         errors="replace",
         start_new_session=True,
     ) as proc:
+        _RUNNING_GROUPS.add(proc.pid)
         try:
             out, _ = proc.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -433,6 +449,8 @@ def _run_group(
                 os.killpg(proc.pid, signal.SIGKILL)
             proc.communicate()
             raise
+        finally:
+            _RUNNING_GROUPS.discard(proc.pid)
         return subprocess.CompletedProcess(argv, proc.returncode, out, None)
 
 
@@ -612,11 +630,16 @@ def install_steps(repo: Path, commit: str = MAIN) -> list[str]:
 
 
 def suggest_test_command(plan: Plan, commit: str = MAIN) -> str | None:
-    """A ``test_command`` that installs dependencies first, or ``None`` if none are tracked."""
-    steps = install_steps(plan.repo, commit)
-    if not steps or not plan.test_commands:
+    """A ``test_command`` that installs dependencies first, or ``None``.
+
+    Only for one plan test command from the shared instructions: several commands each
+    start at the repo root (joining them would carry a ``cd`` over), and a configured
+    ``test_command`` is Nick's own choice.
+    """
+    if plan.test_source == "config" or len(plan.test_commands) != 1:
         return None
-    return " && ".join([*steps, *plan.test_commands])
+    steps = install_steps(plan.repo, commit)
+    return " && ".join([*steps, plan.test_commands[0]]) if steps else None
 
 
 # --------------------------------------------------------------------------- the checks

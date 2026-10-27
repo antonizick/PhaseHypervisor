@@ -2,6 +2,7 @@
 
 import os
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,13 @@ class Config:
     idle_timeout_s: int = 1800  # no stream events for this long: kill the session
     wall_timeout_s: int = 21600  # hard cap on one session
     test_timeout_s: int = 3600  # cap on each verification test command (Phase 06)
+
+
+def env_root(env: Mapping[str, str], var: str, under_home: str) -> Path:
+    """``$var`` if set, else ``$HOME/<under_home>``: the S1 work root and the vault root."""
+    root = env.get(var)
+    home = env.get("HOME")
+    return Path(root) if root else (Path(home) if home else Path.home()) / under_home
 
 
 def default_state_root() -> Path:

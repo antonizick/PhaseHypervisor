@@ -13,6 +13,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,7 +29,7 @@ from phx.logging import EventLog
 from phx.plan import Status, load_plan
 from phx.recover import find_claude_processes, repair_blocked
 from phx.state import RunState, RunStatus, load_state, save_state
-from phx.supervisor import EXIT_FINISHED, EXIT_PAUSED, RESET_MARGIN_S
+from phx.supervisor import EXIT_FINISHED, EXIT_PAUSED, RESET_MARGIN_S, Supervisor
 from scenarios import Scenario
 from test_supervisor import FAKES, PLAN, SRC, FakeClock, H
 
@@ -390,3 +391,112 @@ def test_preflight_record_refuses_symlinks(x: H, tmp_path: Path) -> None:
     with pytest.raises(PreflightRefused, match="symlink"):
         record(x.repo, env=x.env)
     assert not (tmp_path / "preflight.json").exists()
+
+
+# --------------------------------------------------------------------------- code-review follow-ups
+
+
+def test_short_log_write_leaves_no_fragment(tmp_path: Path, monkeypatch: Any) -> None:
+    log = EventLog(tmp_path / "run.jsonl", mirror=io.StringIO())
+    log.event("first", reason="ok")
+
+    class Short(FullDisk):
+        def write(self, fd: int, data: Any) -> int:
+            return os.write(fd, data[:7])
+
+    monkeypatch.setattr("phx.logging.os", Short(tmp_path))
+    log.event("second", reason="cut")
+    monkeypatch.undo()
+    log.event("third", reason="ok")
+    events = [json.loads(ln)["event"] for ln in (tmp_path / "run.jsonl").read_text().splitlines()]
+    assert events == ["first", "third"]
+
+
+def test_final_state_save_failure_is_shouted(
+    x: H, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    scenario(x.decide_q1())
+    disk = FullDisk(x.state_root / "SMP" / ".state.json")
+    disk.armed = False
+    monkeypatch.setattr("phx.state.os", disk)
+    real = Supervisor._finish
+
+    def full_at_the_end(self: Supervisor, end: Any) -> int:
+        disk.armed = True
+        return real(self, end)
+
+    monkeypatch.setattr(Supervisor, "_finish", full_at_the_end)
+    assert x.run(pause_after="01") == EXIT_PAUSED
+    out = x.out.getvalue()
+    assert "WARNING: state.json could not be written" in out and "use phx resume only" in out
+
+
+def test_stop_during_verification_pauses_with_a_clear_reason(
+    x: H, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Code review: tests run in their own session, so a stop must reach them itself."""
+    scenario(x.all_auto().decide_q1())
+    (x.repo / ".phx").mkdir()
+    (x.repo / ".phx" / "config.toml").write_text('test_command = "sleep 30"\n')
+    git(x.repo, "add", "-A")
+    git(x.repo, "commit", "-q", "-m", "slow tests")
+    sup = x.sup(until="01")
+
+    def stop_when_tests_run() -> None:
+        from phx import verify
+
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline and not verify._RUNNING_GROUPS:
+            time.sleep(0.05)
+        sup.request_stop("received SIGINT")
+
+    t = threading.Thread(target=stop_when_tests_run)
+    t.start()
+    started = time.monotonic()
+    assert sup.run() == EXIT_PAUSED
+    t.join(5)
+    assert time.monotonic() - started < 25  # the 30 s test command was killed
+    end = x.last_event("run_end")
+    assert (
+        end["rule"] == "stopped_during_verification"
+        and "verification is incomplete" in end["reason"]
+    )
+
+
+def test_dry_run_test_check_respects_the_work_root(x: H) -> None:
+    x.env["PHX_WORK_ROOT"] = str(x.tmp / "elsewhere")
+    assert x.run(dry_run=True) == 0
+    assert "Test check: skipped" in x.out.getvalue() and not x.events("test_check")
+
+
+def test_suggestion_only_for_one_shared_instructions_command(tmp_path: Path) -> None:
+    from phx.verify import suggest_test_command
+
+    s = Scenario(tmp_path)
+    (s.repo / "package-lock.json").write_text("{}")
+    git(s.repo, "add", "-A")
+    git(s.repo, "commit", "-q", "-m", "lock")
+    plan = load_plan(s.repo)
+    assert suggest_test_command(plan) == "npm ci && test -f hello.txt"
+    two = SimpleNamespace(repo=s.repo, test_source="shared-instructions", test_commands=("a", "b"))
+    assert suggest_test_command(two) is None  # type: ignore[arg-type]
+    cfg = SimpleNamespace(repo=s.repo, test_source="config", test_commands=("make check",))
+    assert suggest_test_command(cfg) is None  # type: ignore[arg-type]
+
+
+def test_preflight_record_counts_the_commit_not_the_add(
+    x: H, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from phx import preflight
+
+    real = preflight._git
+
+    def flaky_add(repo: Path, *argv: str, timeout: float | None = None) -> Any:
+        got = real(repo, *argv, timeout=timeout)
+        if argv[:1] == ("add",):
+            return subprocess.CompletedProcess(got.args, 1, "", "index.lock briefly held")
+        return got
+
+    monkeypatch.setattr(preflight, "_git", flaky_add)
+    done = preflight.record(x.repo, env=x.env)
+    assert done.commit and git(x.repo, "status", "--porcelain") == ""

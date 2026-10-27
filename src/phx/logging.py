@@ -1,5 +1,6 @@
 """Append-only JSONL event log with a human-readable stderr mirror (spec R10)."""
 
+import contextlib
 import errno
 import json
 import os
@@ -40,8 +41,14 @@ class EventLog:
             # One O_APPEND write per record keeps concurrent appenders from interleaving.
             fd = os.open(self.path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
             try:
-                if os.write(fd, line.encode()) != len(line.encode()):
-                    raise OSError(errno.ENOSPC, "short write")
+                start = os.fstat(fd).st_size
+                try:
+                    if os.write(fd, line.encode()) != len(line.encode()):
+                        raise OSError(errno.ENOSPC, "short write")
+                except OSError:
+                    with contextlib.suppress(OSError):  # no half record before the next one
+                        os.ftruncate(fd, start)
+                    raise
                 os.fsync(fd)
             finally:
                 os.close(fd)

@@ -86,6 +86,20 @@ def test_no_false_positives(text: str) -> None:
     assert redact_text(text) == text
 
 
+@pytest.mark.parametrize(
+    ("text", "kept"),
+    [
+        ("DB_PASSWORD=abc,def;ghi done", " done"),
+        ("GITHUB_TOKEN: abc}def]x", ""),
+        (r"GH_TOKEN=abc\\def", ""),
+    ],
+)
+def test_unquoted_values_are_redacted_whole(text: str, kept: str) -> None:
+    """Code review (Phase 11): punctuation inside an unquoted secret is part of it."""
+    name = text.split("=")[0].split(":")[0]
+    assert redact_text(text).endswith(f"{REDACTED}{kept}") and redact_text(text).startswith(name)
+
+
 def test_idempotent() -> None:
     once = redact_text(f'GH_TOKEN=abc "OPENROUTER_API_KEY": "x" {"sk-or-v1-" + "f" * 20}')
     assert redact_text(once) == once and once.count(REDACTED) == 3

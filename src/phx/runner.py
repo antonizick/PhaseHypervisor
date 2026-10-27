@@ -7,6 +7,8 @@ enforces an idle timeout and a wall-clock cap, totals tokens and cost from the
 with the classification is the supervisor's job (Phases 06/07).
 """
 
+import contextlib
+import errno
 import json
 import os
 import queue
@@ -475,8 +477,10 @@ def run_session(
                 stderr.append(redact_text(line.rstrip("\n")))
                 continue
             if fd is not None:
+                data = (redact_text(line.rstrip("\n")) + "\n").encode()
                 try:
-                    os.write(fd, (redact_text(line.rstrip("\n")) + "\n").encode())
+                    if os.write(fd, data) != len(data):
+                        raise OSError(errno.ENOSPC, "short write")
                 except OSError as exc:  # full disk: keep the session, lose the copy
                     os.close(fd)
                     fd = None
@@ -507,6 +511,10 @@ def run_session(
     finally:
         if fd is not None:
             os.close(fd)
+        # the transcript's mtime is "when PHX's session ended" (recover.last_session_end),
+        # also when a full disk stopped the transcript early
+        with contextlib.suppress(OSError):
+            os.utime(transcript)
         try:
             exit_code: int | None = proc.wait(timeout=timeouts.term_grace_s + 5)
         except subprocess.TimeoutExpired:

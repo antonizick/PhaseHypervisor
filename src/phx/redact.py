@@ -20,7 +20,7 @@ _PATTERNS: tuple[re.Pattern[str], ...] = (
 _ASSIGNMENTS = re.compile(
     r"(?:(?<![A-Za-z0-9_])|(?<=\\[ntr]))([A-Z][A-Z0-9_]*(?:TOKEN|API_KEY|SECRET|PASSWORD))"
     r"((?:\\?[\"'])?\s*[=:]\s*)"
-    r"(\[REDACTED\]|\\\"(?:[^\"\\]|\\[^\"])*\\\"|\"(?:[^\"\\]|\\.)*\"|'[^']*'|[^\s,;}\]\"'\\]+)"
+    r"(\[REDACTED\]|\\\"(?:[^\"\\]|\\[^\"])*\\\"|\"(?:[^\"\\]|\\.)*\"|'[^']*'|(?:[^\s\"'\\]|\\\\)+)"
 )
 _BEARER = re.compile(r"(Authorization\s*:\s*Bearer\s+)[^\s\"'\\]+", re.IGNORECASE)
 

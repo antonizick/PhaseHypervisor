@@ -28,7 +28,7 @@ from phx import notify
 from phx.classify import ExitClass
 from phx.locks import LockBusy, RunLock, main_checkout
 from phx.logging import EventLog
-from phx.paths import Config, ensure_state_dirs, parse_config, state_dir
+from phx.paths import Config, ensure_state_dirs, env_root, parse_config, state_dir
 from phx.plan import (
     STATUS_LABELS,
     ContractError,
@@ -72,6 +72,7 @@ from phx.verify import (
     main_head,
     parse_command,
     run_tests,
+    stop_running_tests,
     suggest_test_command,
 )
 
@@ -208,12 +209,11 @@ class Supervisor:
         if not self.stop_event.is_set():
             self.stop_reason = reason
             self.stop_event.set()
+            stop_running_tests()  # a verification test command would not see the event
 
     def work_root(self) -> Path:
         """Repos PHX may run in (spec S1): ``$PHX_WORK_ROOT``, else ``~/Work``."""
-        root = self.env.get("PHX_WORK_ROOT")
-        home = self.env.get("HOME")
-        return Path(root) if root else (Path(home) if home else Path.home()) / "Work"
+        return env_root(self.env, "PHX_WORK_ROOT", "Work")
 
     def run(self) -> int:
         if self.options.dry_run:
@@ -698,6 +698,16 @@ class Supervisor:
             )
             self.state.totals(p.id).outcome = decision.rule
             self._save()
+            tests = decision.verdict.check("tests") if decision.verdict else None
+            if self.stop_event.is_set() and tests is not None and tests.status is CheckStatus.FAIL:
+                # a stop during verification killed the tests: that failure proves nothing
+                return End(
+                    EndKind.PAUSED,
+                    f"{self.stop_reason} while phase {p.id} was being verified; verification "
+                    "is incomplete. Check the phase, then phx resume",
+                    "stopped_during_verification",
+                    p.id,
+                )
             if decision.action is Action.NEXT_PHASE:
                 self.state.completed.append(p.id)
                 self.state.recoveries = 0
@@ -947,6 +957,18 @@ class Supervisor:
                 f"{self._held_pause.reason}",
             )
         self._save()
+        if self._state_unsaved:
+            self._save()  # one more try: this is the save a later run decides on
+        if self._state_unsaved:
+            self._say(
+                f"phx: WARNING: state.json could not be written ({self.state_dir}); this "
+                f"{status} state is not recorded. Free disk space before the next phx run"
+                + (
+                    ", and use phx resume only once you have dealt with the pause"
+                    if end.kind is EndKind.PAUSED
+                    else ""
+                )
+            )
         self.log.event(
             "run_end",
             phase=end.phase,
@@ -1041,6 +1063,10 @@ class Supervisor:
         command that needs ``node_modules`` fails after good work. Saying so before the
         run costs only the test time; ``--skip-test-check`` skips it.
         """
+        root = self.work_root().resolve()
+        if not self.repo.is_relative_to(root):
+            self._say(f"Test check: skipped; {self.repo} is outside {root} (spec S1).")
+            return
         commit = main_head(self.repo)
         if not plan.test_commands or commit is None:
             self._say("Test check: the plan names no test command; verification skips tests.")

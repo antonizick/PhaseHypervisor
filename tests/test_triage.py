@@ -80,7 +80,15 @@ def test_prompt_marks_the_run_text_as_data(tmp_path: Path) -> None:
         < prompt.index("FINAL MESSAGES OF THE PHASE SESSION>>>")
     )
     assert "Phase 05: blocked on question #6" in prompt
-    assert "no installed dependencies" in prompt and "not installing them" in prompt
+    assert "no installed dependencies" not in prompt  # only when the tests check failed
+    failed = Verdict(
+        "05",
+        RepoState.COMPLETE,
+        Outcome.FAILED,
+        (Check("tests", CheckStatus.FAIL, "`make check`: fail (exit 127)"),),
+    )
+    hinted = build_prompt("05", failed, t)
+    assert "no installed dependencies" in hinted and "not installing them" in hinted
 
 
 def test_run_text_cannot_close_its_data_block(tmp_path: Path) -> None:

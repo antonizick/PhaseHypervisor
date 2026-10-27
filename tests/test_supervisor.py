@@ -690,7 +690,7 @@ def test_phx_stop_command_against_a_real_process(
     # after the stop the lock file is stale: the shell check prints nothing
     check = subprocess.run(
         ["bash", "-c", CONTRACT_CHECK + "; echo done"],
-        env=x.env,
+        env={k: v for k, v in x.env.items() if k != "PHX_AUTO"},  # a hands-off session sets it
         capture_output=True,
         text=True,
         check=False,

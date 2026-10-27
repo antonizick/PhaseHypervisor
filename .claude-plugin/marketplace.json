@@ -1,0 +1,15 @@
+{
+  "name": "phasehypervisor",
+  "owner": { "name": "antonizick", "url": "https://github.com/antonizick" },
+  "metadata": {
+    "description": "The phased-project method for Claude Code: plan a build as phases, run them with /phase, optionally hands-off with PhaseHypervisor (phx)."
+  },
+  "plugins": [
+    {
+      "name": "phased-project",
+      "source": "./plugins/phased-project",
+      "description": "Skill /phased-project (bootstraps a phased plan with per-repo /phase and /phase-add commands) and the /phx command for PhaseHypervisor.",
+      "category": "development"
+    }
+  ]
+}

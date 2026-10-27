@@ -1,0 +1,10 @@
+{
+  "name": "phased-project",
+  "version": "0.1.0",
+  "description": "Plan a multi-session build as phases with a status table, self-contained prompts and per-repo /phase and /phase-add commands; drive PhaseHypervisor (phx) hands-off runs with /phx.",
+  "author": { "name": "antonizick", "url": "https://github.com/antonizick" },
+  "homepage": "https://github.com/antonizick/PhaseHypervisor/blob/main/docs/PHX_GETTING_STARTED.md",
+  "repository": "https://github.com/antonizick/PhaseHypervisor",
+  "license": "MIT",
+  "keywords": ["planning", "phases", "workflow", "automation"]
+}

@@ -1,0 +1,19 @@
+---
+description: Drive PhaseHypervisor (phx) from inside Claude Code (e.g. /phx status, /phx run <repo>, /phx resume <repo>, /phx preflight <repo>)
+argument-hint: "status | run | resume | preflight [repo]"
+---
+You are driving PhaseHypervisor (`phx`; guide: <https://github.com/antonizick/PhaseHypervisor/blob/main/docs/PHX_USER_GUIDE.md>). Argument: `$ARGUMENTS`.
+
+First run `command -v phx`. If it prints nothing, `phx` is not installed: tell the user it is optional (manual `/phase` works without it), that it installs with `uv tool install git+https://github.com/antonizick/PhaseHypervisor`, and stop.
+
+Parse the argument as `<verb> [repo]`. `repo` is a path; or a name from `Project aliases` in the user's "Phased-project settings" (in their global `~/.claude/CLAUDE.md`, if they have that section); or a folder name under that section's `Work root`, if one is set. If it is omitted, use the repo of the current directory (`git rev-parse --show-toplevel`, or its main checkout when this is a `-phase-NN` worktree). If a name cannot be resolved, say so and stop. Never read, print or copy secrets or key files. Run the CLI exactly as written below, with argument lists, and summarise its output in a few lines for the user: do not paste long tables unless asked.
+
+- **`status`** (or empty): run `phx plan <repo>` (read-only: phases, Gates, next phase, `Contract:` line, drift, open owner questions) and `phx status <repo>` (whether a run is active, paused, waiting for a usage limit or finished). Summarise: next phase, run state, anything that needs the user (an open question, a pause, a `⚠️` drift, `Contract:` not 1 meaning the repo's `/phase` command predates the hands-off contract).
+- **`preflight`**: `phx preflight` opens an *interactive* Claude Code session and refuses without a terminal, so it cannot run inside this session. Run `phx preflight <repo> --check` and `phx preflight <repo> --dry-run`; summarise the remaining phases, the leads and whether the recorded preflight is current, stale or missing. Then tell the user to run `phx preflight <repo>` in a separate terminal (a `!` command here has no terminal for it).
+- **`run`**: first run `phx plan <repo>` and `phx preflight <repo> --check`. Stop and tell the user if `Contract:` is not 1 or a `phx` supervisor is already running. A `🔄 In progress` phase is fine: `phx run` resumes it, unless a Claude session is working on it; say which phase it is. Then run `phx run <repo> --dry-run` and show which phases would run and where it would pause (Gates `review` / `owner`). Ask the user to confirm; only after a clear yes, start it with `phx run <repo> --detach` (a systemd user unit `phx-<repo>`, so it outlives this session) and tell the user how to follow it: `phx status <repo>`, `phx log <repo> -f`, `phx stop <repo>`, `phx resume <repo>`. If the user adds options (`--pause-after NN`, `--until NN`, `--max-phases N`), pass them through unchanged.
+- **`resume`**: run `phx status <repo>` and say why the run stopped or paused (the pause reason names what to do first: answer a question, review a phase, finish an owner phase by hand). Ask the user to confirm, then start `phx resume <repo> --detach` and say how to follow it, as for `run`.
+- **Anything else**: list these four verbs and stop.
+
+**Always `--detach`.** Never start `phx run` or `phx resume` in the foreground from Claude Code (a Bash call or a `!` command): when the session is backgrounded, ends or the call times out, the supervisor gets SIGTERM and stops mid-phase. The phase stays resumable, but the run is over. `--detach` needs `systemd-run --user` (Linux with systemd). Without it, do not start the run here: tell the user to run `phx run <repo>` (or `phx resume <repo>`) in a terminal of their own, for example inside `tmux`.
+
+Do not edit any repo's files, answer owner questions (`phx answer`), or stop a run unless the user asks for it in this session.

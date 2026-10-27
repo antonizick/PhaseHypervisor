@@ -1,6 +1,6 @@
 # PHX Architecture
 
-> Skeleton from Phase 01; Phase 02, 04, 05, 06, 07 and 08 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
+> Skeleton from Phase 01; Phase 02, 04, 05, 06, 07, 08 and 11 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
 
 ## Components
 | Component | Module (planned) | Phase | Role |
@@ -208,10 +208,25 @@ phx run → Supervisor._loop first round → _check_preflight(plan) → warning 
 
 Test double: the fake `claude` started without `-p` acts as the preflight session (`PHX_FAKE_EXPECT` asserts strings in the appended prompt, `PHX_FAKE_PREFLIGHT_RECORD=1` runs the record command, `PHX_FAKE_PROMPT_COPY` keeps the prompt).
 
+## Phase 11: hardening (threat model `PHX_THREAT_MODEL.md`, ADR-0020, ADR-0021)
+| Where | Behaviour |
+|---|---|
+| `redact.py` | Token shapes plus assignments to any upper-case `*TOKEN`, `*API_KEY`, `*SECRET` or `*PASSWORD` name, in shell, YAML, JSON and escaped-JSON forms. A name right after an escaped `\n` counts. Quotes are kept, so lines stay valid JSON, and redaction is idempotent. `tests/redaction_audit.py` scans output for leftovers. |
+| `logging.EventLog` | A record that cannot be written (ENOSPC, short write) goes to the stderr mirror and increments `write_errors`; the run continues. |
+| `state.save_state` | Full-write loop; on failure the temp file is removed and `OSError` raised; stale `.state.json.*.tmp` from a killed supervisor are removed after a successful save. `Supervisor._save` logs `state_write_failed` once (then `state_write_recovered`) and keeps state in memory. |
+| `runner.run_session` | A failed transcript write closes the transcript (`transcript_write_failed`); the session continues. |
+| `verify.run_command` | Each step runs in its own process group (`_run_group`); a timeout kills the group. `install_steps` / `suggest_test_command` turn tracked lockfiles into an install prefix. |
+| `supervisor._dry_test_check` | `--dry-run` runs `run_tests` once on `main` (event `test_check`) and prints a suggestion on failure; `RunOptions.test_check`, CLI `--skip-test-check`. |
+| `supervisor` resume | `_held_pause`: `phx resume` clears the pause only after the first round's startup checks pass; a refusal restores it (`pause_kept`). |
+| `recover.phase_activity` | Also counts the latest `chore(plan): start\|resume phase NN` commit on `main`. |
+| `recover.repair_blocked`, `cli.answer_question`, `preflight.record` | A failed commit restores the file's text (or removes a new record) rather than `git checkout`, which `index.lock` would also block. `record` refuses a symlinked `.phx/` or `preflight.json`. |
+| `vault.append_summary` | The note must be absolute, `.md`, and resolve inside `vault_root()` (`$PHX_VAULT_ROOT`, default `~/Documents`). |
+| `triage._data`, `preflight._quoted` | Repo text cannot close its `<<<…>>>` block or « » quote. Triage is told the clone has no installed dependencies. |
+
 ## Interface with phase sessions
 PHX and a phase session talk only through the repo and one line of output, defined in [PHX_AUTO_MODE_CONTRACT.md](PHX_AUTO_MODE_CONTRACT.md) (contract version 1, Phase 03):
 - **In:** `/phase NN --auto` plus `PHX_AUTO=1`. The command must carry `PHX-CONTRACT: 1`.
 - **Out:** the plan on `main` (`✅`, or `⛔` with an Owner question whose Status starts with `Open`), the phase branch/worktree, and a final `PHX-RESULT: {json}` line with status `complete`, `blocked` or `refused`. The line is a hint; verification decides.
-- **Locks:** `${XDG_RUNTIME_DIR}/phx/phx.lock` and `<repo-name>.lock`, held with `flock` for the supervisor's life, so a manual `/phase` can see a running supervisor and stop.
+- **Locks:** `${XDG_RUNTIME_DIR}/phx/phx.lock` and `<repo-name>.lock`, held with `flock` for the supervisor's life, so a manual `/phase` can see a running supervisor and stop. Its check ends with `echo PHX-CHECK-DONE` and fails closed (ADR-0020).
 
 See [PHX_SPECIFICATION.md](PHX_SPECIFICATION.md) for the requirements behind each step and [PHX_DECISIONS.md](PHX_DECISIONS.md) for the decisions.

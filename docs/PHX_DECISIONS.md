@@ -23,6 +23,8 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0017 | 2026-10-26 16:59 CDT | Preflight: interactive launch with an appended system-prompt file, PHX-built context, `--record` fingerprint and staleness rules, no pre-approved publishing | Accepted | 08 |
 | ADR-0018 | 2026-10-26 17:16 CDT | Rollout to the four existing projects: one adoption commit each, repo-specific stricter rules kept and flagged, `/phx` as a user-level command | Accepted | 09 |
 | ADR-0019 | 2026-10-26 18:38 CDT | Pilot corrections: live-session guard counts main-checkout sessions only on later work, stopped sessions charge their turns, always detach from Claude Code | Accepted | 10 |
+| ADR-0020 | 2026-10-26 23:35 CDT | Manual `/phase` PHX check is fail-closed (`PHX-CHECK-DONE` sentinel); contract stays version 1 | Accepted | 11 |
+| ADR-0021 | 2026-10-26 23:35 CDT | Hardening from the threat model: confined vault and record writes, full-disk tolerance, pauses kept on refused resumes, claim commit as activity, dry-run test check | Accepted | 11 |
 
 ---
 
@@ -279,4 +281,46 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 **Decision.** The second option (spec R21). Processes in the worktree always count. `claude bg-pty-host` wrappers are skipped. PHX's last session end is the mtime of its newest `sessions/<phase>-<n>.jsonl`. A resumable check names the ignored processes in `resume_check`. Usage: when the result event is missing or reports zero tokens, PHX sums the last `usage` per assistant message ID; cost stays unknown. A recorded session whose phase is `✅` on `main` is dropped (`session_dropped`). `/phx` gains `resume` and always detaches; the user guide says to always `--detach` from inside Claude Code.
 
 **Consequences.** Resume works while Nick keeps Claude Code open in the repo. Token totals now include interrupted sessions (cost still only from result events). The guard remains conservative for sessions in the worktree.
+
+## ADR-0020: The manual `/phase` PHX check fails closed
+**Recorded.** 2026-10-26 23:35 CDT (Phase 11)
+
+**Context.** Contract §8 step 0 makes a manual `/phase` check for a live supervisor before it claims anything. In the Phase 10 pilot (finding F5), a headless manual `/phase` had that check denied by permissions four times. It carried on to the next steps and stopped only because a dependency was missing. A check that is skipped when it cannot run protects nothing.
+
+**Options considered.**
+| Option | Pros | Cons |
+|---|---|---|
+| Keep the wording ("if it prints `PHX-RUNNING` … stop") | No change to five repos | Silence is ambiguous: the check prints nothing both when no supervisor runs and when it never ran |
+| Add a closing sentinel `echo PHX-CHECK-DONE`, and stop unless the output ends with it (chosen) | Unambiguous; works for denied, failed and timed-out calls; one line per repo | A manual `/phase` in a sandbox that forbids shell commands now refuses (by design; Nick runs it interactively instead) |
+| Bump the contract to version 2 | Signals the change | PHX reads nothing new (hands-off mode skips step 0), so a bump would only force needless re-migrations |
+
+**Decision.** The second option, in the skill template, `SKILL.md`, the playbook, contract §8 and the `phase.md` of PHX, MM3 (`81ee0a6`), CL (`9555f22`), OCC (`a1d5cdd`) and YTPL2 (`582b460`), one commit per repo. `status` reports the failed check above the table and continues. The contract stays at **version 1**.
+
+**Consequences.** A manual `/phase` that cannot verify PHX is absent no longer claims. Test fixtures were refreshed from the four repos. The contract test asserts the sentinel.
+
+## ADR-0021: Hardening decisions from the Phase 11 threat model
+**Recorded.** 2026-10-26 23:35 CDT (Phase 11)
+
+**Context.** `docs/PHX_THREAT_MODEL.md` rated 20 threats. These decisions are the ones that change behaviour.
+
+**Decisions.**
+1. **Vault note confinement (T17).** The note path read from `CLAUDE.md` on `main` must be an absolute `.md` path. It must resolve, symlinks followed, inside `$PHX_VAULT_ROOT`, default `~/Documents`. Otherwise the summary is skipped and logged. Alternatives: trust the path (repo text could point PHX at any Markdown file), or an allowlist file (more setup for no gain). `PHX_VAULT_ROOT` joins the `--detach` allowlist.
+2. **`preflight --record` refuses symlinks (T4).** A committed symlink at `.phx/` or `.phx/preflight.json` would redirect the write outside the repo.
+3. **Full disk is not fatal (T11).**
+   - Event-log records that cannot be written go to stderr (the journal when detached).
+   - A failed `state.json` write is logged once and the run continues with its state in memory.
+   - A failed transcript write stops only the transcript.
+   - Rejected alternative: stop the run on the first failed write. That would kill a phase session that is doing good work because PHX's own bookkeeping disk is full.
+4. **Failed commits restore the file's text (T13, T16).** They no longer run `git checkout --`, which fails while `index.lock` is held and would leave Nick's `main` checkout dirty.
+5. **`phx resume` keeps the pause when the run is refused at startup (F6).** The pause is cleared only after the plan, contract, config, preflight and launcher checks pass. A refusal logs `pause_kept`.
+6. **The claim commit counts as phase activity (T9, F8).** The live-session guard treats the latest `chore(plan): start|resume phase NN` commit on `main` as activity, so a session that claimed by hand and has not yet branched is not resumed over.
+7. **Dry-run test check (F9).**
+   - What runs: `phx run --dry-run` runs the plan's test command once, exactly as verification will (a clean clone of `main`, no shell). If it fails, PHX says so, and when lockfiles are tracked (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `uv.lock`, depth ≤ 2) it suggests a `test_command` that installs them first.
+   - Opting out: `--skip-test-check` skips the check.
+   - Triage: the triage prompt now says the clone has no installed dependencies.
+   - Why not the preflight: in `phx preflight` the check would delay the interactive session by the test time, and its context step must stay instant.
+8. **Redaction scope (T7).** Assignments are redacted for any upper-case name ending in `TOKEN`, `API_KEY`, `SECRET` or `PASSWORD`, in shell, YAML, JSON and escaped-JSON forms. Quotes are kept, so lines stay valid JSON. Redaction is idempotent.
+9. **Test-command timeouts kill the process group (T6).**
+
+**Consequences.** No High risk is left unmitigated. A real run whose vault note lives outside `~/Documents` (the Phase 10 pilot's throwaway vault) needs `PHX_VAULT_ROOT`.
 

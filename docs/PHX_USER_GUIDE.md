@@ -42,7 +42,7 @@ Publishing is never pre-approved: making a repo public, publishing a release or 
 
 ## `phx run`: run a plan hands-off
 ```bash
-phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--dry-run] [--require-preflight]
+phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--dry-run [--skip-test-check]] [--require-preflight]
 ```
 Each round, PHX re-reads the plan from `main` and picks, in this order:
 1. a usage-limit wait left by an earlier run (it finishes the wait, then resumes that session);
@@ -57,12 +57,12 @@ Options:
 - `--pause-after NN`: pause after phase NN completes.
 - `--until NN`: run up to and including NN, start nothing later, then finish.
 - `--max-phases N`: finish after N phases complete in this run.
-- `--dry-run`: print the phases it would run in order (assuming each completes), with the exact launch command, and where it would stop. Launches nothing, takes no lock, writes no state.
-- `--require-preflight`: refuse to start (exit 1, rule `preflight_missing` or `preflight_stale`) unless a current preflight is recorded. Without it, PHX only warns.
+- `--dry-run`: print the phases it would run in order (assuming each completes), with the exact launch command, and where it would stop. Launches nothing, takes no lock, writes no state. It then runs the test command once, exactly as verification will (a clean clone of `main`, no installed dependencies, no shell). If the command fails, PHX says so; when the repo tracks a lockfile (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `uv.lock`), it also prints a `test_command` for `.phx/config.toml` that installs dependencies first (Phase 11). A failure can be expected early in a plan, before the phase that adds what the tests check. `--skip-test-check` skips this step.
+- `--require-preflight`: refuse to start (exit 1, rule `preflight_missing` or `preflight_stale`) unless a current preflight is recorded. Without it, PHX only warns. A `phx resume` refused this way keeps its pause (`pause_kept` in the log).
 
 Exit status: `0` finished (nothing left, or `--until`/`--max-phases` reached), `1` error (another supervisor running, plan or contract problem, repo outside `~/Work`, internal error), `3` paused, `4` stopped.
 
-Only one supervisor runs on the machine at a time (ADR-0007). While it runs, a manual `/phase` in that repo sees its lock and stops instead of claiming (contract §8).
+Only one supervisor runs on the machine at a time (ADR-0007). While it runs, a manual `/phase` in that repo sees its lock and stops instead of claiming (contract §8). If the manual check cannot run (for example, a permission prompt denies it), `/phase` stops too and says so (fail-closed, ADR-0020).
 
 ## When a run pauses
 A pause is remembered in `state.json` until you clear it with `phx resume`; `phx run` on a paused repo refuses and repeats the reason. `phx status` and the notification say why:
@@ -122,7 +122,7 @@ To resume sooner, switch to OpenRouter with **Super+Alt+A**: PHX checks `ai-prov
 Desktop notifications (silent, never spoken) for: phase complete, blocked (with a short haiku summary of why), usage-limit wait (with the resume time), provider switch noticed, verification failure, other pauses and run finished. Without a display they are skipped and logged.
 
 ## Obsidian run summary
-At the end of every run (finished, paused or stopped), PHX appends one line to the project note named in the repo's `CLAUDE.md` ("The Obsidian project note `…`"): outcome, then per phase the result, tokens, cost, sessions and waits. It changes only that note's `## Log` section and `updated:` field.
+At the end of every run (finished, paused or stopped), PHX appends one line to the project note named in the repo's `CLAUDE.md` ("The Obsidian project note `…`"): outcome, then per phase the result, tokens, cost, sessions and waits. It changes only that note's `## Log` section and `updated:` field. The note must be a `.md` file inside your vault, `$PHX_VAULT_ROOT` (default `~/Documents`); for any other path PHX skips the summary and logs why (Phase 11).
 
 ## Troubleshooting
 - **"another phx supervisor holds the … lock"**: one supervisor at a time per machine. `phx status` shows which; `phx stop <that repo>` stops it.
@@ -134,6 +134,9 @@ At the end of every run (finished, paused or stopped), PHX appends one line to t
 - **A warning about the test command**: verification runs it without a shell; set `test_command` in `.phx/config.toml` to a script (ADR-0015).
 - **The detached unit is gone**: it is collected when it ends; `phx log` and `phx status` still have everything. `journalctl --user -u phx-<repo>` shows its stdout.
 - **Lock files** in `$XDG_RUNTIME_DIR/phx/` stay after a run; an unlocked file means "not running".
+- **`phx: …run.jsonl not written (No space left on device)`** on stderr (or in `journalctl --user -u phx-<repo>`): the state disk is full. The run carries on and keeps its decisions on stderr. Free space; the next write succeeds (`state_write_recovered`).
+- **"note is not a .md file inside the vault"** in the `vault` event: the note named in `CLAUDE.md` is outside `$PHX_VAULT_ROOT`. Set `PHX_VAULT_ROOT` if your vault lives elsewhere.
+- **`verification_failed` with "command not found" after good work**: the clean clone has no installed dependencies. Run `phx run <repo> --dry-run` for a suggested `test_command`.
 
 ## `phx plan`: see what PHX sees
 ```bash

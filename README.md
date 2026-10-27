@@ -1,6 +1,6 @@
 # PhaseHypervisor (`phx`)
 
-> **Status: pre-release.** `phx run` (Phase 07) and `phx preflight` (Phase 08) work; the four existing projects were migrated to the hands-off contract in Phase 09; real-token pilots (10) are still to come.
+> **Status: pre-release.** `phx run` (Phase 07) and `phx preflight` (Phase 08) work; the four existing projects were migrated to the hands-off contract in Phase 09; Phase 10 piloted it on real sessions (`docs/PHX_PILOT_REPORT.md`); hardening and QA (11) are next.
 
 PhaseHypervisor is a hands-off deployer for implementation plans made with the `phased-project` method. It reads a repo's `<PREFIX>_IMPLEMENTATION_PLAN.md`, asks the owner every foreseeable question once (`phx preflight`), then runs the remaining phases one at a time. Each phase is a fresh headless Claude Code session started through `ai-provider run -p "/phase NN --auto"` on the model the plan names. PHX verifies each phase independently, waits out usage limits and resumes. The supervisor itself is a plain Python program that never calls an LLM.
 

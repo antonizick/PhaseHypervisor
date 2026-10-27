@@ -33,6 +33,7 @@ PHX is safe to leave running: the threat model is written down, risks are mitiga
    - Contract step 0 (manual-run guard) **fails open**: in a headless non-`--auto` session the lock check was denied by permissions four times and the agent went on to the next steps. Make it fail-closed ("if the check cannot run, tell Nick and stop before claiming") in the skill template, the playbook, `PHX_AUTO_MODE_CONTRACT.md` §8 and the five migrated `phase.md` files (PHX, MM3, CL, OCC, YTPL2), one commit per repo; decide with an ADR whether it needs a contract version bump (it should not: PHX reads nothing new).
    - Threat-model the ADR-0019 guard heuristic: a main-checkout session that claimed a phase by hand but has not yet written anything is not seen; check that the claim commit itself counts (branch tip time after process start).
    - `phx resume --require-preflight` clears the pause before the preflight check refuses the run; decide whether the pause should stay.
+   - Verification runs the plan's tests in a clean clone with no installed dependencies, so YTPL2 Phase 03 (good work) paused as `verification_failed` (`prettier` not found) after a $6.12 opus session, and the haiku triage advised `npm install` in the main checkout, which would not help. Make `phx preflight` (context step, no tokens) or `phx run --dry-run` run the test command once in a clean clone of `main` and, if it fails, say so and suggest a `test_command` that installs dependencies first; and give triage the hint that the clone has no installed dependencies.
 
 ## Out of scope
 New features.

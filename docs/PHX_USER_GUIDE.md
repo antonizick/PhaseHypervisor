@@ -176,7 +176,7 @@ Optional, committed on `main`, never containing secrets. Unknown keys or wrong t
 
 | Key | Default | Meaning |
 |---|---|---|
-| `test_command` | from the shared instructions | Command verification runs on a clean clone of `main` (Phase 06). No shell: `&&`, `cd DIR`, `NAME=value`, quotes and globs (`**` too) work; pipes, `;`, `||`, redirects and `$VAR` do not, so point it at a script for anything more (ADR-0015) |
+| `test_command` | from the shared instructions | Command verification runs on a clean clone of `main` (Phase 06). No shell: `&&`, `cd DIR`, `NAME=value`, quotes and globs (`**` too) work; pipes, `;`, `||`, redirects and `$VAR` do not, so point it at a script for anything more (ADR-0015). The clone has **no installed dependencies** (no `node_modules`, no build output; `uv run` syncs itself, `npm` does not), so a repo whose checks need them installs them first, e.g. YTPL2's `npm ci --prefix frontend && make check` (Phase 10 pilot). If the file sits under a broad ignore rule such as `config.toml`, add `!.phx/config.toml` to `.gitignore`: PHX reads it from `main` |
 | `test_timeout_s` | `3600` | Cap on each verification test command (Phase 06) |
 | `max_budget_usd` | none | Passed as `--max-budget-usd` **only when the provider is OpenRouter** (spec R9) |
 | `idle_timeout_s` | `1800` | A phase session that emits no stream event for this long is stopped (SIGTERM, then SIGKILL) and classified `timeout` (Phase 05) |

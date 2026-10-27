@@ -92,11 +92,13 @@ handle_outcome(repo, outcome, state, log, recoveries, baseline, config) ──�
   auth_error / provider_error ─────────────────────────────────► decide (no verification)
   row 🔄 and (result line "blocked" or wip(phase-NN): blocked commit) ─► repair_blocked  (the only write)
   verify_phase(repo, NN, classification, baseline) ──► Verdict    reads main; tests in a temp clone
-  live_sessions(repo, NN)      only before a retry: claude processes in the worktree or main checkout
+  live_sessions(repo, NN, since) only before a retry: claude processes in the worktree (always) or the
+                               main checkout (only headless `/phase` ones, or ones that started before work
+                               on NN that is newer than `since`, PHX's last session end; ADR-0019); pty hosts skipped
   decide(NN, classification, verdict, session_id, recoveries, live) ──► Decision
   triage.summarize(...)        haiku, tool-less, on a pause after blocked / needs_review / failed
   run.jsonl                    verify · repair / repair_skipped · triage · decision
-check_resumable(repo, NN) ──► Resumability   R14: before resuming a 🔄 phase at start-up
+check_resumable(repo, NN, since) ──► Resumability   R14: before resuming a 🔄 phase; names ignored idle sessions
 ```
 
 **Checks** (`Check(name, status pass|fail|skip, evidence, required)`), all read from `main` and the main checkout without writing:

@@ -2,7 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from phx.paths import Config, ensure_state_dirs, load_config, sessions_dir, state_dir
+from phx.paths import (
+    Config,
+    ensure_state_dirs,
+    load_config,
+    parse_config,
+    sessions_dir,
+    state_dir,
+)
 
 
 def test_state_dir_uses_repo_name_and_xdg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -46,3 +53,11 @@ def test_config_rejects_bad_input(tmp_path: Path, body: str) -> None:
     (tmp_path / ".phx" / "config.toml").write_text(body)
     with pytest.raises(ValueError):
         load_config(tmp_path)
+
+
+def test_bool_is_not_a_number() -> None:
+    """A TOML bool is an int in Python; numeric fields still refuse it (Phase 04 follow-up)."""
+    with pytest.raises(ValueError, match="test_timeout_s must be int"):
+        parse_config("test_timeout_s = true\n", "x")
+    with pytest.raises(ValueError, match="max_budget_usd must be float"):
+        parse_config("max_budget_usd = false\n", "x")

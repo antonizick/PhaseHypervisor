@@ -493,3 +493,34 @@ def test_plan_phase_lookup() -> None:
     assert plan.phase("01").id == "01"
     with pytest.raises(KeyError):
         plan.phase("02")
+
+
+# ------------------------------------------------------------------ cell setters (Phase 11)
+
+
+def test_set_status_cell_skips_other_tables() -> None:
+    from phx.plan import set_status_cell
+
+    text = (
+        "| Tool | Version |\n|---|---|\n| uv | 0.13 |\n\n"
+        "| Phase | Name | Status |\n|---|---|---|\n| 01 | One | ⬜ Not started |\n"
+    )
+    out = set_status_cell(text, "01", "⛔ Blocked")
+    assert out.splitlines()[-1] == "| 01 | One | ⛔ Blocked |"
+    assert out.splitlines()[2] == "| uv | 0.13 |"
+    with pytest.raises(PlanError, match="phase 09 not in the phase table"):
+        set_status_cell(text, "09", "x")
+
+
+def test_set_question_status_header_variants() -> None:
+    from phx.plan import set_question_status
+
+    text = (
+        "## Owner questions (old)\n| Note | Text |\n|---|---|\n| a | b |\n"
+        "| # | Question | Status |\n|---|---|---|\n| 1 | Old? | Open |\n\n"
+        "## More questions\n| ID | Question | Proposed default | Needed by |\n|---|---|---|---|\n"
+        "| 2 | Colour? | Open. Proposed default: blue | Phase 02 |\n"
+    )
+    out = set_question_status(text, "2", "Answered TS: green")
+    assert "| 2 | Colour? | Answered TS: green | Phase 02 |" in out
+    assert "| 1 | Old? | Open |" in out and "| a | b |" in out

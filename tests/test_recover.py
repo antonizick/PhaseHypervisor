@@ -9,11 +9,14 @@ import json
 import os
 import shutil
 import time
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from phx import recover
 from phx.classify import Classification, ExitClass
 from phx.logging import EventLog
 from phx.paths import Config
@@ -559,3 +562,69 @@ def test_custom_triage_function(e: Env) -> None:
     d = e.handle(e.session("blocked.jsonl"), triage=fake)
     assert calls and calls[0]["phase"] == "05" and calls[0]["verdict"] is d.verdict
     assert d.action is Action.PAUSE and d.summary is None
+
+
+# --------------------------------------------------------------------------- edge paths (Phase 11)
+
+
+def test_decide_unexpected_combination() -> None:
+    from phx.verify import RepoState, Verdict
+
+    verdict = Verdict("05", RepoState.IN_PROGRESS, Outcome.IN_PROGRESS, ())
+    d = decide("05", Classification(ExitClass.COMPLETE, "result line"), verdict)
+    assert d.action is Action.PAUSE and d.rule == "unexpected"
+    assert "session ended as complete with the repo in_progress" in d.reason
+
+
+def test_ancestors_stop_at_an_unreadable_stat(tmp_path: Path) -> None:
+    from phx.recover import _ancestors
+
+    me = tmp_path / str(os.getpid())
+    me.mkdir()
+    (me / "stat").write_text(f"{os.getpid()} (python) S notapid 1 1\n")
+    assert _ancestors(tmp_path) == {os.getpid()}
+
+
+def test_phase_activity_edge_paths(e: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    e.sc.claim().work()
+    (e.sc.worktree / "hello.txt").unlink()  # " D hello.txt": no mtime to read
+    claim = phase_activity(e.sc.repo, "05")
+    assert claim is not None
+    real = recover.load_live
+
+    def with_ghost(repo: Path) -> Any:
+        live = real(repo)
+        return SimpleNamespace(
+            for_phase=lambda pid: (
+                ["phase-05-gone", *live.for_phase(pid)[0]],
+                live.for_phase(pid)[1],
+            )
+        )
+
+    monkeypatch.setattr(recover, "load_live", with_ghost)
+    assert phase_activity(e.sc.repo, "05") == claim  # the vanished branch is skipped
+
+
+def test_live_sessions_without_ignored_list(e: Env) -> None:
+    e.sc.claim().work(commit=False)
+    now = time.time()
+    fake_proc(e.proc, 61, comm="claude", argv=["claude"], cwd=e.sc.repo, started=now + 60)
+    fake_proc(e.proc, 62, comm="claude", argv=["claude"], cwd=e.sc.repo, started=now + 90)
+    assert live_sessions(e.sc.repo, "05", proc_root=e.proc, exclude=()) == []
+
+
+def test_last_session_end_skips_a_dangling_transcript(tmp_path: Path) -> None:
+    (tmp_path / "sessions").mkdir()
+    (tmp_path / "sessions" / "05-1.jsonl").symlink_to(tmp_path / "gone")
+    good = tmp_path / "sessions" / "05-2.jsonl"
+    good.write_text("")
+    os.utime(good, (200.0, 200.0))
+    assert last_session_end(tmp_path, "05") == 200.0
+
+
+def test_handle_outcome_for_a_phase_missing_from_the_plan(e: Env) -> None:
+    out = e.session("complete.jsonl")
+    out = replace(out, phase="99")
+    d = e.handle(out, triage=lambda **_: None)
+    assert d.action is Action.PAUSE
+    assert not e.events("repair") and not e.events("repair_skipped")

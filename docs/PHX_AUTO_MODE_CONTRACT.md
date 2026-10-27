@@ -125,10 +125,12 @@ PHX creates `LOCKDIR` with mode `0700`, holds an **exclusive `flock`** on each l
 **Manual check (auto mode off, every form of `/phase`).** Before anything else the command runs:
 
 ```bash
-f="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/phx/$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")").lock"; [ -e "$f" ] && ! flock -n -s "$f" true && echo "PHX-RUNNING $(cat "$f")"; printenv PHX_AUTO
+f="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/phx/$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")").lock"; [ -e "$f" ] && ! flock -n -s "$f" true && echo "PHX-RUNNING $(cat "$f")"; printenv PHX_AUTO; echo PHX-CHECK-DONE
 ```
 
-(`flock` is util-linux, present on the reference machine; `phx` itself need not be installed.) If it prints `PHX-RUNNING`, a supervisor is live on this repo: the command tells Nick (PID, phase, start time, and `phx status` / `phx stop` if installed) and stops without claiming, resuming or changing anything. For `status` it shows the notice above the table and continues, since `status` changes nothing. The same command's last line tells the agent whether `PHX_AUTO=1` is set.
+(`flock` is util-linux, present on the reference machine; `phx` itself need not be installed.) If it prints `PHX-RUNNING`, a supervisor is live on this repo: the command tells Nick (PID, phase, start time, and `phx status` / `phx stop` if installed) and stops without claiming, resuming or changing anything. For `status` it shows the notice above the table and continues, since `status` changes nothing. The same command's second-to-last line tells the agent whether `PHX_AUTO=1` is set.
+
+**Fail closed (amended 2026-10-26 23:08 CDT, Phase 11, ADR-0020).** The check counts only if its output ends with `PHX-CHECK-DONE`. If it cannot run (the tool call is denied by permissions, errors or times out) or that line is missing, the command tells Nick that the PHX check could not run and stops before claiming, resuming or changing anything; it does not skip the check or work around it. `status` says so above the table and continues. (The Phase 10 pilot saw a headless manual `/phase` carry on after its check was denied four times.) This changes only what the manual agent reads, nothing PHX reads, so the contract stays version 1.
 
 **Auto mode** skips the check: the supervisor holding the lock is the one that started the session.
 

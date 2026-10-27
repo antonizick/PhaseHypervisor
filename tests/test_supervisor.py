@@ -634,7 +634,9 @@ def test_phx_stop_command_against_a_real_process(
             text=True,
             check=False,
         )
-        line = check.stdout.strip()
+        lines = check.stdout.strip().splitlines()
+        assert lines[-1] == "PHX-CHECK-DONE"  # fail-closed sentinel (ADR-0020)
+        line = lines[0]
         assert line.startswith("PHX-RUNNING {")
         body = json.loads(line.removeprefix("PHX-RUNNING "))
         assert body["pid"] == proc.pid and body["phase"] == "01" and body["repo"] == str(x.repo)
@@ -656,7 +658,8 @@ def test_phx_stop_command_against_a_real_process(
         text=True,
         check=False,
     )
-    assert "PHX-RUNNING" not in check.stdout and check.stdout.strip().endswith("done")
+    assert "PHX-RUNNING" not in check.stdout
+    assert check.stdout.split() == ["PHX-CHECK-DONE", "done"]
 
 
 def test_unexpected_error_is_logged_and_ends_the_run(

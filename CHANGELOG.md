@@ -24,6 +24,7 @@ First release: the whole of Phases 00 to 12. Everything below was built in the p
 - Phase 00: specification, decision log, implementation plan and phase prompts.
 
 ### Fixed
+- Phase 12: `test_detach_stop_and_allowlist` was flaky on slow CI runners (it stopped the run between the fake agent's plan edit and its claim commit, so verification correctly reported a dirty main checkout). It now waits for the claim commit on `main` first. Test-only; found when CI on the first v0.1.0 commit failed (it had failed once before, on the Phase 11 merge-time commit).
 - Phase 11: the manual `/phase` PHX check is fail-closed: a check that cannot run stops the command before it claims (ADR-0020; PHX, MM3, CL, OCC and YTPL2, the skill and the playbook). Contract stays version 1.
 - Phase 11 (security): redaction now covers `"NAME": "value"`, escaped JSON and names after an escaped newline for any `*TOKEN`/`*API_KEY`/`*SECRET`/`*PASSWORD`, plus `ghs_`/`ghu_`/`ghr_` and `sk-ant-oat` tokens; redacted lines stay valid JSON. `phx preflight --record` refuses a symlinked `.phx/` or `preflight.json`. The vault note must resolve inside `$PHX_VAULT_ROOT`. Text quoted into the triage and preflight prompts cannot close its data block.
 - Phase 11: a full state disk no longer ends a run or kills its session. A failed `⛔` repair, `phx answer` or preflight record commit (for example while `index.lock` is held) no longer leaves the plan file edited in the main checkout. A timed-out test command is killed with its whole process group.

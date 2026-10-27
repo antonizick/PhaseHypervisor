@@ -23,6 +23,7 @@ from conftest import RepoFactory
 from phx.cli import main
 from phx.detach import ENV_ALLOWLIST, Detached, detach
 from phx.locks import running
+from phx.plan import Status
 from phx.supervisor import EXIT_ERROR, EXIT_STOPPED
 from test_runner import FAKE_KEY
 from test_supervisor import H
@@ -98,7 +99,9 @@ def test_detach_stop_and_allowlist(x: H, capsys: pytest.CaptureFixture[str]) -> 
         assert main([*state, "run", str(x.repo), "--detach"]) == EXIT_ERROR
         assert "already running" in capsys.readouterr().err
         deadline = time.monotonic() + 20
-        while time.monotonic() < deadline and not x.calls("01"):
+        # wait for the claim commit on main: a stop between the agent's plan edit and its commit
+        # leaves the main checkout dirty, which verification rightly reports
+        while time.monotonic() < deadline and x.status("01") is not Status.IN_PROGRESS:
             time.sleep(0.1)
         assert main([*state, "stop", str(x.repo), "--timeout", "30"]) == 0
         assert "phx: stopped: received SIGTERM" in capsys.readouterr().out

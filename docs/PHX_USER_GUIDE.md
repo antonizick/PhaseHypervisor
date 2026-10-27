@@ -75,8 +75,9 @@ A pause is remembered in `state.json` until you clear it with `phx resume`; `phx
 | Gate owner on NN | run `/phase NN` yourself, then `phx resume` (if NN is already `🔄`, the pause says so: finish it by hand first) |
 | `--pause-after NN` | `phx resume` |
 | Verification failed / needs review | read `phx status` and `phx log`, fix the repo (or finish the phase by hand), then `phx resume` |
-| A Claude session is open in the worktree or main checkout | it may be working on the phase: close it (or wait for it), then `phx resume`. An idle session in the main checkout, such as the one you drive `phx` from, does not cause this pause: it counts only if the phase's branch or worktree changed after it started and after PHX's last session for that phase (ADR-0019) |
+| A Claude session is open in the worktree or main checkout | it may be working on the phase: close it (or wait for it), then `phx resume`. An idle session in the main checkout, such as the one you drive `phx` from, does not cause this pause: it counts only if the phase's claim commit, branch or worktree changed after it started and after PHX's last session for that phase (ADR-0019, ADR-0021) |
 | Authentication or provider error | log in again or fix the provider, then `phx resume` |
+| Stopped while verifying (`stopped_during_verification`) | `phx stop` or Ctrl+C arrived while the test command ran, so the test failure proves nothing. Check the phase (or run its tests), then `phx resume` |
 | Timeout or crash twice | PHX already resumed once and retried once; check the log, then `phx resume` |
 
 ## `phx resume`: clear a pause and carry on

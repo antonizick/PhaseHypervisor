@@ -320,7 +320,13 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
    - Triage: the triage prompt now says the clone has no installed dependencies.
    - Why not the preflight: in `phx preflight` the check would delay the interactive session by the test time, and its context step must stay instant.
 8. **Redaction scope (T7).** Assignments are redacted for any upper-case name ending in `TOKEN`, `API_KEY`, `SECRET` or `PASSWORD`, in shell, YAML, JSON and escaped-JSON forms. Quotes are kept, so lines stay valid JSON. Redaction is idempotent.
-9. **Test-command timeouts kill the process group (T6).**
+9. **Test-command timeouts kill the process group (T6).** Because the command then runs in its own session, the terminal's Ctrl+C no longer reaches it. `phx stop` and Ctrl+C now kill running test commands themselves (`verify.stop_running_tests`). A stop that interrupted the tests pauses as `stopped_during_verification`, because that test failure proves nothing.
+10. **Code-review fixes.**
+    - The dry-run test check obeys the S1 work root.
+    - A failed final `state.json` save is retried once, then reported loudly.
+    - A partial event-log write is truncated away.
+    - The transcript's mtime stays current after a write failure, since it is PHX's 'last session end'.
+    - The `test_command` suggestion is made only for a single shared-instructions command.
 
 **Consequences.** No High risk is left unmitigated. A real run whose vault note lives outside `~/Documents` (the Phase 10 pilot's throwaway vault) needs `PHX_VAULT_ROOT`.
 

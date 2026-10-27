@@ -25,6 +25,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0019 | 2026-10-26 18:38 CDT | Pilot corrections: live-session guard counts main-checkout sessions only on later work, stopped sessions charge their turns, always detach from Claude Code | Accepted | 10 |
 | ADR-0020 | 2026-10-26 23:35 CDT | Manual `/phase` PHX check is fail-closed (`PHX-CHECK-DONE` sentinel); contract stays version 1 | Accepted | 11 |
 | ADR-0021 | 2026-10-26 23:35 CDT | Hardening from the threat model: confined vault and record writes, full-disk tolerance, pauses kept on refused resumes, claim commit as activity, dry-run test check | Accepted | 11 |
+| ADR-0022 | 2026-10-27 05:16 CDT | Share the method: the repo is the source of the `phased-project` skill and `/phx`, shipped as a Claude Code plugin plus manual fallback, with a new public getting-started guide | Accepted | 12a (planning) |
 
 ---
 
@@ -330,3 +331,24 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 
 **Consequences.** No High risk is left unmitigated. A real run whose vault note lives outside `~/Documents` (the Phase 10 pilot's throwaway vault) needs `PHX_VAULT_ROOT`.
 
+## ADR-0022: Share the method from this repo as a plugin, with a public guide
+**Recorded.** 2026-10-27 05:16 CDT (planning of Phase 12a, `/phase-add`)
+
+**Context.** PHX v0.1.0 is public, but only Nick can use it as intended. The `phased-project` skill, its templates (which generate every repo's `/phase` and `/phase-add`) and the `/phx` command exist only in Nick's `~/.claude`, with about 95 references to his name, paths, vault and private repos. They also rely on standing rules that live only in his global `CLAUDE.md`. Nick asked whether the whole system could be packaged so that other users can deploy it, with instructions on how the pieces work together. Planning concluded that it can: the `phx` runtime already falls back to `claude` without `ai-provider`, and its vault root is configurable. Nick chose among these options on 2026-10-27 05:14 CDT.
+
+**Options considered.**
+
+| Question | Option | Pros | Cons |
+|---|---|---|---|
+| Source of the skill | **A. Repo is the source; Nick switches to it** | One copy, no drift; Nick uses what others get | Edits the live skill every project depends on; needs a regression check and backups |
+| | B. Separate public copy | No risk to Nick's setup | Two copies drift; every improvement made twice |
+| | C. Export script that sanitises Nick's copy | Nick keeps one hand-edited copy | Fragile substitution; could leak personal text into a public repo |
+| Install path | **A. Plugin (marketplace in this repo) plus manual-copy fallback** | Native install and update; works without plugins too | Two install paths to document and test |
+| | B. Plugin only | Simplest | Leaves non-plugin users to work it out |
+| | C. `install.sh` only | One command, could also install `phx` | Script writing into `~/.claude` is less trusted; no auto-update |
+| Explanatory guide | **A. New public guide in the repo; playbook stays Nick's** | Written for strangers; nothing private published | One more document to keep in step |
+| | B. Publish a scrubbed playbook | One document | Written for Nick; changes his vault habit |
+
+**Decision.** A, A, A. Personal values move into an optional "Phased-project settings" section of the user's global `CLAUDE.md`, and `examples/CLAUDE.user.md` gives new users that section plus the standing rules. Phase 12a decides, and records in its own ADR, how plugin namespacing works, whether Nick's install uses symlinks or the plugin, and the exact settings format.
+
+**Consequences.** From Phase 12a on, skill and template changes are made in `plugins/phased-project/` in this repo. They are mirrored in `docs/PHX_GETTING_STARTED.md` and in Nick's playbook note (`CLAUDE.md` rule 7 changes). Everything committed to the plugin is public on push, so a deny-list test guards against personal text. The hands-off contract stays version 1 (ADR-0012), and manual use without `phx` stays fully supported (ADR-0011). Tagging a plugin or app version, or creating a GitHub Release, still needs Nick's confirmation (ADR-0004).

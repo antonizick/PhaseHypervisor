@@ -1,7 +1,7 @@
 # PHX: PhaseHypervisor Implementation Plan
 
 **Spec:** [`docs/PHX_SPECIFICATION.md`](docs/PHX_SPECIFICATION.md). **Decisions:** [`docs/PHX_DECISIONS.md`](docs/PHX_DECISIONS.md). **Agent rules:** [`CLAUDE.md`](CLAUDE.md). **Shared phase instructions:** [`prompts/PHX_shared-instructions.md`](prompts/PHX_shared-instructions.md)
-**Last updated:** 2026-10-27 04:40 CDT (Phase 12)
+**Last updated:** 2026-10-27 05:16 CDT (planning: phase 12a inserted)
 
 > ⚠️ **Mandatory:** every agent that works on this project keeps this file accurate. **Before doing any other work, set your phase to `🔄 In progress` and commit that change to `main`** (claim protocol: `prompts/PHX_shared-instructions.md` §1a). Other agents read this table from `main`. At the end, set it to `✅ Complete` or `⛔ Blocked` and add a Phase Log entry. See `CLAUDE.md`.
 
@@ -41,9 +41,11 @@ Each phase is claimed by a `chore(plan): start phase NN` commit on `main` and ru
 | 10 | Pilot runs & tuning | Dry run on fixtures; a real hands-off run of a throwaway 3-phase sample plan (forced block, resume, simulated limit); one real plan per owner question 2; measure tokens and time; fix what the pilots expose | Opus 5.5 | 08, 09 | ✅ Complete | [PHX_phase-10-pilot-runs.md](prompts/PHX_phase-10-pilot-runs.md) | review |
 | 11 | Hardening, security review & QA | Threat model (bypass permissions, injection via repo text, secrets in logs, lock races), scanners, coverage, failure-injection tests, docs pass, close all follow-ups | Opus 5.5 | 10 | ✅ Complete | [PHX_phase-11-hardening-qa.md](prompts/PHX_phase-11-hardening-qa.md) | auto |
 | 12 | Release v0.1.0 | Final docs, CHANGELOG, version and tag, push to the private GitHub repo, final report with timeline, MVP sign-off; making the repo public or a GitHub release stops for Nick | Sonnet 5.5 | 11 | ✅ Complete | [PHX_phase-12-release.md](prompts/PHX_phase-12-release.md) | review |
+| 12a | Shareable method package | Make the repo the single source of the `phased-project` skill and `/phx` command: generic (no personal paths, optional settings in the user's CLAUDE.md), shipped as a Claude Code plugin from a marketplace in this repo plus a manual-copy fallback; public getting-started guide on how the method, `/phase`, `/phase-add` and `phx` fit together; Nick's install switched to the repo copy | Opus 5.5 | 12 | ⬜ Not started | [PHX_phase-12a-shareable-method-package.md](prompts/PHX_phase-12a-shareable-method-package.md) | review |
 
 ### Model rationale
 - **Opus 5.5** (`/model claude-opus-5-5`): the `/phase` contract and skill changes (every future project depends on them), plan parsing, process supervision and exit classification, verification and recovery logic, the supervisor state machine, preflight prompt design, the pilots and the security review.
+- **Opus 5.5** also for 12a: it rewrites the skill and command templates every future project (Nick's and other users') is generated from, and switches Nick's live install.
 - **Sonnet 5.5** (`/model claude-sonnet-5-5`): repository governance, the scaffold, mechanical rollout of an already-specified contract to four repos, and the release.
 
 ### Dependency graph
@@ -52,6 +54,7 @@ Each phase is claimed by a `chore(plan): start phase NN` commit on `main` and ru
           │       └─► 05 ─┴─► 06 ─► 07 ─┬─► 08 ─┐
           └─► 03 ──► 04                 └─► 09 ─┴─► 10 ─► 11 ─► 12
                 └──────────────────────────► 09
+12 ─► 12a   (post-release: shareable method package)
 ```
 Run serially in ID order (ADR-0007).
 
@@ -246,3 +249,14 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 - **Follow-ups:** the report's §4 lists L1–L12 (pilot directories to delete, YTPL2 paused, probe/triage cost totals, `--safe-mode`, first real usage limit, preflights for MM3/CL/OCC).
 - **Tests:** 491 passed, 1 skipped; ruff check, ruff format --check and mypy --strict src clean; coverage 95 %.
 - 2026-10-27 04:59 CDT: at Nick's explicit request, tag `v0.1.0` was moved to the green commit `b8ac129` (forced tag update, was `c138341`) and the repo `antonizick/PhaseHypervisor` was made **public** (secret scan of history first: only a fake test fixture matched). No GitHub Release object created.
+
+### 2026-10-27 05:16 CDT: Planning: phase 12a inserted (Planned)
+- **Timeline:** started 2026-10-27 05:11 CDT · finished 2026-10-27 05:16 CDT
+- **Request (Nick, via `/phase-add`):** is it possible and practical to package the whole `/phased-project` + `/phase` system (skills, commands, dependencies and instructions on how they work together) in the PHX repo, so other users can deploy it and use PHX? Answer recorded in the prompt: yes. `phx` already falls back to `claude` without `ai-provider` and has a configurable vault root. The gap is the skill, its templates and `/phx`, which carry about 95 personal references and rely on rules in Nick's global `CLAUDE.md`.
+- **Scope:** a Claude Code plugin (marketplace in this repo) with a generic `phased-project` skill and `/phx`, plus a manual-copy fallback; optional "Phased-project settings" in the user's `CLAUDE.md` and `examples/CLAUDE.user.md`; `docs/PHX_GETTING_STARTED.md`; portability wording (README, user guide, SECURITY, threat model T19); Nick's install switched to the repo copy with backups and a regression diff; deny-list test; spec amendment R23.
+- **Placement:** after 12 (every phase is complete; it builds on the released, now public repo). No not-started phases, so nothing to rewire. Gate `review`: it publishes to a public repo and changes Nick's live skill.
+- **Model:** Opus 5.5, because it rewrites the templates every future project is generated from, and the hands-off contract text must survive byte-for-byte.
+- **Decisions:** ADR-0022 (repo is the source; plugin plus manual fallback; new public guide, playbook stays private). Left to the phase: plugin namespacing, symlink vs plugin for Nick, settings format. No new owner questions. Tagging `v0.2.0` or a plugin tag and any GitHub Release are asked at close-out (ADR-0004).
+- **Grounding notes:** `claude plugin validate|details|tag` exist in Claude Code 2.1.310. `~/.claude/commands/phx.md` hard-codes Nick's project aliases. README still lists `ai-provider` as required.
+- **Files:** `prompts/PHX_phase-12a-shareable-method-package.md` (new), this plan (row, graph, model rationale, Last updated), `docs/PHX_DECISIONS.md` (ADR-0022), vault note `02 Projects/PHX Implementation Plan.md`.
+

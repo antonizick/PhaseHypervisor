@@ -1,7 +1,7 @@
 # PHX: PhaseHypervisor Implementation Plan
 
 **Spec:** [`docs/PHX_SPECIFICATION.md`](docs/PHX_SPECIFICATION.md). **Decisions:** [`docs/PHX_DECISIONS.md`](docs/PHX_DECISIONS.md). **Agent rules:** [`CLAUDE.md`](CLAUDE.md). **Shared phase instructions:** [`prompts/PHX_shared-instructions.md`](prompts/PHX_shared-instructions.md)
-**Last updated:** 2026-10-27 05:16 CDT (planning: phase 12a inserted)
+**Last updated:** 2026-10-27 05:47 CDT (Phase 12a complete)
 
 > ⚠️ **Mandatory:** every agent that works on this project keeps this file accurate. **Before doing any other work, set your phase to `🔄 In progress` and commit that change to `main`** (claim protocol: `prompts/PHX_shared-instructions.md` §1a). Other agents read this table from `main`. At the end, set it to `✅ Complete` or `⛔ Blocked` and add a Phase Log entry. See `CLAUDE.md`.
 
@@ -41,7 +41,7 @@ Each phase is claimed by a `chore(plan): start phase NN` commit on `main` and ru
 | 10 | Pilot runs & tuning | Dry run on fixtures; a real hands-off run of a throwaway 3-phase sample plan (forced block, resume, simulated limit); one real plan per owner question 2; measure tokens and time; fix what the pilots expose | Opus 5.5 | 08, 09 | ✅ Complete | [PHX_phase-10-pilot-runs.md](prompts/PHX_phase-10-pilot-runs.md) | review |
 | 11 | Hardening, security review & QA | Threat model (bypass permissions, injection via repo text, secrets in logs, lock races), scanners, coverage, failure-injection tests, docs pass, close all follow-ups | Opus 5.5 | 10 | ✅ Complete | [PHX_phase-11-hardening-qa.md](prompts/PHX_phase-11-hardening-qa.md) | auto |
 | 12 | Release v0.1.0 | Final docs, CHANGELOG, version and tag, push to the private GitHub repo, final report with timeline, MVP sign-off; making the repo public or a GitHub release stops for Nick | Sonnet 5.5 | 11 | ✅ Complete | [PHX_phase-12-release.md](prompts/PHX_phase-12-release.md) | review |
-| 12a | Shareable method package | Make the repo the single source of the `phased-project` skill and `/phx` command: generic (no personal paths, optional settings in the user's CLAUDE.md), shipped as a Claude Code plugin from a marketplace in this repo plus a manual-copy fallback; public getting-started guide on how the method, `/phase`, `/phase-add` and `phx` fit together; Nick's install switched to the repo copy | Opus 5.5 | 12 | 🔄 In progress | [PHX_phase-12a-shareable-method-package.md](prompts/PHX_phase-12a-shareable-method-package.md) | review |
+| 12a | Shareable method package | Make the repo the single source of the `phased-project` skill and `/phx` command: generic (no personal paths, optional settings in the user's CLAUDE.md), shipped as a Claude Code plugin from a marketplace in this repo plus a manual-copy fallback; public getting-started guide on how the method, `/phase`, `/phase-add` and `phx` fit together; Nick's install switched to the repo copy | Opus 5.5 | 12 | ✅ Complete | [PHX_phase-12a-shareable-method-package.md](prompts/PHX_phase-12a-shareable-method-package.md) | review |
 
 ### Model rationale
 - **Opus 5.5** (`/model claude-opus-5-5`): the `/phase` contract and skill changes (every future project depends on them), plan parsing, process supervision and exit classification, verification and recovery logic, the supervisor state machine, preflight prompt design, the pilots and the security review.
@@ -267,3 +267,34 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 - **Grounding notes:** `claude plugin validate|details|tag` exist in Claude Code 2.1.310. `~/.claude/commands/phx.md` hard-codes Nick's project aliases. README still lists `ai-provider` as required.
 - **Files:** `prompts/PHX_phase-12a-shareable-method-package.md` (new), this plan (row, graph, model rationale, Last updated), `docs/PHX_DECISIONS.md` (ADR-0022), vault note `02 Projects/PHX Implementation Plan.md`.
 
+### 2026-10-27 05:47 CDT: Phase 12a: Shareable method package (✅ Complete)
+- **Timeline:** started 2026-10-27 05:31 CDT (claim commit 76f9f5e) · finished 2026-10-27 05:47 CDT · merged 2026-10-27 05:47 CDT
+- **Model:** ran as claude-opus-5-5 (auto mode; plan lists Opus 5.5)
+- **Built:**
+  - **Plugin:** marketplace `phasehypervisor` (`.claude-plugin/marketplace.json`, owner `antonizick` + URL, no email) with plugin `phased-project` 0.1.0 (`plugins/phased-project/`: `.claude-plugin/plugin.json`, `README.md`, `skills/phased-project/SKILL.md` + 10 templates, `commands/phx.md`). `claude plugin validate` passes on both, also with `--strict`. Only advice: no icon. A real install into a scratch `HOME` (`claude plugin install phased-project --marketplace <worktree>`, no tokens) loaded both components at ~262 always-on tokens.
+  - **Generic skill:** "Nick" is now `{{OWNER}}` (capitalised at sentence start). Vault and OS-log text sits in `{{#VAULT}}…{{/VAULT}}` / `{{^VAULT}}…` and `OS_LOG` sections. New markers `{{OS_LOG}}` and `{{METHOD_LINK}}`. Values come from an optional `## Phased-project settings` section in the user's `~/.claude/CLAUDE.md`: Owner, Work root, Vault root, Vault projects folder, Method note, OS modifications log, Reference implementation, Project aliases. `SKILL.md` was rewritten without personal history: each rule keeps a one-line reason, and model advice uses aliases.
+  - **Generic `/phx`:** no paths or aliases baked in (aliases come from settings), guide by GitHub URL, install hint and stop when `phx` is missing, no-systemd advice. Every safety rule is kept.
+  - **New docs and examples:** `examples/CLAUDE.user.md` (settings plus standing rules, each marked optional) and `docs/PHX_GETTING_STARTED.md` (pieces with a diagram, prerequisites, plugin / manual / `phx` install, first-project walkthrough, safety model, update/uninstall, troubleshooting, what is optional).
+  - **Docs updated:** README "Use PHX yourself" and Requirements, user guide (install from git, no-`ai-provider`/notification/systemd section, `/phx` from the plugin), SECURITY (what the plugin lets agents do, the bypass caveat; S1 no longer names a personal path), threat model T19, architecture (12a section), CONTRIBUTING (changing the skill), `CLAUDE.md` rule 7, shared instructions layout. ADR-0024 and spec amendment R23.
+  - **Tests:** `tests/plugin_render.py` (reference renderer, tests only) and `tests/test_plugin_package.py`, 32 tests: manifests and version match, every template rendered with full and empty settings, deny-list, fixed contract lines, the author's render against the pre-12a fixtures (`tests/fixtures/skill_pre12a/`), and a fresh-`HOME` manual install that runs the guide's own commands.
+- **Regression check (task 8):** templates rendered with Nick's settings, compared with his pre-phase live copies (backup):
+  - 8 of 10 are byte-identical, including `phase-command.md` and `phase-add-command.md`.
+  - `CLAUDE.md`: the git-authority heading loses its date, "(standing instruction from Nick, 2026-10-26 08:44 CDT)" → "(standing instruction from Nick)".
+  - `_shared-instructions.md`: "OSMods documentation updated…" → "OS-modification log (`/home/nick/Documents/04 Resources/OSMods/`) updated…".
+  - `PHX-CONTRACT: 1`, step 0, `PHX-CHECK-DONE`, the "Hands-off mode" section and `PHX-RESULT` are identical, with and without settings.
+  - `phx plan` output is identical before and after for this repo and MeetingMaster3 (read-only).
+- **Nick's install (ADR-0023):** backups in `~/.claude/backups/phx12a-20261027-0533/` (skill directory, `phx.md`, `CLAUDE.md`, playbook). A `## Phased-project settings` section was appended to `~/.claude/CLAUDE.md`; the existing rules were byte-compared unchanged. `~/.claude/skills/phased-project` and `~/.claude/commands/phx.md` are now symlinks into the main checkout, and the old live copies were moved into the backup directory (`*.live-moved`). To make the targets exist, the branch was fast-forwarded into local `main` first. Verified without tokens: the links resolve, and this running session reloaded the skill with its new description.
+- **Stranger `phx` install (owner question 9):** `uv tool install git+https://github.com/antonizick/PhaseHypervisor` in a scratch `HOME`/`UV_TOOL_DIR`/`UV_TOOL_BIN_DIR`/`UV_CACHE_DIR`. It installed phx 0.1.0 and `phx plan` worked. Scratch removed; Nick's editable install untouched.
+- **Deviations:**
+  - (1) Plugin names are namespaced with no opt-out (`/phased-project:phased-project`, `/phased-project:phx`). Accepted and documented per owner question 12; manual copies and Nick's symlinks keep the short names.
+  - (2) The skill's trigger phrase "set this up like MeetingMaster3" became "set this up as a phased project"; MeetingMaster3 stays the reference through the settings.
+  - (3) `/phx` aliases moved into a `Project aliases` setting, so Nick's `MM3`/`CL`/`OCC`/`YTPL2` keep working.
+  - (4) Out-of-scope fix, test only: `test_phx_stop_command_against_a_real_process` failed under a hands-off session because it inherited `PHX_AUTO=1`. Its contract check now drops that variable.
+  - (5) `claude plugin validate` is not added to CI, because Claude Code is not installed on the runners. The package tests cover the manifests offline.
+- **Follow-ups:**
+  - Tag `v0.2.0` and a GitHub Release need Nick's yes (ADR-0023: on yes, one commit bumps `pyproject.toml`, `plugin.json` and CHANGELOG to 0.2.0, then the tag).
+  - Optional plugin icon, which the directory listing wants.
+  - Regenerating MM3/CL/OCC/YTPL2 commands from the generic templates (out of scope; not needed, they render the same for Nick).
+  - `src/phx/vault.py` docstring still says "Nick's Obsidian vault" (cosmetic).
+  - macOS `--detach` and a launcher setting (spec says follow-up).
+- **Tests:** 523 passed, 1 skipped (`PHX_AUDIT_DIR` unset); ruff check, ruff format --check, mypy --strict src and pre-commit (detect-secrets) clean.

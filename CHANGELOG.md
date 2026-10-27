@@ -4,6 +4,16 @@ All notable changes to PhaseHypervisor are recorded here. The format follows [Ke
 
 ## [Unreleased]
 
+### Added
+- Phase 12a: the method is shareable. The `phased-project` skill (with its templates, which write each repo's `/phase` and `/phase-add`) and the `/phx` command now live in this repo as a Claude Code plugin: marketplace `phasehypervisor` (`.claude-plugin/marketplace.json`), plugin `phased-project` 0.1.0 (`plugins/phased-project/`). Install with `/plugin install phased-project --marketplace antonizick/PhaseHypervisor` (names are namespaced: `/phased-project:phased-project`, `/phased-project:phx`) or by copying two paths into `~/.claude`. New public guide `docs/PHX_GETTING_STARTED.md` and `examples/CLAUDE.user.md` (optional settings and standing rules). `tests/test_plugin_package.py` (manifests, rendering with and without settings, deny-list, fixed contract text, regression against the pre-12a skill, fresh-`HOME` install by the guide). ADR-0024; spec amendment R23.
+
+### Changed
+- The skill and `/phx` are generic: owner name, work root, vault, method note, OS-modification log, reference repo and project aliases come from an optional "Phased-project settings" section in the user's `~/.claude/CLAUDE.md`; without a vault, vault steps are skipped. `/phx` stops with install instructions when `phx` is missing and explains the no-systemd case.
+- README "Use PHX yourself" section and requirements: `ai-provider` is optional (fallback to `claude`), Linux supported, macOS untested. User guide, SECURITY (what the plugin lets agents do; the bypassed-permissions caveat), threat model T19, architecture, CONTRIBUTING (how to change the skill) and `CLAUDE.md` rule 7 updated.
+
+### Fixed
+- `tests/test_supervisor.py::test_phx_stop_command_against_a_real_process` failed when the suite ran inside a hands-off session (inherited `PHX_AUTO=1`); its contract check now drops `PHX_AUTO`.
+
 ## [0.1.0] - 2026-10-27 04:39 CDT
 
 First release: the whole of Phases 00 to 12. Everything below was built in the phases listed.

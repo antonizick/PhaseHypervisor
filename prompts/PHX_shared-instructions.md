@@ -48,12 +48,16 @@ PhaseHypervisor/
 ├── pyproject.toml  uv.lock  .pre-commit-config.yaml
 ├── .github/                              (CI, issue/PR templates, Dependabot)
 ├── .claude/commands/phase.md  phase-add.md
+├── .claude-plugin/marketplace.json       (Phase 12a: marketplace for the plugin below)
+├── plugins/phased-project/               (Phase 12a: the phased-project skill, templates and /phx; public, deny-listed)
+├── examples/CLAUDE.user.md               (Phase 12a: optional user settings and standing rules)
 ├── docs/
 │   ├── PHX_SPECIFICATION.md              (prefixed)
 │   ├── PHX_DECISIONS.md                  (prefixed)
 │   ├── PHX_ARCHITECTURE.md               (prefixed, from Phase 02)
 │   ├── PHX_AUTO_MODE_CONTRACT.md         (prefixed, Phase 03: the /phase --auto contract)
 │   ├── PHX_USER_GUIDE.md                 (prefixed, from Phase 07)
+│   ├── PHX_GETTING_STARTED.md            (prefixed, Phase 12a: public guide to the method and PHX)
 │   └── PHX_FINAL-REPORT.md               (prefixed, Phase 12)
 ├── prompts/
 │   ├── PHX_shared-instructions.md        (prefixed)

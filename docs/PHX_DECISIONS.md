@@ -27,6 +27,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0021 | 2026-10-26 23:35 CDT | Hardening from the threat model: confined vault and record writes, full-disk tolerance, pauses kept on refused resumes, claim commit as activity, dry-run test check | Accepted | 11 |
 | ADR-0022 | 2026-10-27 05:16 CDT | Share the method: the repo is the source of the `phased-project` skill and `/phx`, shipped as a Claude Code plugin plus manual fallback, with a new public getting-started guide | Accepted | 12a (planning) |
 | ADR-0023 | 2026-10-27 05:28 CDT | Phase 12a pre-decisions: symlinked live install, appended settings section, handle-only manifest metadata, sandboxed `uv tool install` check, version bump only on tag approval, `v0.2.0` tag scheme, namespaced plugin names accepted | Accepted | 12a (preflight) |
+| ADR-0024 | 2026-10-27 05:43 CDT | Plugin layout and namespacing, settings format with `{{#X}}`/`{{^X}}` template sections, regression rule for the generic skill, Nick's install as symlinks | Accepted | 12a |
 
 ---
 
@@ -383,3 +384,27 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 **Decision.** A in every row. In task 6 of Phase 12a: back up `~/.claude/skills/phased-project`, `~/.claude/commands/phx.md` and `~/.claude/CLAUDE.md` with timestamps, append the "Phased-project settings" section, then replace the skill and command with symlinks into `/home/nick/Work/PhaseHypervisor/plugins/phased-project/`. Do this only if the task 8 regression diff shows nothing but explained wording changes; otherwise block-with-question. The manifests name `antonizick` (with its GitHub URL) and give no email. The stranger `uv tool install` path is tried only in a scratch environment. The phase ships at 0.1.0. Its close-out asks one question: may it tag `v0.2.0` and create a GitHub Release? On a yes, it bumps `pyproject.toml`, `plugin.json` and CHANGELOG to 0.2.0 in one commit before tagging.
 
 **Consequences.** Phase 12a can run hands-off up to its close-out question. The tag and Release still need Nick's explicit yes at that moment (ADR-0004, ADR-0017: nothing is pre-approved for publishing). The test that the plugin version matches `phx --version` holds at both 0.1.0 and 0.2.0.
+
+## ADR-0024: Plugin layout, settings format and regression rule for the shared skill
+**Recorded.** 2026-10-27 05:43 CDT (Phase 12a)
+
+**Context.** ADR-0022 made this repo the source of the `phased-project` skill and `/phx` and left three choices to Phase 12a: how plugin namespacing is handled, how personal values reach the templates, and how Nick's own install uses the repo copy. ADR-0023 pre-decided the install (symlinks) and accepted namespaced names. The current Claude Code docs (plugins reference, checked 2026-10-27 05:43 CDT) say every plugin component is namespaced under the plugin name, with no opt-out.
+
+**Options considered.**
+
+| Question | Option | Pros | Cons |
+|---|---|---|---|
+| Layout | **A. Marketplace at the repo root, plugin in `plugins/phased-project/` with `skills/` and `commands/`** | Standard layout; `claude plugin validate` passes; room for more plugins | Two manifests |
+| | B. Plugin at the repo root | One manifest | Mixes the plugin with the Python project; the root `CLAUDE.md` would trigger a validator warning |
+| Names | **A. Accept namespacing; the guide lists both forms; manual copy and symlinks keep short names** | Honest; no hacks | Long names for plugin users |
+| | B. Name the plugin and skill so the namespaced form reads well | Shorter | Still namespaced; renames the skill everyone knows |
+| Existing un-namespaced copies | **A. Tell users to keep one install path (plugin or copy), not both** | Simple; no surprise duplicates | A user who has both sees the skill twice until they remove one |
+| | B. Plugin detects and removes old copies | Automatic | A plugin deleting user files is a bad idea |
+| Personal values | **A. Optional `## Phased-project settings` bullets in the user's global `CLAUDE.md`; templates use `{{OWNER}}`, `{{OS_LOG}}`, `{{METHOD_LINK}}`, `{{VAULT_NOTE_PATH}}` and mustache-style sections `{{#VAULT}}…{{/VAULT}}` / `{{^VAULT}}…{{/VAULT}}`** | Readable by the agent and by people; every value optional; Nick's render equals his old templates | The agent must apply the section rule correctly (covered by a reference renderer and tests) |
+| | B. Plugin `userConfig` values | Native prompt in `/config` | Values only reach skill text as `${user_config.KEY}`; a manual copy gets nothing; no conditional text |
+| | C. A separate settings file | Machine-readable | Another file to find; nothing loads it into context |
+
+**Decision.** A in every row. The settings are `Owner`, `Work root`, `Vault root`, `Vault projects folder`, `Method note`, `OS modifications log`, `Reference implementation` and `Project aliases` (the last keeps Nick's `/phx MM3` working without baking aliases into the public command). A placeholder value such as `<…>` counts as unset. **Regression rule:** rendering the templates with Nick's settings must reproduce his pre-12a live templates except for explained wording; measured: 8 of 10 templates byte-identical, `CLAUDE.md` loses the dated "(…, 2026-10-26 08:44 CDT)" from the git-authority heading, and the shared instructions' close-out line names the OS log by path instead of "OSMods documentation". The contract-critical text (`PHX-CONTRACT: 1`, step 0, `PHX-CHECK-DONE`, the "Hands-off mode" section, `PHX-RESULT`) is byte-identical (tests in `tests/test_plugin_package.py`, fixtures `tests/fixtures/skill_pre12a/`). Nick's install is two symlinks into the main checkout, made only after that check passed (ADR-0023).
+
+**Consequences.** The contract stays version 1 (ADR-0012). The skill's description no longer names Nick or MeetingMaster3; "set this up like MeetingMaster3" still works through the `Reference implementation` setting, but the trigger phrase is now "set this up as a phased project". Model advice in the skill uses aliases (`/model opus`, `/model sonnet`) so it does not go stale with model versions. Repos already bootstrapped keep their generated commands (no re-migration). A plugin version is the repo version; tagging stays with Nick (ADR-0004).
+

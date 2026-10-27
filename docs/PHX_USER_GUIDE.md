@@ -2,12 +2,20 @@
 
 PHX runs the remaining phases of a phased-project plan for you, one at a time, each in a fresh headless Claude Code session on the model the plan names, and checks each phase itself. It is optional (ADR-0011): manual `/phase` keeps working exactly as before, and you can switch between the two at any phase boundary. `phx preflight` asks every question it can foresee up front, so the run that follows stops as rarely as possible.
 
+**New here?** Start with [PHX_GETTING_STARTED.md](PHX_GETTING_STARTED.md): what the skill, `/phase`, `/phase-add`, `phx` and `/phx` are, how to install them, and a first project. This guide is the `phx` reference. Some examples below use the author's own repos and paths; substitute yours.
+
 ## Install
 ```bash
-uv tool install --editable /home/nick/Work/PhaseHypervisor   # puts `phx` in ~/.local/bin
+uv tool install git+https://github.com/antonizick/PhaseHypervisor   # puts `phx` in ~/.local/bin
 phx --version
 ```
-The install follows the repo's main checkout, so merged phases take effect without reinstalling (ADR-0016). Undo: `uv tool uninstall phx`. Without installing: `cd /home/nick/Work/PhaseHypervisor && uv run phx …`, or `cd src && python3 -m phx …`.
+Upgrade with `uv tool upgrade phx`; undo with `uv tool uninstall phx`. Requirements: Linux, Python 3.12+, Claude Code signed in; `ai-provider`, `notify-send` and systemd are optional (see "Without `ai-provider`, notifications or systemd").
+
+**From a clone (development, the author's setup):**
+```bash
+uv tool install --editable /home/nick/Work/PhaseHypervisor
+```
+The editable install follows the repo's main checkout, so merged phases take effect without reinstalling (ADR-0016). Undo: `uv tool uninstall phx`. Without installing: `cd /home/nick/Work/PhaseHypervisor && uv run phx …`, or `cd src && python3 -m phx …`.
 
 ## Quick start
 ```bash
@@ -26,7 +34,7 @@ phx preflight [<repo>]             # interactive session on opus, in the repo's 
 phx preflight [<repo>] --dry-run   # build the session prompt and print the command; launch nothing
 phx preflight [<repo>] --check     # is the recorded preflight still current? (exit 0 yes, 3 no)
 ```
-A preflight is one interactive Claude Code session (through `ai-provider run`, so it follows Super+Alt+A) that reads the plan, the spec's Amendments and the prompts of every phase not yet `✅ Complete` (not the code, to keep tokens down). It lists everything a hands-off session would otherwise stop for: open or deferred owner questions, "ask Nick" or "confirm" instructions, keys and logins, spending, manual or hardware checks, publishing, and risky steps. It checks the prerequisites it can check cheaply (tools on PATH, `gh auth status`, whether key files **exist**; it never reads them) and asks you in rounds of up to four questions, recommended answer first. Then it:
+A preflight is one interactive Claude Code session (through `ai-provider run` when installed, so it follows the provider switch; otherwise `claude`) that reads the plan, the spec's Amendments and the prompts of every phase not yet `✅ Complete` (not the code, to keep tokens down). It lists everything a hands-off session would otherwise stop for: open or deferred owner questions, "ask Nick" or "confirm" instructions, keys and logins, spending, manual or hardware checks, publishing, and risky steps. It checks the prerequisites it can check cheaply (tools on PATH, `gh auth status`, whether key files **exist**; it never reads them) and asks you in rounds of up to four questions, recommended answer first. Then it:
 - writes each answer into the Owner questions table (`Decided <TS>: … (phx preflight)`) and, for real decisions, an ADR;
 - proposes a Gate for every remaining phase (`review` for publishing, spending or manual-check phases, `owner` where you must act yourself) and writes the ones you confirm (adding the `Gate` column if the plan has none);
 - commits `docs(plan): phx preflight <TS>` to `main` and pushes;
@@ -117,7 +125,13 @@ phx log ~/Work/YTPL2 -n 0 --json   # everything, raw JSON
 ## Usage limits and switching provider
 When a Pro 5-hour or weekly limit stops a phase, PHX records the stop, notifies you with the resume time and waits: until the announced reset time plus 2 minutes, or 30 min, 1 h, 2 h, 4 h, then every 6 h when no reset time is given. Then one tiny `haiku` probe checks that capacity is back and the **same session** resumes (`--resume`). The wait survives suspend, `phx stop` and restarts.
 
-To resume sooner, switch to OpenRouter with **Super+Alt+A**: PHX checks `ai-provider get` every 5 minutes (`poll_interval_s`) during a wait and resumes at once on OpenRouter. It never switches provider by itself (ADR-0006).
+To resume sooner with the optional `ai-provider` switch installed, switch it to OpenRouter (the author binds that to a key): PHX checks `ai-provider get` every 5 minutes (`poll_interval_s`) during a wait and resumes at once on OpenRouter. It never switches provider by itself (ADR-0006).
+
+## Without `ai-provider`, notifications or systemd
+- **No `ai-provider`:** `phx` launches `claude` from `PATH` and logs `ai-provider not found; launching claude directly (provider switch ignored)`. Usage-limit waits, probes and resumes work the same; the provider shows as `unknown` and there is no early resume on a provider switch.
+- **No `notify-send` or no display:** notifications are skipped and logged; `phx status` and `phx log` have everything.
+- **No `systemd-run --user`** (macOS, containers, non-systemd distributions): `--detach` fails. Run `phx run` in a terminal you keep open, for example in `tmux`. Never start it in the foreground from a Claude Code Bash call.
+- **Repos outside `~/Work`:** set `PHX_WORK_ROOT` to your projects folder.
 
 ## Notifications
 Desktop notifications (silent, never spoken) for: phase complete, blocked (with a short haiku summary of why), usage-limit wait (with the resume time), provider switch noticed, verification failure, other pauses and run finished. Without a display they are skipped and logged.
@@ -161,7 +175,7 @@ The output has:
 Exit status: `0` when the plan was read, `1` with `phx plan: <reason>` when it cannot be (no plan on `main`, a malformed phase ID or row, a duplicate ID, a missing column, an unreadable status, an unknown Gate value, an invalid `.phx/config.toml`).
 
 ## `/phx`: drive PHX from inside Claude Code (Phase 09)
-`~/.claude/commands/phx.md` is a user-level slash command, so it works in any session and any directory:
+`/phx` ships in the `phased-project` plugin (`plugins/phased-project/commands/phx.md`, Phase 12a). Installed as a plugin it is typed `/phased-project:phx`; a manual copy in `~/.claude/commands/phx.md` (or a symlink, as on the author's machine) keeps `/phx`. It is user-level, so it works in any session and any directory. If `phx` is not installed it says how to install it and stops:
 
 | Command | What it does |
 |---|---|
@@ -170,7 +184,7 @@ Exit status: `0` when the plan was read, `1` with `phx plan: <reason>` when it c
 | `/phx resume [repo]` | runs `phx status`, says why the run stopped or paused, asks you to confirm, then starts `phx resume <repo> --detach` |
 | `/phx run [repo] [--pause-after NN …]` | checks the contract and preflight, shows `phx run --dry-run`, asks you to confirm, then starts `phx run <repo> --detach` and tells you how to follow it (`phx status`, `phx log -f`, `phx stop`, `phx resume`) |
 
-`repo` is a path, a project name (`MM3`, `CL`, `OCC`, `YTPL2`) or, when left out, the repo of the current directory. The command never answers owner questions, edits a repo or stops a run unless you ask. To remove it: `rm ~/.claude/commands/phx.md`.
+`repo` is a path, a name from `Project aliases` or a folder under `Work root` in your "Phased-project settings" (see [`examples/CLAUDE.user.md`](../examples/CLAUDE.user.md); the author's aliases are `MM3`, `CL`, `OCC`, `YTPL2`), or, when left out, the repo of the current directory. The command never answers owner questions, edits a repo or stops a run unless you ask. To remove it: uninstall the plugin, or delete the manual copy.
 
 ## Migrating a repo (Phase 09)
 Repos made with the skill after 2026-10-14 already carry the contract. For an older repo, the `phased-project` skill has a "Migrating to the hands-off contract" checklist (also in the playbook note). MeetingMaster3, chessloopDeploy, OCC and YTPL2 were migrated on 2026-10-26 17:16 CDT with one `chore(phx): adopt hands-off phase contract` commit each; `phx plan <repo>` reports `Contract: 1` for all four. Run `phx preflight` after migrating: the explicit Gate column changes every row's fingerprint, so an earlier record is stale.

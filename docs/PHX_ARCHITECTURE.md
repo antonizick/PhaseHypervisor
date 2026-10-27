@@ -1,6 +1,6 @@
 # PHX Architecture
 
-> Skeleton from Phase 01; Phase 02, 04, 05, 06, 07, 08 and 11 modules documented below. Each later phase fills in its components; keep this file in sync with the code.
+> Skeleton from Phase 01; Phase 02, 04, 05, 06, 07, 08, 11 and 12a components documented below. Each later phase fills in its components; keep this file in sync with the code.
 
 ## Components
 | Component | Module (planned) | Phase | Role |
@@ -12,6 +12,7 @@
 | Verifier and recovery | `verify.py`, `recover.py`, `triage.py` | 06 | independent post-phase checks, blocked-status repair, retry/resume |
 | Supervisor | `supervisor.py`, `locks.py`, `state.py`, `notify.py`, `vault.py`, `detach.py` | 07 | `phx run / status / resume / stop / log / answer`, locks, state, waits, notifications, detached runs, vault summary |
 | Preflight | `preflight.py`, `prompts/PHX_preflight.md` | 08 | one interactive question sweep before a hands-off run; staleness check in `phx run` |
+| Method package (plugin) | `.claude-plugin/marketplace.json`, `plugins/phased-project/` | 12a | the `phased-project` skill and templates (which write each repo's `/phase` and `/phase-add`) and `/phx`, as a Claude Code plugin; not Python, not imported by `phx` |
 
 ## Phase 02 modules (built)
 | Module | Role |
@@ -222,6 +223,24 @@ Test double: the fake `claude` started without `-p` acts as the preflight sessio
 | `recover.repair_blocked`, `cli.answer_question`, `preflight.record` | A failed commit restores the file's text (or removes a new record) rather than `git checkout`, which `index.lock` would also block. `record` refuses a symlinked `.phx/` or `preflight.json`. |
 | `vault.append_summary` | The note must be absolute, `.md`, and resolve inside `vault_root()` (`$PHX_VAULT_ROOT`, default `~/Documents`). |
 | `triage._data`, `preflight._quoted` | Repo text cannot close its `<<<…>>>` block or « » quote. Triage is told the clone has no installed dependencies. |
+
+## Phase 12a: method package (`plugins/phased-project/`, ADR-0022, ADR-0024)
+```
+.claude-plugin/marketplace.json          marketplace "phasehypervisor" (owner antonizick), one plugin
+plugins/phased-project/
+├── .claude-plugin/plugin.json           name, version (= phx --version), MIT, homepage = getting-started guide
+├── README.md
+├── skills/phased-project/SKILL.md       the bootstrap skill (generic; settings from the user's CLAUDE.md)
+├── skills/phased-project/templates/     CLAUDE, IMPLEMENTATION_PLAN, _shared-instructions, phase-command,
+│                                        phase-add-command, phase-prompt, DECISIONS, spec-amendments,
+│                                        change-request, vault-project-note
+└── commands/phx.md                      /phx (status | run | resume | preflight)
+examples/CLAUDE.user.md                  optional "Phased-project settings" section and standing rules
+```
+- **Settings, not paths.** Personal values come from an optional `## Phased-project settings` section in the user's global `~/.claude/CLAUDE.md` (`Owner`, `Work root`, `Vault root`, `Vault projects folder`, `Method note`, `OS modifications log`, `Reference implementation`, `Project aliases`). Templates carry `{{OWNER}}`, `{{OS_LOG}}`, `{{METHOD_LINK}}` and `{{VAULT_NOTE_PATH}}`, plus sections `{{#VAULT}}…{{/VAULT}}` / `{{^VAULT}}…{{/VAULT}}` (and the same for `OS_LOG`) that are kept or dropped by whether the setting exists. The agent running the skill fills them; `tests/plugin_render.py` is a reference renderer used only by tests.
+- **Namespacing.** As a plugin, components are `/phased-project:phased-project` and `/phased-project:phx`; a manual copy or a symlink keeps `/phased-project` and `/phx`. Per-repo `/phase` and `/phase-add` are generated files and never namespaced.
+- **Nick's install** is two symlinks into the main checkout (`~/.claude/skills/phased-project`, `~/.claude/commands/phx.md`), so the repo is the only copy (ADR-0023).
+- **Guards.** `tests/test_plugin_package.py`: manifests, version match, every template renders with full and empty settings, deny-list over `plugins/`, `examples/` and the guide, contract lines fixed, the author's render equal to the pre-12a skill (fixtures in `tests/fixtures/skill_pre12a/`) except one explained line, and a fresh-`HOME` manual install that follows the guide's commands.
 
 ## Interface with phase sessions
 PHX and a phase session talk only through the repo and one line of output, defined in [PHX_AUTO_MODE_CONTRACT.md](PHX_AUTO_MODE_CONTRACT.md) (contract version 1, Phase 03):

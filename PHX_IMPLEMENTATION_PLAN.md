@@ -39,7 +39,7 @@ Each phase is claimed by a `chore(plan): start phase NN` commit on `main` and ru
 | 08 | Preflight question sweep | `phx preflight`: one interactive strongest-model session that reads the remaining phases, asks Nick everything foreseeable, checks prerequisites, sets gates, records answers/ADRs and commits; staleness check in `phx run` | Opus 5.5 | 07 | ✅ Complete | [PHX_phase-08-preflight.md](prompts/PHX_phase-08-preflight.md) | auto |
 | 09 | Roll out to existing projects | Apply the Phase 03 contract and ADR-0004 rules to MM3, CL, OCC and YTPL2 (only when idle), add Gate columns, `phx` user-level slash command, skill "Running hands-off" section | Sonnet 5.5 | 03, 07 | ✅ Complete | [PHX_phase-09-rollout.md](prompts/PHX_phase-09-rollout.md) | review |
 | 10 | Pilot runs & tuning | Dry run on fixtures; a real hands-off run of a throwaway 3-phase sample plan (forced block, resume, simulated limit); one real plan per owner question 2; measure tokens and time; fix what the pilots expose | Opus 5.5 | 08, 09 | ✅ Complete | [PHX_phase-10-pilot-runs.md](prompts/PHX_phase-10-pilot-runs.md) | review |
-| 11 | Hardening, security review & QA | Threat model (bypass permissions, injection via repo text, secrets in logs, lock races), scanners, coverage, failure-injection tests, docs pass, close all follow-ups | Opus 5.5 | 10 | 🔄 In progress | [PHX_phase-11-hardening-qa.md](prompts/PHX_phase-11-hardening-qa.md) | auto |
+| 11 | Hardening, security review & QA | Threat model (bypass permissions, injection via repo text, secrets in logs, lock races), scanners, coverage, failure-injection tests, docs pass, close all follow-ups | Opus 5.5 | 10 | ✅ Complete | [PHX_phase-11-hardening-qa.md](prompts/PHX_phase-11-hardening-qa.md) | auto |
 | 12 | Release v0.1.0 | Final docs, CHANGELOG, version and tag, push to the private GitHub repo, final report with timeline, MVP sign-off; making the repo public or a GitHub release stops for Nick | Sonnet 5.5 | 11 | ⬜ Not started | [PHX_phase-12-release.md](prompts/PHX_phase-12-release.md) | review |
 
 ### Model rationale
@@ -179,3 +179,60 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 - **Deviations / flags for Nick:** (1) Nick drove PXP phases 01–06 himself, including the handover (04 and 06 by hand, Gate `owner` set in the preflight); I added phases 07–09 for the block, limit and stop. (2) The contract manual check ran inside PXP instead of a separate repo; step 4 was not reached (PHX never launches with an open question), step 6 only partly (manual `/phase` refused on dependencies, and fails open when its lock check is denied), and step 7 was **not run**: the auto-mode classifier refused this session's launch of a bypass-permissions `/phase next --auto`. (3) Real preflights only for PXP and YTPL2 (Nick's choice); MM3, CL and OCC got dry runs only and still have no preflight record. (4) ADR-0009 unchanged: no real Pro limit or provider toggle happened. (5) YTPL2 is left paused (`verification_failed`, already verified by hand); `phx resume /home/nick/Work/YTPL2` would start Phase 05 (04 is Gate `owner`). (6) No preflight cost is recorded (Claude Code writes none for interactive sessions); tokens come from the transcripts.
 - **Follow-ups:** Phase 11 task 8: make `/phase` step 0 fail-closed everywhere; threat-model the ADR-0019 heuristic; `phx resume --require-preflight` clears the pause before refusing; test the test command in a clean clone at preflight / dry-run time and tell triage the clone has no installed dependencies. Delete `~/Work/tries/phx-pilot`, `~/Work/tries/phx-pilot-vault` and `~/.local/state/phx/phx-pilot` when the report no longer needs them.
 - **Tests:** 428 passed (9 new regression tests in `test_recover.py`, `test_runner.py`, `test_supervisor.py`), ruff check, ruff format --check and mypy --strict src clean.
+
+### 2026-10-26 23:46 CDT: Phase 11: Hardening, security review & QA (✅ Complete)
+- **Timeline:** started 2026-10-26 23:03 CDT (claim commit 45f24e0) · finished 2026-10-26 23:46 CDT · merged {MERGED}
+- **Built:**
+  - **Threat model** `docs/PHX_THREAT_MODEL.md`: 20 threats rated, each with its mitigation and test, or an accepted residual. No High risk is left unmitigated; T1/T2 (bypass permissions, prompt injection) are accepted on record at M.
+  - **Manual `/phase` step 0 is fail-closed** (`PHX-CHECK-DONE` sentinel, ADR-0020, contract stays version 1). Applied in PHX, MM3 `81ee0a6`, CL `9555f22`, OCC `a1d5cdd` and YTPL2 `582b460` (one commit each, plus a vault log line each), the skill (`templates/phase-command.md`, `SKILL.md`; backups `~/.claude/skills/phased-project/.backup/*-phase11`) and the playbook.
+  - **Redaction:** JSON, escaped-JSON and generic `*TOKEN`/`*API_KEY`/`*SECRET`/`*PASSWORD` assignments; names after an escaped newline; output stays valid JSON; idempotent.
+  - **Redaction audit:** `tests/redaction_audit.py`, kept as `tests/test_redaction_audit.py`. The Phase 10 state (26 files, 2,081 lines) and the vault notes PHX wrote are clean.
+  - **Full disk:** a full state disk no longer ends a run.
+  - **Git lock contention:** failed commits restore the file instead of running `git checkout`, which `index.lock` also blocks (a real bug, found by the new tests).
+  - **Vault:** the note path is confined to `$PHX_VAULT_ROOT`.
+  - **Preflight record** refuses symlinks.
+  - **Data fencing:** triage and preflight data cannot close their fences.
+  - **Test commands:** run in their own process group, killed whole on timeout and on `phx stop`.
+  - **Phase 10 findings:**
+    - F6: a refused `phx resume` keeps its pause.
+    - F8: the claim commit counts as phase activity.
+    - F9: `phx run --dry-run` runs the test command in a clean clone and suggests a dependency-installing `test_command` (`--skip-test-check`); triage gets the hint when the tests check failed.
+  - **Failure-injection suite** `tests/test_failure_injection.py`: `kill -9` mid-phase and mid-state-write, full disk, `index.lock`, push timeout, suspend and a backwards clock, plan edited mid-run.
+  - **Coverage tests:** detach/stop/signals via a fake `systemd-run`, which also checks the env allowlist end to end.
+  - ADR-0020 and ADR-0021; spec amendment R22.
+- **Reviews:**
+  - `/security-review` of the full codebase: 2 Medium findings, both fixed in `18649f4`:
+    - escaped-newline secrets in transcripts;
+    - `preflight --record` writing through a committed symlink.
+  - `/code-review high` of `src/phx`: 10 findings, all fixed in `fbce26f`. The three that matter most:
+    - the dry-run test check ran before the S1 guard;
+    - unquoted secret values were cut short at punctuation;
+    - a failed final save could lose a pause.
+- **Acceptance:**
+  - The threat model is complete, with no unmitigated High risk.
+  - All checks pass.
+  - No secrets in any PHX output from the pilots: real-state audit via `PHX_AUDIT_DIR=~/.local/state/phx`.
+  - Coverage is 95 % overall and 100 % on `plan.py`, `classify.py` and `recover.py` (was 93 % / 99 % / 100 % / 95 %).
+  - Real check: `phx run /home/nick/Work/YTPL2 --dry-run` ran YTPL2's configured `npm ci --prefix frontend && make check` in a clean clone: pass, 29 s, repo untouched.
+- **Deviations:**
+  - F9's test check lives in `--dry-run`, not in the preflight context step, which must stay instant (ADR-0021 §7). `--dry-run` now takes the test time unless `--skip-test-check` is given.
+  - A stop that interrupts verification's tests pauses as `stopped_during_verification`, so the outcome is not misreported as a verification failure.
+- **Follow-ups closed:**
+  - Phase 04: `paths.py` bool test.
+  - Phase 06: `recover.py` 100 %.
+  - Phase 07: `cli.py` stop, detach and signal paths and `detach.detach` are now tested (`cli.py` 74 → 84 %).
+  - Phase 10: all four task 8 items.
+  - The `/phase-add` check from Phase 03 is closed with no change: `/phase-add` only commits plan rows, and PHX re-reads the plan every round and respects the new rows (`test_plan_edit_mid_run_*`).
+- **Follow-ups deferred (explicitly):**
+  - **Probe and triage cost in the run totals** (Phase 07). They are logged in their own events; adding them is accounting, not hardening. Candidate for after v0.1.0.
+  - **`phx status` provider before the first session** (Phase 07). Cosmetic.
+  - **Linger for detached runs across logout** (Phase 07). Nick's call; the user guide documents it.
+  - **`--safe-mode` for probe and triage** (Phases 05/06). Needs a token measurement on real sessions; out of scope for QA.
+  - **Lead-pattern tuning** (Phase 08). Needs more real preflights.
+  - **CL `test_command`** (Phase 09). CL is complete; only needed if CL is ever run hands-off.
+  - **Pilot directories** (Phase 10). Nick decides when to delete `~/Work/tries/phx-pilot`, `~/Work/tries/phx-pilot-vault` and `~/.local/state/phx/phx-pilot`. They are not mine to remove. Note that PHX now needs `PHX_VAULT_ROOT=~/Work/tries/phx-pilot-vault` to write that pilot's vault note.
+  - **Prompt 01 copyright spelling** (Phase 01). Historical; stays as is.
+  - **Accepted residual risks:** listed in the threat model §3 (T1, T2, T7, T19 at M).
+- **Later prompts:** `prompts/PHX_phase-12-release.md` now reads the threat model and starts its known limitations from §3.
+- **Tests:** 491 passed, 1 skipped (`PHX_AUDIT_DIR` unset; it passes when set). That is 63 new tests: `test_failure_injection.py` 21, `test_cli_detach.py` 7, `test_redaction_audit.py` 4, plus additions to `test_redact`, `test_recover`, `test_plan`, `test_verify`, `test_triage`, `test_preflight`, `test_supervisor`, `test_supervisor_units` and `test_paths`. ruff check, ruff format --check and mypy --strict src are clean.
+

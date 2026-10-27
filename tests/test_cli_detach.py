@@ -47,7 +47,8 @@ if os.environ.get("PHX_FAKE_SYSTEMD_FAIL"):
     print("Failed to start transient service unit: Unit phx-x.service already exists.",
           file=sys.stderr)
     sys.exit(1)
-env.update({{k: v for k, v in os.environ.items() if k.startswith("PHX_FAKE_")}})
+# the real unit gets only the allowlist; the test repo needs its git identity (no ~/.gitconfig on CI)
+env.update({{k: v for k, v in os.environ.items() if k.startswith(("PHX_FAKE_", "GIT_"))}})
 subprocess.Popen(args[1:], cwd=cwd, env=env, start_new_session=True,
                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 """

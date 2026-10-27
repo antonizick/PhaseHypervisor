@@ -1,5 +1,7 @@
 import json
 import os
+import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -513,3 +515,28 @@ def test_run_tests_clone_failure(make_repo: RepoFactory) -> None:
     plan = load_plan(repo)
     check = run_tests(plan, "0" * 40, timeout=10)
     assert check.status is CheckStatus.FAIL and "could not clone" in check.evidence
+
+
+def test_timeout_kills_the_whole_process_group(tmp_path: Path) -> None:
+    """A test runner's grandchildren die with it on timeout (Phase 11 hardening)."""
+    pid_file = tmp_path / "grandchild.pid"
+    script = tmp_path / "runner.py"
+    script.write_text(
+        "import subprocess, sys, time\n"
+        "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+        f"open({str(pid_file)!r}, 'w').write(str(child.pid))\n"
+        "time.sleep(60)\n"
+    )
+    r = run_command(f"{sys.executable} {script}", tmp_path, ENV, timeout=1, missing_is_skip=False)
+    assert r.status is CheckStatus.FAIL and "timed out after 1 s" in r.detail
+    pid = int(pid_file.read_text())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    else:
+        os.kill(pid, 9)
+        raise AssertionError("grandchild outlived the timeout")

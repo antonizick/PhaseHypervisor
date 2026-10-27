@@ -210,11 +210,16 @@ def test_vault_summary_appended(h: Callable[..., H], tmp_path: Path) -> None:
     git(x.repo, "add", "CLAUDE.md")
     git(x.repo, "commit", "-q", "-m", "claude md")
     assert x.run(until="01") == EXIT_FINISHED
+    # outside the vault root (default ~/Documents): left alone
+    assert note.read_text() == original
+    assert "inside the vault" in x.last_event("vault")["reason"]
+    x.env["PHX_VAULT_ROOT"] = str(note.parent)
+    assert x.run(until="01a") == EXIT_FINISHED
     text = note.read_text()
     assert "updated: 2026-01-01" not in text and "\nupdated: 20" in text
     log_part = text.split("## Log")[1].split("## Other")[0]
     assert "- **old:** entry\n- **" in log_part and "PHX run `" in log_part
-    assert "01 ✅ complete (1.2k tokens, $0.01, 1 session(s))" in log_part
+    assert "01a ✅ complete (1.2k tokens, $0.01, 1 session(s))" in log_part
     assert text.endswith("## Other\nkeep\n") and text.startswith("---\ntags: [x]\n")
     assert x.last_event("vault")["written"] is True
 
@@ -324,6 +329,38 @@ def test_dry_run_spends_nothing(h: Callable[..., H]) -> None:
     event = x.last_event("dry_run")
     assert [s["phase"] for s in event["steps"]] == ["01", "01a"] and event["end"] == "review_gate"
     assert [x.status(p) for p in ("01", "01a")] == [Status.NOT_STARTED] * 2
+    # the test command ran once in a clean clone; hello.txt does not exist yet, no lockfile
+    check = x.last_event("test_check")
+    assert check["status"] == "fail" and check["suggestion"] is None
+    assert "Test check: fail" in out and "no installed dependencies" in out
+    assert "If the failure is expected at this point of the plan" in out
+    assert git(x.repo, "status", "--porcelain") == ""
+
+
+def test_dry_run_test_check_suggests_installing_dependencies(h: Callable[..., H]) -> None:
+    """Phase 10 finding F9: a clean clone has no node_modules; say so before the run."""
+    x = h()
+    for rel in ("frontend/package.json", "frontend/package-lock.json", "uv.lock"):
+        (x.repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (x.repo / rel).write_text("{}\n")
+    (x.repo / "node_modules" / "dep").mkdir(parents=True)
+    (x.repo / "node_modules" / "dep" / "package-lock.json").write_text("{}\n")
+    git(x.repo, "add", "-A", "-f")
+    git(x.repo, "commit", "-q", "-m", "lockfiles")
+    assert x.run(dry_run=True) == EXIT_FINISHED
+    suggestion = x.last_event("test_check")["suggestion"]
+    assert suggestion == "uv sync --frozen && npm ci --prefix frontend && test -f hello.txt"
+    assert f"test_command = {json.dumps(suggestion)}" in x.out.getvalue()
+    # passing tests: no advice; --skip-test-check: not run at all
+    (x.repo / "hello.txt").write_text("hi\n")
+    git(x.repo, "add", "hello.txt")
+    git(x.repo, "commit", "-q", "-m", "hello")
+    x.out = io.StringIO()
+    assert x.run(dry_run=True) == EXIT_FINISHED
+    assert x.last_event("test_check")["status"] == "pass" and "Test check: pass" in x.out.getvalue()
+    n = len(x.events("test_check"))
+    assert x.run(dry_run=True, test_check=False) == EXIT_FINISHED
+    assert len(x.events("test_check")) == n
 
 
 # --------------------------------------------------------------------------- blocks and answers
@@ -737,6 +774,23 @@ def test_require_preflight_refuses_before_any_launch(h: Callable[..., H]) -> Non
     end = x.last_event("run_end")
     assert end["rule"] == "preflight_missing" and "--require-preflight" in end["reason"]
     assert x.phase_calls() == [] and x.state().pause is None
+
+
+def test_resume_refused_by_require_preflight_keeps_the_pause(h: Callable[..., H]) -> None:
+    """Phase 10 finding F6: a refused `phx resume` must not clear the pause it never acted on."""
+    x = h().all_auto().decide_q1()
+    assert x.run(pause_after="01") == EXIT_PAUSED
+    paused = x.state().pause
+    assert paused is not None and paused.rule == "pause_after"
+    assert x.run(resume=True, require_preflight=True) == EXIT_ERROR
+    assert x.state().pause == paused
+    kept = x.last_event("pause_kept")
+    assert "preflight_missing" in kept["reason"] and "--pause-after 01" in kept["reason"]
+    assert not [e for e in x.events("resume") if "cleared" in e["reason"]]
+    assert x.run() == EXIT_PAUSED  # still paused: a plain run refuses
+    assert x.run(resume=True, until="01a") == EXIT_FINISHED
+    assert "pause cleared: --pause-after 01" in x.last_event("resume")["reason"]
+    assert x.state().pause is None and x.phase_calls() == ["01", "01a"]
 
 
 def test_fresh_preflight_then_stale_after_a_phase_is_added(h: Callable[..., H]) -> None:

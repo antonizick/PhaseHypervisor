@@ -247,3 +247,28 @@ def test_run_rejects_bad_options(make_repo: RepoFactory) -> None:
         main(["run", str(repo), "--until", "7"])
     with pytest.raises(SystemExit, match="at least 1"):
         main(["run", str(repo), "--max-phases", "0"])
+
+
+def test_vault_path_confined_to_the_vault_root(make_repo: RepoFactory, tmp_path: Path) -> None:
+    """CLAUDE.md is repo text: PHX writes only a .md note inside PHX_VAULT_ROOT (Phase 11)."""
+    from phx.logging import EventLog
+    from phx.state import RunState
+    from phx.vault import append_summary, vault_root
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    outside = tmp_path / "outside.md"
+    outside.write_text("## Log\n")
+    (vault / "link.md").symlink_to(outside)
+    env = {"PHX_VAULT_ROOT": str(vault), "HOME": str(tmp_path)}
+    assert vault_root({"HOME": "/h"}) == Path("/h/Documents")
+    assert vault_root(env) == vault
+    log = EventLog(tmp_path / "run.jsonl")
+    for target in (outside, vault / "link.md", Path("rel/x.md")):
+        repo = make_repo("sample", name=f"work/R{abs(hash(target)) % 10**6}")
+        (repo / "CLAUDE.md").write_text(f"The Obsidian project note `{target}`\n")
+        git(repo, "add", "CLAUDE.md")
+        git(repo, "commit", "-q", "-m", "note")
+        got = append_summary(repo, RunState(), log, env)
+        assert not got.written and "inside the vault" in got.reason, target
+    assert outside.read_text() == "## Log\n"

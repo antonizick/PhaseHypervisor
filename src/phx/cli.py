@@ -105,6 +105,11 @@ def build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="refuse when no current preflight is recorded (default: warn)",
             )
+            cmd.add_argument(
+                "--skip-test-check",
+                action="store_true",
+                help="with --dry-run: don't run the test command in a clean clone of main",
+            )
         elif name == "status":
             cmd.add_argument("repo", type=Path, nargs="?", help="repo path (default: all repos)")
             cmd.add_argument("--json", action="store_true", help="print JSON")
@@ -269,6 +274,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         resume=args.command == "resume",
         require_preflight=args.require_preflight,
+        test_check=not args.skip_test_check,
     )
     if args.detach and not args.dry_run:
         holder = running(repo)

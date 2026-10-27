@@ -8,6 +8,7 @@ The decision table is documented in ``docs/PHX_ARCHITECTURE.md``.
 """
 
 import os
+import re
 import subprocess
 from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field, replace
@@ -394,9 +395,26 @@ def find_claude_processes(
 
 
 def phase_activity(repo: Path, phase_id: str) -> float | None:
-    """Latest sign of work on a phase: its branch tip's commit time or a changed file's mtime."""
+    """Latest sign of work on a phase: its claim (or resume) commit on ``main``, its branch
+    tip's commit time or a changed file's mtime.
+
+    The claim commit counts so that a session that claimed the phase by hand but has not
+    yet created its branch or written a file is still seen (Phase 11, ADR-0019 review).
+    """
     branches, trees = load_live(repo).for_phase(phase_id)
     times: list[float] = []
+    claim = _run_git(
+        repo,
+        "log",
+        "-1",
+        "--format=%ct",
+        "-E",
+        f"--grep=^chore\\(plan\\): (start|resume) phase {re.escape(phase_id)}$",
+        MAIN,
+        "--",
+    ).stdout.strip()
+    if claim.isdigit():
+        times.append(float(claim))
     for branch in branches:
         out = _run_git(repo, "log", "-1", "--format=%ct", branch, "--").stdout.strip()
         if out.isdigit():

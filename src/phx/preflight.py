@@ -350,6 +350,11 @@ def _cell(text: str) -> str:
     return _clip(" ".join(text.split()), 160).replace("|", "\\|")
 
 
+def _quoted(text: str) -> str:
+    """Repo text for a « » quote: one line, and it cannot close the quote (Phase 11)."""
+    return " ".join(text.split()).replace("«", "\u2039").replace("»", "\u203a")
+
+
 def _deferred(status: str) -> bool:
     return status.strip().lstrip("*_` ").lower().startswith("deferred")
 
@@ -478,7 +483,7 @@ def assemble_prompt(
             continue
         out += ["", f"#### Phase {p.id}"]
         for lead in found[:MAX_LEADS_PER_PHASE]:
-            out.append(f"- [{', '.join(lead.kinds)}] line {lead.line}: «{lead.text}»")
+            out.append(f"- [{', '.join(lead.kinds)}] line {lead.line}: «{_quoted(lead.text)}»")
         if len(found) > MAX_LEADS_PER_PHASE:
             out.append(f"- … {len(found) - MAX_LEADS_PER_PHASE} more; read the prompt")
     if not any(leads.values()):

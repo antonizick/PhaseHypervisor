@@ -4,10 +4,15 @@ The note's path comes from the repo's ``CLAUDE.md`` on ``main`` (the line naming
 Obsidian project note `…`" that every phased-project repo carries). Only two things in
 the note change: the ``updated:`` frontmatter field and one new line at the end of its
 ``## Log`` section. A note without either is left alone (logged).
+
+``CLAUDE.md`` is repo text, so the path is confined (Phase 11 threat model): it must be
+an absolute ``.md`` path that resolves, symlinks followed, inside the vault root
+``$PHX_VAULT_ROOT`` (default ``~/Documents``).
 """
 
 import os
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -99,7 +104,17 @@ def append_line(text: str, line: str, ts: str) -> str | None:
     return out
 
 
-def append_summary(repo: Path, state: RunState, log: EventLog) -> VaultResult:
+def vault_root(env: Mapping[str, str] | None = None) -> Path:
+    """``$PHX_VAULT_ROOT``, else ``~/Documents`` (Nick's Obsidian vault)."""
+    env = os.environ if env is None else env
+    root = env.get("PHX_VAULT_ROOT")
+    home = env.get("HOME")
+    return Path(root) if root else (Path(home) if home else Path.home()) / "Documents"
+
+
+def append_summary(
+    repo: Path, state: RunState, log: EventLog, env: Mapping[str, str] | None = None
+) -> VaultResult:
     path = note_path(repo)
 
     def done(written: bool, reason: str) -> VaultResult:
@@ -108,6 +123,10 @@ def append_summary(repo: Path, state: RunState, log: EventLog) -> VaultResult:
 
     if path is None:
         return done(False, "CLAUDE.md on main names no Obsidian project note")
+    root = vault_root(env).resolve()
+    if not path.is_absolute() or path.suffix != ".md" or not path.resolve().is_relative_to(root):
+        return done(False, f"note is not a .md file inside the vault {root} (PHX_VAULT_ROOT)")
+    path = path.resolve()
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:

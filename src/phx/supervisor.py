@@ -9,6 +9,7 @@ supervisor carry on after a stop, crash or reboot. The supervisor never calls an
 itself; the only model calls are the phase sessions, the limit probe and triage.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -64,7 +65,15 @@ from phx.runner import (
 )
 from phx.state import Pause, RunState, RunStatus, Wait, load_state, now_ts, save_state
 from phx.vault import append_summary
-from phx.verify import UnsupportedCommand, capture_baseline, parse_command
+from phx.verify import (
+    CheckStatus,
+    UnsupportedCommand,
+    capture_baseline,
+    main_head,
+    parse_command,
+    run_tests,
+    suggest_test_command,
+)
 
 DEPS_WAIT = "dependencies not complete"
 EXIT_FINISHED = 0
@@ -102,6 +111,7 @@ class RunOptions:
     dry_run: bool = False
     resume: bool = False  # `phx resume`: clear a pause first
     require_preflight: bool = False  # refuse instead of warn without a current preflight
+    test_check: bool = True  # dry run: run the test command once in a clean clone (F9)
 
 
 class EndKind(StrEnum):
@@ -189,6 +199,7 @@ class Supervisor:
         self.lock: RunLock | None = None
         self._last_beat = 0.0
         self._state_unsaved = False
+        self._held_pause: Pause | None = None  # the pause `phx resume` clears once it starts
 
     # ------------------------------------------------------------------ public
 
@@ -300,13 +311,11 @@ class Supervisor:
             unit=self.unit,
             options=self.options.__dict__,
         )
-        if self.options.resume:
-            cleared = prev.pause.reason if prev and prev.pause else None
-            self.log.event(
-                "resume",
-                phase=prev.pause.phase if prev and prev.pause else None,
-                reason=f"pause cleared: {cleared}" if cleared else "nothing was paused",
-            )
+        # `phx resume` clears a pause only once the startup checks pass; a run refused
+        # before that (--require-preflight, a contract or config error) keeps it (F6).
+        self._held_pause = prev.pause if self.options.resume and prev else None
+        if self.options.resume and self._held_pause is None:
+            self.log.event("resume", reason="nothing was paused")
         self._save()
         try:
             end = self._loop()
@@ -351,6 +360,11 @@ class Supervisor:
                     self.launcher = find_launcher(self.env)
                 except LauncherError as exc:
                     return End(EndKind.FAILED, str(exc), "no_launcher")
+                if self._held_pause is not None:
+                    held, self._held_pause = self._held_pause, None
+                    self.log.event(
+                        "resume", phase=held.phase, reason=f"pause cleared: {held.reason}"
+                    )
             limit = self._limits_reached()
             if limit:
                 return limit
@@ -924,6 +938,14 @@ class Supervisor:
             self.state.pause = Pause(
                 end.reason, end.rule, end.phase, now_ts(), list(end.question_ids), summary
             )
+        elif self._held_pause is not None:
+            self.state.pause = self._held_pause
+            self.log.event(
+                "pause_kept",
+                phase=self._held_pause.phase,
+                reason=f"run refused before it started ({end.rule}); the pause stays: "
+                f"{self._held_pause.reason}",
+            )
         self._save()
         self.log.event(
             "run_end",
@@ -939,7 +961,7 @@ class Supervisor:
         )
         self._notify_end(end, summary)
         if self.vault and (self.state.phases or end.kind is not EndKind.FAILED):
-            append_summary(self.repo, self.state, self.log)
+            append_summary(self.repo, self.state, self.log, self.env)
         self._say(f"phx: run {status}: {end.reason}")
         if end.kind is EndKind.PAUSED:
             self._say(f"     when ready: phx resume {self.repo}")
@@ -1002,6 +1024,8 @@ class Supervisor:
         steps: list[dict[str, Any]] = []
         end = self._simulate(plan, launcher, steps)
         self._say(f"Then: {end.kind} ({end.reason})")
+        if self.options.test_check:
+            self._dry_test_check(plan)
         self.log.event(
             "dry_run",
             reason=f"would run {len(steps)} phase(s), then {end.kind}: {end.reason}",
@@ -1009,6 +1033,48 @@ class Supervisor:
             end=end.rule,
         )
         return EXIT_FINISHED
+
+    def _dry_test_check(self, plan: Plan) -> None:
+        """Run the test command as verification will, in a clean clone of ``main`` (F9).
+
+        Verification runs it after every phase with no installed dependencies, so a
+        command that needs ``node_modules`` fails after good work. Saying so before the
+        run costs only the test time; ``--skip-test-check`` skips it.
+        """
+        commit = main_head(self.repo)
+        if not plan.test_commands or commit is None:
+            self._say("Test check: the plan names no test command; verification skips tests.")
+            return
+        self._say(f"Test check: running {' && '.join(plan.test_commands)} in a clean clone…")
+        check = run_tests(plan, commit, timeout=float(self.config.test_timeout_s), env=self.env)
+        suggestion = None
+        if check.status is CheckStatus.FAIL:
+            suggestion = suggest_test_command(plan, commit)
+        self.log.event(
+            "test_check",
+            reason=f"tests {check.status} in a clean clone of main",
+            status=str(check.status),
+            evidence=check.evidence,
+            suggestion=suggestion,
+        )
+        self._say(f"Test check: {check.status}")
+        if check.status is not CheckStatus.FAIL:
+            return
+        self._say("  " + check.evidence.replace("\n", "\n  "))
+        self._say(
+            "  A clean clone has no installed dependencies (no node_modules, no virtualenv), "
+            "so verification will fail the same way after every phase."
+        )
+        if suggestion:
+            self._say(
+                "  If that is the cause, commit this to .phx/config.toml on main:\n"
+                f"    test_command = {json.dumps(suggestion)}"
+            )
+        else:
+            self._say(
+                "  If the failure is expected at this point of the plan, ignore it; otherwise "
+                "fix it or set test_command in .phx/config.toml."
+            )
 
     def _simulate(self, plan: Plan, launcher: Launcher | None, steps: list[dict[str, Any]]) -> End:
         """Walk the plan as if each chosen phase completes; append each step to ``steps``."""

@@ -33,6 +33,7 @@ ENV_ALLOWLIST = (
     "WAYLAND_DISPLAY",
     "DBUS_SESSION_BUS_ADDRESS",
     "PHX_WORK_ROOT",
+    "PHX_VAULT_ROOT",
 )
 STOP_TIMEOUT_S = 90  # SIGTERM grace for the unit: session term grace + logging + vault
 

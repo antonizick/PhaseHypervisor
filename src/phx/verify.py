@@ -13,10 +13,12 @@ into ``&&``-joined steps, each a word list with optional ``NAME=value`` prefixes
 Pipes, redirects, ``;``, ``||``, variables and command substitution are refused.
 """
 
+import contextlib
 import glob
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -405,6 +407,35 @@ def _inside(path: Path, root: Path) -> bool:
     return path == root or path.is_relative_to(root)
 
 
+def _run_group(
+    argv: list[str], cwd: Path, env: Mapping[str, str], timeout: float
+) -> subprocess.CompletedProcess[str]:
+    """Run ``argv`` in its own process group; on timeout kill the whole group.
+
+    ``subprocess.run(timeout=…)`` kills only the direct child, so a test runner's
+    workers (``make`` → ``npm`` → ``node``) would outlive the check (Phase 11).
+    """
+    with subprocess.Popen(
+        argv,
+        cwd=cwd,
+        env=dict(env),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        errors="replace",
+        start_new_session=True,
+    ) as proc:
+        try:
+            out, _ = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(proc.pid, signal.SIGKILL)
+            proc.communicate()
+            raise
+        return subprocess.CompletedProcess(argv, proc.returncode, out, None)
+
+
 def run_command(
     command: str,
     root: Path,
@@ -454,18 +485,7 @@ def run_command(
             elif shutil.which(exe, path=child_env.get("PATH")) is None:
                 return CommandResult(command, CheckStatus.FAIL, f"{exe}: command not found on PATH")
             try:
-                proc = subprocess.run(
-                    argv,
-                    cwd=cwd,
-                    env=child_env,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    errors="replace",
-                    timeout=timeout,
-                    check=False,
-                )
+                proc = _run_group(argv, cwd, child_env, timeout)
             except subprocess.TimeoutExpired:
                 return CommandResult(
                     command,
@@ -561,6 +581,42 @@ def run_tests(
         status = CheckStatus.PASS
     source = f"from {plan.test_source}, clean clone of {MAIN} at {commit[:7]}"
     return Check("tests", status, "\n".join([*lines, source]))
+
+
+# Lockfile -> the command that installs from it, run from the repo root (Phase 11, F9).
+_INSTALLERS = (
+    ("package-lock.json", "npm ci{prefix}", " --prefix {dir}"),
+    ("pnpm-lock.yaml", "pnpm install --frozen-lockfile{prefix}", " --dir {dir}"),
+    ("yarn.lock", "yarn install --frozen-lockfile{prefix}", " --cwd {dir}"),
+    ("uv.lock", "uv sync --frozen{prefix}", " --directory {dir}"),
+)
+
+
+def install_steps(repo: Path, commit: str = MAIN) -> list[str]:
+    """Install commands for the lockfiles tracked at ``commit`` (depth <= 2, no vendored dirs).
+
+    A clean clone has none of what they install, so a test command that relies on them
+    fails in verification after good work (Phase 10 pilot, YTPL2 Phase 03).
+    """
+    out = _out(repo, "ls-tree", "-r", "--name-only", commit)
+    steps: list[str] = []
+    for name in sorted((out or "").splitlines(), key=lambda n: (n.count("/"), n)):
+        parts = name.split("/")
+        if len(parts) > 3 or any(p in ("node_modules", "vendor", ".venv") for p in parts):
+            continue
+        for lockfile, template, prefix in _INSTALLERS:
+            if parts[-1] == lockfile:
+                where = "/".join(parts[:-1])
+                steps.append(template.format(prefix=prefix.format(dir=where) if where else ""))
+    return steps
+
+
+def suggest_test_command(plan: Plan, commit: str = MAIN) -> str | None:
+    """A ``test_command`` that installs dependencies first, or ``None`` if none are tracked."""
+    steps = install_steps(plan.repo, commit)
+    if not steps or not plan.test_commands:
+        return None
+    return " && ".join([*steps, *plan.test_commands])
 
 
 # --------------------------------------------------------------------------- the checks

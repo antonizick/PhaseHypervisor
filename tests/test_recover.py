@@ -17,6 +17,7 @@ import pytest
 from phx.classify import Classification, ExitClass
 from phx.logging import EventLog
 from phx.paths import Config
+from phx.plan import load_live
 from phx.recover import (
     MAX_RECOVERIES,
     Action,
@@ -28,6 +29,7 @@ from phx.recover import (
     handle_outcome,
     last_session_end,
     live_sessions,
+    phase_activity,
     phase_prompt,
     repair_blocked,
 )
@@ -505,6 +507,23 @@ def test_idle_main_checkout_session_is_not_a_rival(e: Env) -> None:
     assert not check_resumable(
         e.sc.repo, "05", since=now + 600, proc_root=e.proc, exclude=()
     ).resumable
+
+
+def test_claim_commit_alone_counts_as_activity(e: Env) -> None:
+    """ADR-0019 review (Phase 11): a hand claim with no branch or file yet is still seen."""
+    now = time.time()
+    fake_proc(e.proc, 91, comm="claude", argv=["claude"], cwd=e.sc.repo, started=now - 600)
+    e.sc.write_plan(e.sc.repo, render("🔄 In progress"), "chore(plan): start phase 05")
+    assert load_live(e.sc.repo).for_phase("05") == ([], [])  # no branch, no worktree yet
+    assert phase_activity(e.sc.repo, "05") == pytest.approx(now, abs=5)
+    r = check_resumable(e.sc.repo, "05", proc_root=e.proc, exclude=())
+    assert not r.resumable and "pid 91" in r.reason
+    # a session started after the claim (Nick opening Claude Code to look) is not a rival
+    shutil.rmtree(e.proc)
+    fake_proc(e.proc, 92, comm="claude", argv=["claude"], cwd=e.sc.repo, started=now + 60)
+    assert check_resumable(e.sc.repo, "05", proc_root=e.proc, exclude=()).resumable
+    # another phase's claim commit is not this phase's activity
+    assert phase_activity(e.sc.repo, "5") is None and phase_activity(e.sc.repo, "05a") is None
 
 
 def test_last_session_end(tmp_path: Path) -> None:

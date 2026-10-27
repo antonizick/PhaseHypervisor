@@ -46,6 +46,11 @@ def emit(event: dict[str, Any]) -> None:
 
 def init(session: str) -> None:
     emit({"type": "system", "subtype": "init", "session_id": session, "model": "fake"})
+    leak = os.environ.get("PHX_FAKE_LEAK")  # a secret the agent "prints" (redaction audit)
+    if leak:
+        message = {"id": "msg-leak", "content": [{"type": "text", "text": leak}]}
+        emit({"type": "assistant", "message": message, "session_id": session})
+        emit({"type": "user", "message": {"content": [{"type": "tool_result", "content": leak}]}})
 
 
 def result(session: str, text: str, *, error: bool = False, cost: float = 0.01) -> None:

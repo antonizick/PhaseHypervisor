@@ -712,11 +712,18 @@ def record(
     data = build_record(plan, ts=ts, session_id=session_id, unresolved=unresolved, base_commit=base)
     path = repo / PREFLIGHT_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
+    before = show_main(repo, PREFLIGHT_FILE)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     added = _git(repo, "add", "--", PREFLIGHT_FILE)
     message = f"chore(phx): record preflight {ts}"
     commit = _git(repo, "commit", "-q", "-m", message, "--", PREFLIGHT_FILE)
     if added.returncode != 0 or commit.returncode != 0:
+        # leave main's checkout as it was (Phase 11: git lock contention)
+        _git(repo, "reset", "-q", "--", PREFLIGHT_FILE)
+        if before is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_text(before, encoding="utf-8")
         raise PreflightRefused(f"git commit failed: {(added.stderr + commit.stderr).strip()}")
     sha = _git(repo, "rev-parse", "--short", "HEAD").stdout.strip()
     pushed = "no origin remote"

@@ -188,6 +188,7 @@ class Supervisor:
         self.launcher: Launcher | None = None
         self.lock: RunLock | None = None
         self._last_beat = 0.0
+        self._state_unsaved = False
 
     # ------------------------------------------------------------------ public
 
@@ -234,7 +235,22 @@ class Supervisor:
         print(text, file=self.out, flush=True)
 
     def _save(self) -> None:
-        save_state(self.state_dir, self.state)
+        """Write ``state.json``; a failure (full disk) is logged, never fatal (Phase 11)."""
+        try:
+            save_state(self.state_dir, self.state)
+        except OSError as exc:
+            if not self._state_unsaved:
+                self.log.event(
+                    "state_write_failed",
+                    phase=self.state.phase,
+                    reason=f"state.json not written ({exc.strerror or exc}); the run "
+                    "continues and keeps its state in memory until a write succeeds",
+                )
+            self._state_unsaved = True
+        else:
+            if self._state_unsaved:
+                self.log.event("state_write_recovered", phase=self.state.phase, reason="saved")
+            self._state_unsaved = False
 
     # ------------------------------------------------------------------ main loop
 

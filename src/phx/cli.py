@@ -582,7 +582,7 @@ def answer_question(repo: Path, question_id: str, answer: str, *, force: bool = 
     message = f"docs(plan): answer owner question {question.id}\n\nAnswered with phx answer."
     commit = _git(repo, "commit", "-q", "-m", message, "--", plan.plan_file)
     if commit.returncode != 0:
-        _git(repo, "checkout", "--", plan.plan_file)
+        path.write_text(text, encoding="utf-8")  # not `git checkout`: index.lock blocks it too
         raise ValueError(f"git commit failed: {commit.stderr.strip()}")
     sha = _git(repo, "rev-parse", "--short", "HEAD").stdout.strip()
     pushed = "no origin remote"

@@ -254,7 +254,8 @@ def repair_blocked(
     )
     commit = _run_git(repo, "commit", "-q", "-m", message, "--", plan.plan_file)
     if commit.returncode != 0:
-        _run_git(repo, "checkout", "--", plan.plan_file)
+        # Restore the text itself: `git checkout` fails too while index.lock is held.
+        path.write_text(text, encoding="utf-8")
         skip(f"git commit failed: {commit.stderr.strip()}")
         return None
     sha = _run_git(repo, "rev-parse", "HEAD").stdout.strip()

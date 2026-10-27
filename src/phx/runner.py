@@ -442,7 +442,7 @@ def run_session(
     events = 0
     open_streams = 2
     timed_out: str | None = None
-    fd = os.open(transcript, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    fd: int | None = os.open(transcript, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
     try:
         while open_streams:
             now = time.monotonic()
@@ -474,7 +474,18 @@ def run_session(
             if tag == "err":
                 stderr.append(redact_text(line.rstrip("\n")))
                 continue
-            os.write(fd, (redact_text(line.rstrip("\n")) + "\n").encode())
+            if fd is not None:
+                try:
+                    os.write(fd, (redact_text(line.rstrip("\n")) + "\n").encode())
+                except OSError as exc:  # full disk: keep the session, lose the copy
+                    os.close(fd)
+                    fd = None
+                    log.event(
+                        "transcript_write_failed",
+                        phase=phase,
+                        reason=f"{transcript} not written further ({exc.strerror or exc}); "
+                        "the session continues",
+                    )
             try:
                 event = json.loads(line)
             except ValueError:
@@ -494,7 +505,8 @@ def run_session(
             if on_event is not None:
                 on_event(event)
     finally:
-        os.close(fd)
+        if fd is not None:
+            os.close(fd)
         try:
             exit_code: int | None = proc.wait(timeout=timeouts.term_grace_s + 5)
         except subprocess.TimeoutExpired:

@@ -138,16 +138,29 @@ def load_state(state_dir: Path) -> RunState | None:
 
 
 def save_state(state_dir: Path, state: RunState) -> None:
-    """Write ``state.json`` atomically: temp file, fsync, rename."""
+    """Write ``state.json`` atomically: temp file, fsync, rename.
+
+    A failed write (full disk) removes its temp file and raises ``OSError``; the old
+    ``state.json`` stays intact. A temp file left by a supervisor killed mid-write
+    (``kill -9``) is never read and is removed by the next successful save.
+    """
     state_dir.mkdir(parents=True, exist_ok=True)
     state.updated = now_ts()
     path = state_path(state_dir)
     tmp = path.with_name(f".{STATE_FILE}.{os.getpid()}.tmp")
-    data = json.dumps(state.to_json(), ensure_ascii=False, indent=2) + "\n"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    data = (json.dumps(state.to_json(), ensure_ascii=False, indent=2) + "\n").encode()
     try:
-        os.write(fd, data.encode())
-        os.fsync(fd)
-    finally:
-        os.close(fd)
-    os.replace(tmp, path)
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            view = memoryview(data)
+            while view:
+                view = view[os.write(fd, view) :]
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        os.replace(tmp, path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+    for stale in state_dir.glob(f".{STATE_FILE}.*.tmp"):
+        stale.unlink(missing_ok=True)

@@ -121,5 +121,6 @@ def append_summary(repo: Path, state: RunState, log: EventLog) -> VaultResult:
         tmp.write_text(new, encoding="utf-8")
         os.replace(tmp, path)
     except OSError as exc:
+        tmp.unlink(missing_ok=True)
         return done(False, f"note not written: {type(exc).__name__}")
     return done(True, "run summary appended to the note's Log section")

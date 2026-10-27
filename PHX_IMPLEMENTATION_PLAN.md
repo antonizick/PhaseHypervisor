@@ -181,7 +181,7 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 - **Tests:** 428 passed (9 new regression tests in `test_recover.py`, `test_runner.py`, `test_supervisor.py`), ruff check, ruff format --check and mypy --strict src clean.
 
 ### 2026-10-26 23:46 CDT: Phase 11: Hardening, security review & QA (✅ Complete)
-- **Timeline:** started 2026-10-26 23:03 CDT (claim commit 45f24e0) · finished 2026-10-26 23:46 CDT · merged {MERGED}
+- **Timeline:** started 2026-10-26 23:03 CDT (claim commit 45f24e0) · finished 2026-10-26 23:46 CDT · merged 2026-10-26 23:46 CDT
 - **Built:**
   - **Threat model** `docs/PHX_THREAT_MODEL.md`: 20 threats rated, each with its mitigation and test, or an accepted residual. No High risk is left unmitigated; T1/T2 (bypass permissions, prompt injection) are accepted on record at M.
   - **Manual `/phase` step 0 is fail-closed** (`PHX-CHECK-DONE` sentinel, ADR-0020, contract stays version 1). Applied in PHX, MM3 `81ee0a6`, CL `9555f22`, OCC `a1d5cdd` and YTPL2 `582b460` (one commit each, plus a vault log line each), the skill (`templates/phase-command.md`, `SKILL.md`; backups `~/.claude/skills/phased-project/.backup/*-phase11`) and the playbook.

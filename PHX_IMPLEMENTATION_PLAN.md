@@ -237,7 +237,7 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 - **Tests:** 491 passed, 1 skipped (`PHX_AUDIT_DIR` unset; it passes when set). That is 63 new tests: `test_failure_injection.py` 21, `test_cli_detach.py` 7, `test_redaction_audit.py` 4, plus additions to `test_redact`, `test_recover`, `test_plan`, `test_verify`, `test_triage`, `test_preflight`, `test_supervisor`, `test_supervisor_units` and `test_paths`. ruff check, ruff format --check and mypy --strict src are clean.
 
 ### 2026-10-27 04:40 CDT: Phase 12: Release v0.1.0 (✅ Complete)
-- **Timeline:** started 2026-10-27 04:34 CDT (claim commit 2d55bfb) · finished 2026-10-27 04:40 CDT · merged MERGED_TS
+- **Timeline:** started 2026-10-27 04:34 CDT (claim commit 2d55bfb) · finished 2026-10-27 04:40 CDT · merged 2026-10-27 04:42 CDT
 - **Model:** ran as claude-sonnet-5-5 (plan lists Sonnet 5.5)
 - **Built:** version `0.1.0` (`pyproject.toml`, `src/phx/__init__.py`, `uv.lock`); CHANGELOG `[0.1.0]` heading; `docs/PHX_FINAL-REPORT.md` (what was built, Definition of done with evidence, measured pilot results, limitations from threat model §3 and the deferred follow-ups, Mermaid gantt and table of the build timeline); README status and doc table; Definition of done boxes ticked. Outside the repo: playbook note "Released command set", OSMods write-up and index, Obsidian project note (status `complete`).
 - **Definition of done:** all 11 boxes checked with evidence in the report §2. One honest gap is recorded there: no real Pro usage limit or provider toggle has happened (the limit path ran on a real session through a shim; the toggle is covered by tests).

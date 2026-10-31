@@ -28,6 +28,7 @@ PHX is built with its own method. Work is split into phases in [PHX_IMPLEMENTATI
 | [docs/PHX_PILOT_REPORT.md](docs/PHX_PILOT_REPORT.md) | Measured results of the real-token pilots (Phase 10) |
 | [docs/PHX_FINAL-REPORT.md](docs/PHX_FINAL-REPORT.md) | v0.1.0 final report: Definition of done evidence, results, limitations, timeline (Phase 12) |
 | [docs/PHX_AUTO_MODE_CONTRACT.md](docs/PHX_AUTO_MODE_CONTRACT.md) | Hands-off `/phase NN --auto` contract (version 1) shared by PHX and every phase command |
+| [docs/PHX_TIMELINE.svg](docs/PHX_TIMELINE.svg) | Generated picture of this project's planning and build (see the plan's [Timeline](PHX_IMPLEMENTATION_PLAN.md#timeline); `scripts/phase_timeline.py`, Phase 12b) |
 | [CLAUDE.md](CLAUDE.md) | Rules for AI agents working in this repo |
 
 ## Usage

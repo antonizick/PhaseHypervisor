@@ -176,12 +176,31 @@ def _changed(old: str, new: str) -> list[str]:
     return [line for line in diff if line[:1] in "+-" and line[:3] not in ("+++", "---")]
 
 
+# Phase 12b added the visual-timeline maintenance lines; everything else must stay as it was.
+TIMELINE_FRAGMENTS = (
+    ", refresh the timeline on `main` (§4a) as `docs(plan): refresh timeline`",
+    ", the timeline SVG included,",
+)
+TIMELINE_SENTENCE = re.compile(r" Run `python3 scripts/phase_timeline\.py --check`.*?close-out\)\.")
+TIMELINE_LINE = re.compile(r"refresh the timeline|Timeline refreshed|^- Refresh the timeline", re.I)
+
+
+def without_timeline(text: str) -> str:
+    """Rendered template text with the Phase 12b timeline additions taken out again."""
+    text = re.sub(r"\n## 4a\. Visual timeline.*?(?=\n## |\Z)", "", text, flags=re.S)
+    text = TIMELINE_SENTENCE.sub("", text)
+    for fragment in TIMELINE_FRAGMENTS:
+        text = text.replace(fragment, "")
+    return "".join(ln for ln in text.splitlines(True) if not TIMELINE_LINE.search(ln))
+
+
 def test_full_settings_render_matches_pre12a_skill() -> None:
     """With the author's settings, only explained wording changes from the pre-12a live copies."""
     values = settings_values(FULL_SETTINGS)
     for name in ("phase-command.md", "phase-add-command.md"):
-        assert render((TEMPLATES / name).read_text(), values) == (PRE12A / name).read_text(), name
-    shared = render((TEMPLATES / "_shared-instructions.md").read_text(), values)
+        rendered = without_timeline(render((TEMPLATES / name).read_text(), values))
+        assert rendered == (PRE12A / name).read_text(), name
+    shared = without_timeline(render((TEMPLATES / "_shared-instructions.md").read_text(), values))
     assert _changed((PRE12A / "_shared-instructions.md").read_text(), shared) == [
         "-- [ ] OSMods documentation updated if the host system was modified.",
         "+- [ ] OS-modification log (`/home/nick/Documents/04 Resources/OSMods/`)"
@@ -237,3 +256,21 @@ def test_fresh_user_manual_install(tmp_path: Path) -> None:
     assert "\nPHX-CONTRACT: 1\n" in phase_md
     for word in DENY:
         assert word not in phase_md
+
+
+def test_timeline_lines_render_with_and_without_settings() -> None:
+    for settings in (FULL_SETTINGS, None):
+        values = settings_values(settings)
+        shared = render((TEMPLATES / "_shared-instructions.md").read_text(), values)
+        assert "## 4a. Visual timeline" in shared and "never on a phase branch" in shared
+        add = render((TEMPLATES / "phase-add-command.md").read_text(), values)
+        plan = render((TEMPLATES / "IMPLEMENTATION_PLAN.md").read_text(), values)
+        for text in (shared, add):
+            line = next(ln for ln in text.splitlines() if "phase_timeline.py --write" in ln)
+            assert ("--vault-note" in line) == (settings is not None), line
+        assert (
+            plan.index("## Phases")
+            < plan.index("<!-- phase-timeline:start")
+            < plan.index("### Model rationale")
+        )
+    assert (SKILL / "scripts" / "phase_timeline.py").is_file()

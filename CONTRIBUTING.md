@@ -21,7 +21,8 @@ The `phased-project` skill, its templates and the `/phx` command live in `plugin
 2. Never write personal names, paths or private project names there: `tests/test_plugin_package.py` has a deny-list.
 3. Hands-off contract text (`PHX-CONTRACT: 1`, step 0, the "Hands-off mode" section, §1b) must stay as it is unless the contract version changes (ADR-0012). The tests compare it with fixed text and with the pre-12a copies in `tests/fixtures/skill_pre12a/`; if you change it on purpose, update those and say why in an ADR.
 4. Run `uv run pytest tests/test_plugin_package.py` and `claude plugin validate .` and `claude plugin validate plugins/phased-project`.
-5. Update [docs/PHX_GETTING_STARTED.md](docs/PHX_GETTING_STARTED.md) when what a user sees or types changes. A plugin version bump goes with a repo release (`plugin.json` matches `phx --version`).
+5. **The timeline generator** is `plugins/phased-project/skills/phased-project/scripts/phase_timeline.py`, copied byte for byte to `scripts/phase_timeline.py` (a test compares them). It must stay standard-library-only and Python 3.9-compatible (ruff checks it with `py39`; a test parses it with `feature_version=(3, 9)`). After changing its output on purpose, refresh the golden files with `UPDATE_GOLDEN=1 uv run pytest tests/test_phase_timeline.py`, review the diff in `tests/fixtures/timeline/golden/`, copy the script to `scripts/`, and run `python3 scripts/phase_timeline.py --write` on `main`.
+6. Update [docs/PHX_GETTING_STARTED.md](docs/PHX_GETTING_STARTED.md) when what a user sees or types changes. A plugin version bump goes with a repo release (`plugin.json` matches `phx --version`).
 
 ## Reporting bugs and ideas
 Use the issue templates in `.github/ISSUE_TEMPLATE/`. For security problems follow [SECURITY.md](SECURITY.md) instead of opening a public issue.

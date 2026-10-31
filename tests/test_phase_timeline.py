@@ -491,3 +491,38 @@ def test_python39_syntax_and_header() -> None:
     }
     assert imports <= set(sys.stdlib_module_names) | {"__future__"}
     assert "datetime.now" not in source and "time.time" not in source
+
+
+def test_bootstrap_from_templates_shows_phase00(tmp_path: Path) -> None:
+    """A new project from the skill templates has the script, the markers and a Phase 00 bar."""
+    from plugin_render import TEMPLATES, render, settings_values
+
+    text = render((TEMPLATES / "IMPLEMENTATION_PLAN.md").read_text(), settings_values(None))
+    fills = {
+        "PREFIX": "NEW",
+        "PHASE00_STARTED": "2026-10-01 09:00 CDT",
+        "TIMESTAMP": "2026-10-01 09:30 CDT",
+        "PHASE_ROWS": "| 01 | First | x | Sonnet 5.5 | 00 | ⬜ Not started | n/a | auto |",
+        "PLANNING_MODEL": "Opus 5.5",
+    }
+    text = re.sub(r"\{\{([A-Z0-9_]+)\}\}", lambda m: fills.get(m.group(1), "x"), text)
+    g = GitRepo(tmp_path)
+    (tmp_path / "NEW_IMPLEMENTATION_PLAN.md").write_text(text)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "phase_timeline.py").write_bytes(SKILL_SCRIPT.read_bytes())
+    out = subprocess.run(
+        [sys.executable, "scripts/phase_timeline.py", "--write"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert out.returncode == 0, out.stderr
+    g.git("add", "-A")
+    g.commit("docs(plan): phase 00 planning", "2026-10-01T09:31:00-05:00")
+    svg = (tmp_path / "docs" / "NEW_TIMELINE.svg").read_text()
+    assert 'id="tl-p00"' in svg and "Not started: 01." in svg
+    check = subprocess.run(
+        [sys.executable, "scripts/phase_timeline.py", "--check"], cwd=tmp_path, check=False
+    )
+    assert check.returncode == 0

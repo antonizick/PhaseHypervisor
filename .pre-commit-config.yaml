@@ -8,4 +8,5 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        args: ["--baseline", ".secrets.baseline"]
+        # .phx/preflight.json holds SHA-256 plan fingerprints written by `phx preflight --record`, not secrets.
+        args: ["--baseline", ".secrets.baseline", "--exclude-files", "^\\.phx/preflight\\.json$"]

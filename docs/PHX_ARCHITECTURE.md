@@ -242,6 +242,19 @@ examples/CLAUDE.user.md                  optional "Phased-project settings" sect
 - **Nick's install** is two symlinks into the main checkout (`~/.claude/skills/phased-project`, `~/.claude/commands/phx.md`), so the repo is the only copy (ADR-0023).
 - **Guards.** `tests/test_plugin_package.py`: manifests, version match, every template renders with full and empty settings, deny-list over `plugins/`, `examples/` and the guide, contract lines fixed, the author's render equal to the pre-12a skill (fixtures in `tests/fixtures/skill_pre12a/`) except one explained line, and a fresh-`HOME` manual install that follows the guide's commands.
 
+## Phase 12b: visual timeline (`scripts/phase_timeline.py`, ADR-0025, ADR-0027)
+A skill component, not part of `phx`: `plugins/phased-project/skills/phased-project/scripts/phase_timeline.py`, copied into every repo as `scripts/phase_timeline.py` (this repo's copy is byte-identical). One stdlib file, Python ≥ 3.9, `git` only.
+```
+plan (working tree) ─┬─ phase table (ID, name, status)          ┌─ docs/<PREFIX>_TIMELINE.svg
+                     └─ Phase Log (Timeline bullets, headings) ─┼─ plan:         ## Timeline block (image, Mermaid per session, table, totals)
+git log HEAD ── claim / blocked / resume / merge / preflight  ──┼─ final report: same block, if it has the markers
+                commits, offsets for zone names                  └─ vault note:   block without the image (--vault-note)
+```
+- **Model:** `PhaseRecord` (start, finish, merged, blocked/paused waits, claim) and `PlanningItem` (Phase 00, `Planning:` entries, `phx preflight` markers), each value tagged with its source and whether it is approximate. Source order: Timeline bullet, git, heading timestamp.
+- **Axis:** activity spans merged into working sessions; gaps over `--gap-minutes` become breaks; session width ∝ √length. "As of" is the latest recorded event, so output is a function of repo state only.
+- **Writes:** only between `<!-- phase-timeline:start … -->` and `<!-- phase-timeline:end -->`, via a temp file and `os.replace`. `--check` compares, `--print` writes the block to stdout. Exit 2 for a missing plan or markers, or markers before the phase table.
+- **Compatibility with `phx`:** the block sits after the phase table, its table has no `Status` column and it uses no `##`/`###` headings, so `plan.parse_phase_table` and `verify.phase_log_entries` read the same (tests; `phx plan` byte-identical on five repos).
+
 ## Interface with phase sessions
 PHX and a phase session talk only through the repo and one line of output, defined in [PHX_AUTO_MODE_CONTRACT.md](PHX_AUTO_MODE_CONTRACT.md) (contract version 1, Phase 03):
 - **In:** `/phase NN --auto` plus `PHX_AUTO=1`. The command must carry `PHX-CONTRACT: 1`.

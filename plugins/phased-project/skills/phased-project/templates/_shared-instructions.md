@@ -31,12 +31,13 @@ Applies only in hands-off mode (`/phase NN --auto` or `PHX_AUTO=1`, set only by 
    - set the phase's Status to `⛔ Blocked`;
    - add a Phase Log entry `### <TS>: Phase NN: <title> (⛔ Blocked)` with bullets: `- **Timeline:** started <claim TS> (claim commit <hash>) · blocked <TS> to (open)`, then `- **Model:** …`, then `- **Question:** #<id>: <question>`, then what is done, what remains and where to resume.
 3. Commit only that file to `main`: `git commit -m "chore(plan): phase NN blocked" -- {{PREFIX}}_IMPLEMENTATION_PLAN.md`, and push `main` if a remote exists.
+   Then refresh the timeline on `main` (§4a) in its own commit, `docs(plan): refresh timeline`.
 4. {{#VAULT}}In the Obsidian note: row `⛔ Blocked`, `updated:` field, and a timestamped log line naming the question.{{/VAULT}}{{^VAULT}}No vault note is kept for this project; skip this step.{{/VAULT}}
 5. Final message: what was done, the question and its proposed default, then the `PHX-RESULT` line with `"status":"blocked"` and the question IDs (see `/phase`).
 
 A question is **open** while its Status cell starts with `Open`; `Answered …`, `Decided …` and `Deferred …` are not open.
 
-**Resuming** a `⛔ Blocked` phase in hands-off mode: if a question needed by it is still open, refuse without changing anything. Otherwise set the row to `🔄 In progress`, change `blocked <TS> to (open)` to `blocked <TS> to <TS now>` in its Timeline, commit only the plan file to `main` (`chore(plan): resume phase NN`), {{#VAULT}}update the Obsidian note, {{/VAULT}}then run `git merge main` in the worktree, read the answer and continue as a normal resume.
+**Resuming** a `⛔ Blocked` phase in hands-off mode: if a question needed by it is still open, refuse without changing anything. Otherwise set the row to `🔄 In progress`, change `blocked <TS> to (open)` to `blocked <TS> to <TS now>` in its Timeline, commit only the plan file to `main` (`chore(plan): resume phase NN`), refresh the timeline on `main` (§4a) as `docs(plan): refresh timeline`, {{#VAULT}}update the Obsidian note, {{/VAULT}}then run `git merge main` in the worktree, read the answer and continue as a normal resume.
 
 ## 2. Target repository layout (evolves; keep `docs/{{PREFIX}}_ARCHITECTURE.md` in sync)
 ```
@@ -60,4 +61,13 @@ A question is **open** while its Status cell starts with `Open`; `Answered …`,
 {{#VAULT}}- [ ] Obsidian project note updated (status icons, `updated:` field and a timestamped log line).
 {{/VAULT}}- [ ] {{#OS_LOG}}OS-modification log (`{{OS_LOG}}`) updated if the host system was modified.{{/OS_LOG}}{{^OS_LOG}}Host OS changes recorded, if the project keeps an OS-modification log.{{/OS_LOG}}
 - [ ] Work committed on the phase branch. Once the phase is `✅ Complete` and every check passes, merge it into `main` without asking (fast-forward where possible), from the main checkout. Conflicts in `{{PREFIX}}_IMPLEMENTATION_PLAN.md` and the changelog are expected when phases ran in parallel: keep every row and entry from both sides, and use the branch's final status for this phase's row. Then push `main` if a remote exists (create a **private** GitHub repo if the plan calls for one), `git worktree remove ../{{REPO_NAME}}-phase-NN` and `git branch -d phase-NN-<slug>`. Do not merge a `⛔ Blocked` phase or one with failing checks. Making a repo public or publishing a release needs {{OWNER}}'s explicit confirmation (hands-off mode: block-with-question, §1b).
+- [ ] **Timeline refreshed on `main`** after the merge (§4a), committed as `docs(plan): refresh timeline` and pushed.
 - [ ] Final message to {{OWNER}}: what was built, how to try it, what's next, and any open questions. In hands-off mode, its last line is the `PHX-RESULT` line (see `/phase`).
+
+## 4a. Visual timeline (`scripts/phase_timeline.py`)
+The plan's `## Timeline` block, `docs/{{PREFIX}}_TIMELINE.svg`{{#VAULT}}, the vault note's timeline{{/VAULT}} and the final report's timeline (once it exists) are generated. Refresh them **only on `main`, never on a phase branch**, so parallel branches never conflict over them:
+`python3 scripts/phase_timeline.py --write{{#VAULT}} --vault-note "{{VAULT_NOTE_PATH}}"{{/VAULT}}`, then commit the plan, the SVG and the final report (if present) together: `docs(plan): refresh timeline`.
+- When: after the merge at close-out, after the `⛔` commit (§1b) and after the resume commit. The claim commit stays status-only; the new bar appears at the next block, resume or close-out.
+- If the block or the SVG ever conflicts, take either side and re-run `--write`; never merge it by hand.
+- `python3 scripts/phase_timeline.py --check` exits 1 when the outputs are stale (right after a claim this is expected).
+

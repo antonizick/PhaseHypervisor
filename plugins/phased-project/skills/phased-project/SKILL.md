@@ -224,6 +224,14 @@ For repos bootstrapped before the generator existed. Same preconditions as the o
 Older entries ("started not recorded", bare-date headings) show as approximate or "not shown". That is the
 honest picture: do not rewrite history to make the chart prettier.
 
+**Retrofit results** (first rollout, four repos of different ages; the recipe needed no change):
+- A repo with many "started not recorded" entries draws mostly dashed, approximate bars; phases with no usable times are listed under the chart as "Not shown". That is expected.
+- A repo whose final report has no timeline section gets a new `## Timeline` section with the markers at the end.
+- A repo with untracked files in `main` is fine: stage explicit paths only.
+- A repo with no remote has nothing to push; the adoption commit stays local.
+- A paused repo (all remaining phases `⬜`) shows only its completed phases; the others are listed as "Not started".
+- Old ADR indexes may already have gaps; add your row, do not repair theirs.
+
 ## Phase prompt rules (see `templates/phase-prompt.md`)
 Every prompt is self-contained. It has a header line with the model and its `/model` command, "Depends on",
 the branch name and the Gate; **Read first**, naming exact spec sections and prior Phase Log entries; **Goal**;

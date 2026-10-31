@@ -68,7 +68,7 @@ def templates() -> list[Path]:
 
 
 def public_files() -> list[Path]:
-    files = [p for p in PLUGIN.rglob("*") if p.is_file()]
+    files = [p for p in PLUGIN.rglob("*") if p.is_file() and "__pycache__" not in p.parts]
     files += [p for p in (REPO / "examples").rglob("*") if p.is_file()]
     return [*files, GUIDE, REPO / ".claude-plugin" / "marketplace.json"]
 

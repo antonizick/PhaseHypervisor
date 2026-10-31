@@ -40,6 +40,8 @@ addopts = "-ra"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# The timeline generator ships to other repos and must run on Python 3.9 (ADR-0027).
+per-file-target-version = { "**/phase_timeline.py" = "py39" }
 src = ["src", "tests"]
 
 [tool.ruff.lint]

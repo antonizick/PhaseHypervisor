@@ -29,6 +29,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0023 | 2026-10-27 05:28 CDT | Phase 12a pre-decisions: symlinked live install, appended settings section, handle-only manifest metadata, sandboxed `uv tool install` check, version bump only on tag approval, `v0.2.0` tag scheme, namespaced plugin names accepted | Accepted | 12a (preflight) |
 | ADR-0024 | 2026-10-27 05:43 CDT | Plugin layout and namespacing, settings format with `{{#X}}`/`{{^X}}` template sections, regression rule for the generic skill, Nick's install as symlinks | Accepted | 12a |
 | ADR-0025 | 2026-10-31 10:06 CDT | Visual project timeline: generated from the Phase Log and git by a stdlib script in the skill; SVG plus Mermaid and table in a marked block; regenerated only on `main`; rollout split into 12b (skill, PHX, recipe) and 12c (four existing repos) | Accepted | 12b, 12c (planning) |
+| ADR-0026 | 2026-10-31 10:21 CDT | Phase 12b/12c pre-decisions: one preview block in 12b, fixtures keep only Timeline bullets and headings, no tag offered, MM3 untracked files don't block the retrofit, 12c Gate auto | Accepted | 12b, 12c (preflight) |
 
 ---
 
@@ -433,3 +434,28 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 
 **Consequences.** `phx` itself is unchanged and stays optional (ADR-0011); a `phx timeline` command or a verifier freshness check are follow-ups. The Timeline bullet grammar and contract 1 are unchanged (ADR-0012). Legacy entries are shown as approximate, never rewritten.
 
+## ADR-0026: Phase 12b and 12c pre-decisions from the preflight
+**Recorded.** 2026-10-31 10:21 CDT (phx preflight)
+
+**Context.** Phases 12b and 12c (ADR-0025) were added after the last preflight. 12b has a preview checkpoint for Nick, copies fixture text from four other projects into this public repo, and its prompt leaves the `v0.2.0` tag question open. 12c's idle rule ("`main` clean") would skip MeetingMaster3, whose checkout has three untracked scripts. None of the four retrofit repos has a git remote, so 12c commits locally only. Owner questions 13 to 16 record Nick's answers.
+
+**Options considered.**
+
+| Question | Option | Pros | Cons |
+|---|---|---|---|
+| 12b preview approval | **A. Block-with-question once, apply feedback on resume without a second stop** | Build runs unattended; one look | One stop and a resume |
+| | B. Gate `owner`, Nick runs 12b by hand | Live iteration | Nick watches a long session |
+| | C. Approve after merge at the review pause | No stop in the phase | Live skill changes before Nick has seen it |
+| Fixture text | **A. Timeline bullets and headings only, generic names** | Real grammar and times tested; nothing private published | Fixtures less readable |
+| | B. Synthetic only | Zero leakage | Real oddities may be missed |
+| | C. Sanitized excerpts, agent's judgment | Realistic | Leakage judged hands-off |
+| `v0.2.0` tag | **A. Not offered in 12b/12c** | No publishing stop in this run | Tag still open |
+| | B. Offer at 12c close-out (still needs Nick's yes) | Closes ADR-0023's question | Adds a stop |
+| MM3 untracked files | **A. Idle; leave the files alone** | MM3 gets the timeline | Relies on explicit-path staging |
+| | B. Skip MM3 / C. block when reached | Strict rule / Nick decides then | No timeline / a stop |
+| 12c Gate | A. `review` | Pause after the last phase | Nothing follows it to protect |
+| | **B. `auto`** (Nick's choice) | No pause; Nick reads the result when the run ends | No forced look before the run ends |
+
+**Decision.** A, A, A, A, B. Phase 12b renders and self-reviews the previews, then blocks once with the PNG paths and the PHX Mermaid block. Nick's answer approves or lists changes; the resumed session applies them and finishes without blocking again unless the answer says "show me again". Fixtures in `tests/fixtures/timeline/` keep only Timeline bullets and Phase Log headings, with real timestamps; phase names, commit hashes and free text become generic placeholders, and the deny-list test covers that folder. Neither phase asks about a tag or GitHub Release. Phase 12c treats a repo whose only changes are untracked files as idle, stages explicit paths only and never touches those files. Gates: 12b `review`, 12c `auto`.
+
+**Consequences.** One planned stop in 12b (the preview), plus the review pause after it. The tag question from ADR-0023 stays open outside this plan. 12c's commits in the four repos stay local, since none has a remote.

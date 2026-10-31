@@ -28,6 +28,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0022 | 2026-10-27 05:16 CDT | Share the method: the repo is the source of the `phased-project` skill and `/phx`, shipped as a Claude Code plugin plus manual fallback, with a new public getting-started guide | Accepted | 12a (planning) |
 | ADR-0023 | 2026-10-27 05:28 CDT | Phase 12a pre-decisions: symlinked live install, appended settings section, handle-only manifest metadata, sandboxed `uv tool install` check, version bump only on tag approval, `v0.2.0` tag scheme, namespaced plugin names accepted | Accepted | 12a (preflight) |
 | ADR-0024 | 2026-10-27 05:43 CDT | Plugin layout and namespacing, settings format with `{{#X}}`/`{{^X}}` template sections, regression rule for the generic skill, Nick's install as symlinks | Accepted | 12a |
+| ADR-0025 | 2026-10-31 10:06 CDT | Visual project timeline: generated from the Phase Log and git by a stdlib script in the skill; SVG plus Mermaid and table in a marked block; regenerated only on `main`; rollout split into 12b (skill, PHX, recipe) and 12c (four existing repos) | Accepted | 12b, 12c (planning) |
 
 ---
 
@@ -407,4 +408,28 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 **Decision.** A in every row. The settings are `Owner`, `Work root`, `Vault root`, `Vault projects folder`, `Method note`, `OS modifications log`, `Reference implementation` and `Project aliases` (the last keeps Nick's `/phx MM3` working without baking aliases into the public command). A placeholder value such as `<…>` counts as unset. **Regression rule:** rendering the templates with Nick's settings must reproduce his pre-12a live templates except for explained wording; measured: 8 of 10 templates byte-identical, `CLAUDE.md` loses the dated "(…, 2026-10-26 08:44 CDT)" from the git-authority heading, and the shared instructions' close-out line names the OS log by path instead of "OSMods documentation". The contract-critical text (`PHX-CONTRACT: 1`, step 0, `PHX-CHECK-DONE`, the "Hands-off mode" section, `PHX-RESULT`) is byte-identical (tests in `tests/test_plugin_package.py`, fixtures `tests/fixtures/skill_pre12a/`). Nick's install is two symlinks into the main checkout, made only after that check passed (ADR-0023).
 
 **Consequences.** The contract stays version 1 (ADR-0012). The skill's description no longer names Nick or MeetingMaster3; "set this up like MeetingMaster3" still works through the `Reference implementation` setting, but the trigger phrase is now "set this up as a phased project". Model advice in the skill uses aliases (`/model opus`, `/model sonnet`) so it does not go stale with model versions. Repos already bootstrapped keep their generated commands (no re-migration). A plugin version is the repo version; tagging stays with Nick (ADR-0004).
+
+## ADR-0025: Visual project timeline, generated from the Phase Log and git
+**Recorded.** 2026-10-31 10:06 CDT (planning for phases 12b and 12c)
+
+**Context.** Nick wants every phased project's plan and final report to show a visual timeline of planning and of each phase's start and stop. It must stay current during the build, and be "world-class" yet as simple and reliable as possible. The technology is left open. The data has existed since 2026-10-20 (Timeline bullets), but older entries are partial, and PHX's one hand-drawn gantt is hard to read because overnight gaps dwarf short phases.
+
+**Options considered.**
+
+| Question | Option | Pros | Cons |
+|---|---|---|---|
+| Who draws it | **A. A generator script** | Accurate, repeatable, `--check`-able; conflicts fixed by re-running; agents never hand-draw | Code to write and test |
+| | B. Agents hand-edit a chart each phase | No code | Drift, typos, merge conflicts, inconsistent style |
+| Renderer | A. Custom static SVG | Full control: collapsed idle gaps, planning lane, hatched blocks, dark-aware; renders on GitHub and in Obsidian as an image | Most code; the vault note cannot embed a repo file |
+| | B. Mermaid gantt | Native text in GitHub and Obsidian, diffable, least code | No axis breaks (short phases become slivers), limited styling |
+| | **C. Both, from the same data** (Nick's choice) | SVG as the main image; Mermaid works everywhere text goes, including the vault note | Two renderers to keep looking right |
+| | D. Interactive HTML | Zoom and hover | Needs JS/CDN and a viewer; not in Markdown |
+| When it refreshes | **A. Only on `main`: close-out, block, resume, `/phase-add`, bootstrap; `/phase status` only checks** | No branch conflicts; claim commit stays status-only for `phx` | A new phase's bar appears at its first block or close-out, not at the claim |
+| | B. Also at every claim | Bar appears at once | Breaks the status-only claim commit that the claim protocol and `phx` rely on |
+| Rollout | A. Skill + PHX + recipe | Smaller | Nick's live projects keep no timeline |
+| | **B. A plus a retrofit of MM3, CL, OCC, YTPL2** (Nick's choice) | Every project gets it now | More work; split into a second phase |
+
+**Decision.** A, C, A, B. Phase 12b builds `phase_timeline.py` (Python ≥ 3.9, stdlib only), ships it in the skill and in every new repo, wires refreshes into the templates, writes a migration recipe and applies it to PHX. Its preview checkpoint means Nick approves the look before the templates go live. Phase 12c applies the recipe to the four existing repos. Open bars end at `HEAD`'s commit time, never "now", so output is deterministic. The generated block sits after the phase table and has no Status column, so `phx`'s parser is unaffected.
+
+**Consequences.** `phx` itself is unchanged and stays optional (ADR-0011); a `phx timeline` command or a verifier freshness check are follow-ups. The Timeline bullet grammar and contract 1 are unchanged (ADR-0012). Legacy entries are shown as approximate, never rewritten.
 

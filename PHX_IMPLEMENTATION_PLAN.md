@@ -1,7 +1,7 @@
 # PHX: PhaseHypervisor Implementation Plan
 
 **Spec:** [`docs/PHX_SPECIFICATION.md`](docs/PHX_SPECIFICATION.md). **Decisions:** [`docs/PHX_DECISIONS.md`](docs/PHX_DECISIONS.md). **Agent rules:** [`CLAUDE.md`](CLAUDE.md). **Shared phase instructions:** [`prompts/PHX_shared-instructions.md`](prompts/PHX_shared-instructions.md)
-**Last updated:** 2026-10-27 05:47 CDT (Phase 12a complete)
+**Last updated:** 2026-10-31 10:06 CDT (phases 12b and 12c planned)
 
 > ⚠️ **Mandatory:** every agent that works on this project keeps this file accurate. **Before doing any other work, set your phase to `🔄 In progress` and commit that change to `main`** (claim protocol: `prompts/PHX_shared-instructions.md` §1a). Other agents read this table from `main`. At the end, set it to `✅ Complete` or `⛔ Blocked` and add a Phase Log entry. See `CLAUDE.md`.
 
@@ -42,10 +42,13 @@ Each phase is claimed by a `chore(plan): start phase NN` commit on `main` and ru
 | 11 | Hardening, security review & QA | Threat model (bypass permissions, injection via repo text, secrets in logs, lock races), scanners, coverage, failure-injection tests, docs pass, close all follow-ups | Opus 5.5 | 10 | ✅ Complete | [PHX_phase-11-hardening-qa.md](prompts/PHX_phase-11-hardening-qa.md) | auto |
 | 12 | Release v0.1.0 | Final docs, CHANGELOG, version and tag, push to the private GitHub repo, final report with timeline, MVP sign-off; making the repo public or a GitHub release stops for Nick | Sonnet 5.5 | 11 | ✅ Complete | [PHX_phase-12-release.md](prompts/PHX_phase-12-release.md) | review |
 | 12a | Shareable method package | Make the repo the single source of the `phased-project` skill and `/phx` command: generic (no personal paths, optional settings in the user's CLAUDE.md), shipped as a Claude Code plugin from a marketplace in this repo plus a manual-copy fallback; public getting-started guide on how the method, `/phase`, `/phase-add` and `phx` fit together; Nick's install switched to the repo copy | Opus 5.5 | 12 | ✅ Complete | [PHX_phase-12a-shareable-method-package.md](prompts/PHX_phase-12a-shareable-method-package.md) | review |
+| 12b | Visual project timeline | Stdlib generator `scripts/phase_timeline.py` in the `phased-project` skill: reads the phase table, Phase Log Timeline bullets and git, writes `docs/<PREFIX>_TIMELINE.svg` (collapsed idle gaps, planning lane, hatched blocked spans) and a marked Markdown block (image, Mermaid gantt per session, summary table) into the plan, final report and vault note; regenerated on `main` at close-out, block, resume and `/phase-add`; templates, migration recipe, PHX's own plan and final report; preview approved by Nick | Opus 5.5 | 12a | ⬜ Not started | [PHX_phase-12b-visual-timeline.md](prompts/PHX_phase-12b-visual-timeline.md) | review |
+| 12c | Timeline rollout to existing projects | Apply 12b's recipe to MM3, CL, OCC and YTPL2 (idle repos only): script, markers, maintenance lines, generated block in plan, final report and vault note, one adoption commit and ADR each; `phx plan` unchanged | Sonnet 5.5 | 12b | ⬜ Not started | [PHX_phase-12c-timeline-rollout.md](prompts/PHX_phase-12c-timeline-rollout.md) | review |
 
 ### Model rationale
 - **Opus 5.5** (`/model claude-opus-5-5`): the `/phase` contract and skill changes (every future project depends on them), plan parsing, process supervision and exit classification, verification and recovery logic, the supervisor state machine, preflight prompt design, the pilots and the security review.
 - **Opus 5.5** also for 12a: it rewrites the skill and command templates every future project (Nick's and other users') is generated from, and switches Nick's live install.
+- **Opus 5.5** for 12b: time-zone-aware parsing of messy legacy logs with git fallbacks, a deterministic SVG renderer with real design work, and template changes every future project inherits. **Sonnet 5.5** for 12c: a mechanical rollout of an already-written recipe, like Phase 09.
 - **Sonnet 5.5** (`/model claude-sonnet-5-5`): repository governance, the scaffold, mechanical rollout of an already-specified contract to four repos, and the release.
 
 ### Dependency graph
@@ -55,6 +58,7 @@ Each phase is claimed by a `chore(plan): start phase NN` commit on `main` and ru
           └─► 03 ──► 04                 └─► 09 ─┴─► 10 ─► 11 ─► 12
                 └──────────────────────────► 09
 12 ─► 12a   (post-release: shareable method package)
+12a ─► 12b ─► 12c   (visual project timeline; 12c retrofits MM3, CL, OCC, YTPL2)
 ```
 Run serially in ID order (ADR-0007).
 
@@ -298,3 +302,13 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
   - `src/phx/vault.py` docstring still says "Nick's Obsidian vault" (cosmetic).
   - macOS `--detach` and a launcher setting (spec says follow-up).
 - **Tests:** 523 passed, 1 skipped (`PHX_AUDIT_DIR` unset); ruff check, ruff format --check, mypy --strict src and pre-commit (detect-secrets) clean.
+
+### 2026-10-31 10:06 CDT: Planning: phases 12b and 12c inserted (Planned)
+- **Timeline:** started 2026-10-31 10:00 CDT · finished 2026-10-31 10:06 CDT
+- **Request (Nick, via `/phased-project`):** now that project docs log timestamps, the implementation plan and final report should carry an easy-to-read visual timeline of when planning and each phase started and stopped, kept up to date during the build; technology open, but world-class and as simple and reliable as possible.
+- **Grounding:** the data already exists (Timeline bullets since 2026-10-20; 15 in this plan). The only picture is the hand-drawn Mermaid gantt in `docs/PHX_FINAL-REPORT.md` §5, where overnight gaps squash 1–25-minute phases. Older repos have partial bullets ("started not recorded", bare dates), so git fallbacks and an "approximate" marking are needed. `src/phx/plan.py:parse_phase_table` takes the first table with Phase and Status columns, so the generated block goes after the phase table with no Status column. `rsvg-convert` and `chromium` are present for previews; `mmdc` is not.
+- **Decisions (ADR-0025):** generated, never hand-drawn: one stdlib Python script in the skill, copied into each repo. It produces both an SVG (main image) and a Mermaid gantt plus summary table in a marked block (Nick chose "both"). It runs only on `main`, so parallel branches never conflict over it. Rollout covers the skill, PHX and a recipe (12b) **and** a retrofit of MM3/CL/OCC/YTPL2 (12c), as Nick chose. It was split in two to keep each session focused.
+- **Placement:** 12b after 12a (it changes the skill 12a made the source); 12c after 12b (it applies 12b's recipe). Nothing not-started to rewire. Both are Gate `review`: 12b changes Nick's live skill and has a preview checkpoint (his standing preference to review visuals before they go live); 12c touches four other repos (as Phase 09).
+- **Model:** see Model rationale (Opus 5.5 for 12b, Sonnet 5.5 for 12c).
+- **Owner questions:** none open. The 12b preview approval is a checkpoint inside the phase (block-with-question if hands-off), not a pre-decision.
+- **Files:** `prompts/PHX_phase-12b-visual-timeline.md`, `prompts/PHX_phase-12c-timeline-rollout.md` (new); this plan (rows, graph, model rationale, Last updated); `docs/PHX_DECISIONS.md` (ADR-0025); vault note `02 Projects/PHX Implementation Plan.md`.

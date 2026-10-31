@@ -42,7 +42,7 @@ Each phase is claimed by a `chore(plan): start phase NN` commit on `main` and ru
 | 11 | Hardening, security review & QA | Threat model (bypass permissions, injection via repo text, secrets in logs, lock races), scanners, coverage, failure-injection tests, docs pass, close all follow-ups | Opus 5.5 | 10 | ✅ Complete | [PHX_phase-11-hardening-qa.md](prompts/PHX_phase-11-hardening-qa.md) | auto |
 | 12 | Release v0.1.0 | Final docs, CHANGELOG, version and tag, push to the private GitHub repo, final report with timeline, MVP sign-off; making the repo public or a GitHub release stops for Nick | Sonnet 5.5 | 11 | ✅ Complete | [PHX_phase-12-release.md](prompts/PHX_phase-12-release.md) | review |
 | 12a | Shareable method package | Make the repo the single source of the `phased-project` skill and `/phx` command: generic (no personal paths, optional settings in the user's CLAUDE.md), shipped as a Claude Code plugin from a marketplace in this repo plus a manual-copy fallback; public getting-started guide on how the method, `/phase`, `/phase-add` and `phx` fit together; Nick's install switched to the repo copy | Opus 5.5 | 12 | ✅ Complete | [PHX_phase-12a-shareable-method-package.md](prompts/PHX_phase-12a-shareable-method-package.md) | review |
-| 12b | Visual project timeline | Stdlib generator `scripts/phase_timeline.py` in the `phased-project` skill: reads the phase table, Phase Log Timeline bullets and git, writes `docs/<PREFIX>_TIMELINE.svg` (collapsed idle gaps, planning lane, hatched blocked spans) and a marked Markdown block (image, Mermaid gantt per session, summary table) into the plan, final report and vault note; regenerated on `main` at close-out, block, resume and `/phase-add`; templates, migration recipe, PHX's own plan and final report; preview approved by Nick | Opus 5.5 | 12a | 🔄 In progress | [PHX_phase-12b-visual-timeline.md](prompts/PHX_phase-12b-visual-timeline.md) | review |
+| 12b | Visual project timeline | Stdlib generator `scripts/phase_timeline.py` in the `phased-project` skill: reads the phase table, Phase Log Timeline bullets and git, writes `docs/<PREFIX>_TIMELINE.svg` (collapsed idle gaps, planning lane, hatched blocked spans) and a marked Markdown block (image, Mermaid gantt per session, summary table) into the plan, final report and vault note; regenerated on `main` at close-out, block, resume and `/phase-add`; templates, migration recipe, PHX's own plan and final report; preview approved by Nick | Opus 5.5 | 12a | ✅ Complete | [PHX_phase-12b-visual-timeline.md](prompts/PHX_phase-12b-visual-timeline.md) | review |
 | 12c | Timeline rollout to existing projects | Apply 12b's recipe to MM3, CL, OCC and YTPL2 (idle repos only): script, markers, maintenance lines, generated block in plan, final report and vault note, one adoption commit and ADR each; `phx plan` unchanged | Sonnet 5.5 | 12b | ⬜ Not started | [PHX_phase-12c-timeline-rollout.md](prompts/PHX_phase-12c-timeline-rollout.md) | auto |
 
 ## Timeline
@@ -331,3 +331,94 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 - **Done (branch `phase-12b-visual-timeline`, worktree `../PhaseHypervisor-phase-12b`, head `9dfe28e`):** tasks 1–7 and 9. Generator `plugins/phased-project/skills/phased-project/scripts/phase_timeline.py` (+ byte-identical `scripts/` copy); skill sections "Visual timeline" and "Adding the visual timeline to an existing repo"; templates (plan and vault-note markers, shared instructions §4a with refreshes after merge/⛔/resume as their own commits so contract 1 text is unchanged, `/phase status --check`, `/phase-add` refresh); PHX plan, final report §5 (hand-drawn chart removed) and vault note markers; PHX maintenance lines; ADR-0027, spec R24, CHANGELOG, README, architecture, getting-started, CONTRIBUTING, playbook §2b, 12c prompt. `phx plan` byte-identical on scratch copies of all five repos. 550 tests pass; ruff, format, mypy, pre-commit clean (pre-commit fix: `.phx/preflight.json` fingerprints excluded from detect-secrets, baseline rescanned; it failed on `main` before this phase).
 - **Self-review fixes before asking:** session widths ∝ √length (PHX 01–05 were 1–4 px), git fallbacks restricted to real phase-work commits and never for ⬜ phases (MM3 16 was picked up from a prompt edit), commit-burst finish instead of "until the next claim" (MM3 15h was 6 days), late merges as a label not a tail (YTPL2 02 glued two sessions), adaptive break width (MM3 has 10 sessions), zone names from the plan text (CL showed UTC-05:00).
 - **Remains on resume:** apply Nick's answer; then close-out: merge, run `python3 scripts/phase_timeline.py --write --vault-note "/home/nick/Documents/02 Projects/PHX Implementation Plan.md"` on `main` and commit `docs(plan): refresh timeline`; `--check` on `main`; record the preview outcome in ADR-0027 and the approval timestamp here; vault note row and log.
+
+### 2026-10-31 11:20 CDT: Phase 12b: Visual project timeline (✅ Complete)
+- **Timeline:** started 2026-10-31 10:27 CDT (claim commit 747de43) · finished 2026-10-31 11:20 CDT · merged 2026-10-31 11:20 CDT · blocked 2026-10-31 10:53 CDT to 2026-10-31 11:18 CDT
+- **Model:** ran as claude-opus-5-5 (auto mode; plan lists Opus 5.5)
+- **Preview approval:** owner question 17 answered "approved" at 2026-10-31 11:17 CDT; no changes requested, so nothing was changed after the review. Recorded in ADR-0027 ("Preview outcome").
+- **Built:** everything listed in the ⛔ entry above (tasks 1–9): generator ![PHX timeline](docs/PHX_TIMELINE.svg)
+
+*Generated from the Phase Log Timeline bullets and git, as of 2026-10-31 11:18 CDT. ≈ marks a time inferred from git or a heading. Idle gaps over 60 min start a new chart below and are collapsed in the image. Regenerate with `python3 scripts/phase_timeline.py --write`; do not edit by hand.*
+
+```mermaid
+gantt
+    title PHX session 1, 2026-10-26 08:27 to 10:23 CDT
+    dateFormat YYYY-MM-DD HH:mm
+    axisFormat %H:%M
+    section Planning
+    Planning & spec refinement :done, p00, 2026-10-26 08:27, 2026-10-26 08:35
+    section Phases
+    01 Repository foundation & governance :done, p01s1, 2026-10-26 08:50, 2026-10-26 08:51
+    02 Python scaffold, CLI skeleton & CI :done, p02s1, 2026-10-26 08:53, 2026-10-26 08:57
+    03 Hands-off /phase contract & standing rules :done, p03s1, 2026-10-26 08:58, 2026-10-26 09:06
+    04 Plan parser & eligibility engine :done, p04s1, 2026-10-26 09:09, 2026-10-26 09:24
+    05 Session runner & exit classifier :done, p05s1, 2026-10-26 09:27, 2026-10-26 10:23
+```
+
+```mermaid
+gantt
+    title PHX session 2, 2026-10-26 15:16 to 23:46 CDT
+    dateFormat YYYY-MM-DD HH:mm
+    axisFormat %H:%M
+    section Phases
+    06 Verifier & recovery :done, p06s2, 2026-10-26 15:16, 2026-10-26 15:37
+    07 Supervisor loop, state & notifications :done, p07s2, 2026-10-26 16:08, 2026-10-26 16:33
+    08 Preflight question sweep :done, p08s2, 2026-10-26 16:43, 2026-10-26 17:01
+    09 Roll out to existing projects :done, p09s2, 2026-10-26 17:08, 2026-10-26 17:17
+    10 Pilot runs & tuning :done, p10s2, 2026-10-26 17:35, 2026-10-26 22:22
+    11 Hardening, security review & QA :done, p11s2, 2026-10-26 23:03, 2026-10-26 23:46
+```
+
+```mermaid
+gantt
+    title PHX session 3, 2026-10-27 04:34 to 05:47 CDT
+    dateFormat YYYY-MM-DD HH:mm
+    axisFormat %H:%M
+    section Planning
+    +12a Phase 12a inserted :done, plan1, 2026-10-27 05:11, 2026-10-27 05:16
+    phx preflight :milestone, pf064a25a, 2026-10-27 05:28, 0m
+    section Phases
+    12 Release v0.1.0 :done, p12s3, 2026-10-27 04:34, 2026-10-27 04:40
+    12a Shareable method package :done, p12as3, 2026-10-27 05:31, 2026-10-27 05:47
+```
+
+```mermaid
+gantt
+    title PHX session 4, 2026-10-31 10:00 to 10:52 CDT
+    dateFormat YYYY-MM-DD HH:mm
+    axisFormat %H:%M
+    section Planning
+    +12b, 12c Phases 12b and 12c inserted :done, plan2, 2026-10-31 10:00, 2026-10-31 10:06
+    phx preflight :milestone, pfe4af278, 2026-10-31 10:21, 0m
+    section Phases
+    ≈ 12b Visual project timeline :done, p12bs4, 2026-10-31 10:27, 2026-10-31 10:52
+```
+
+| Phase | Name | Started | Finished | Merged | Active | Blocked | Claim |
+|---|---|---|---|---|---:|---:|---|
+| 00 | Planning & spec refinement | 2026-10-26 08:27 CDT | 08:35 |  | 8 m |  | n/a |
+| +12a | Phase 12a inserted | 2026-10-27 05:11 CDT | 05:16 |  | 5 m |  | n/a |
+| plan | phx preflight | 2026-10-27 05:28 CDT |  |  |  |  | n/a |
+| +12b, 12c | Phases 12b and 12c inserted | 2026-10-31 10:00 CDT | 10:06 |  | 6 m |  | n/a |
+| plan | phx preflight | 2026-10-31 10:21 CDT |  |  |  |  | n/a |
+| 01 | Repository foundation & governance | 2026-10-26 08:50 CDT | 08:51 | 08:51 | 1 m |  | `792294d` |
+| 02 | Python scaffold, CLI skeleton & CI | 2026-10-26 08:53 CDT | 08:57 | 08:57 | 4 m |  | `462d097` |
+| 03 | Hands-off `/phase` contract & standing rules | 2026-10-26 08:58 CDT | 09:06 | 09:06 | 8 m |  | `a7d072b` |
+| 04 | Plan parser & eligibility engine | 2026-10-26 09:09 CDT | 09:24 | 09:24 | 15 m |  | `ee4491c` |
+| 05 | Session runner & exit classifier | 2026-10-26 09:27 CDT | 10:23 | 10:23 | 56 m |  | `7ecc3a4` |
+| 06 | Verifier & recovery | 2026-10-26 15:16 CDT | 15:37 | 15:37 | 21 m |  | `81e5199` |
+| 07 | Supervisor loop, state & notifications | 2026-10-26 16:08 CDT | 16:33 | 16:33 | 25 m |  | `38ca68a` |
+| 08 | Preflight question sweep | 2026-10-26 16:43 CDT | 17:01 | 17:01 | 18 m |  | `6fa55bb` |
+| 09 | Roll out to existing projects | 2026-10-26 17:08 CDT | 17:17 | 17:17 | 9 m |  | `661c1bf` |
+| 10 | Pilot runs & tuning | 2026-10-26 17:35 CDT | 22:22 | 22:22 | 4 h 47 m |  | `040388b` |
+| 11 | Hardening, security review & QA | 2026-10-26 23:03 CDT | 23:46 | 23:46 | 43 m |  | `45f24e0` |
+| 12 | Release v0.1.0 | 2026-10-27 04:34 CDT | 04:40 | 04:42 | 6 m |  | `2d55bfb` |
+| 12a | Shareable method package | 2026-10-27 05:31 CDT | 05:47 | 05:47 | 16 m |  | `76f9f5e` |
+| 12b | Visual project timeline | 2026-10-31 10:27 CDT | ≈ 10:52 | not merged yet | 25 m |  | `747de43` |
+
+**Totals:** elapsed 5 d 2 h (first recorded start to 2026-10-31 11:18 CDT) · active phase time 8 h 54 m (sum over phases) · blocked or paused 0 m · idle 4 d 13 h in 3 gap(s) over 60 min.
+
+**Not started:** 12c. in the skill and the repo (byte-identical), "Visual timeline" and migration skill sections, template markers and maintenance lines, PHX plan/final report/vault note blocks, ADR-0027, spec R24, docs. The timeline block is filled by the refresh on `main` after the merge (`docs(plan): refresh timeline`), never on the branch.
+- **Deviations:** none beyond those in the ⛔ entry (pre-commit: `.phx/preflight.json` excluded from detect-secrets).
+- **Follow-ups:** Phase 12c retrofits MM3, CL, OCC and YTPL2 with the migration recipe.
+- **Tests:** 549 passed, 1 skipped (audit test needs `PHX_AUDIT_DIR`); ruff, ruff format, mypy clean; `phx plan` on this repo unchanged apart from the 12b status.

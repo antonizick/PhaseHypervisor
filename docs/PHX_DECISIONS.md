@@ -478,7 +478,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 - **Palette:** dataviz reference slots 1–3 (blue phases, aqua planning, orange hatched waits), validated all-pairs in light and dark; violet failed against blue and was dropped. Aqua's light contrast (2.74:1) is relieved by the lane label and the table.
 - **Ruff target per file:** the script must run on Python 3.9, so `pyproject.toml` sets `per-file-target-version` to `py39` for it; a test parses it with `feature_version=(3, 9)`.
 
-**Preview outcome.** (Recorded at close-out after Nick's review; owner question 17.)
+**Preview outcome.** Approved by Nick without changes (owner question 17, answered 2026-10-31 11:17 CDT). The previews he saw already contained the self-review fixes listed in the Phase 12b Phase Log entry (√-weighted session widths, git fallbacks limited to real phase-work commits, commit-burst finish, late merges as labels, adaptive break width, zone names from the plan text); nothing changed after his review.
 
 **Consequences.** The skill and PHX carry `scripts/phase_timeline.py` (byte-identical copies). Templates gain a `## Timeline` heading with markers, §4a in the shared instructions, a drift line in `/phase status` and a refresh step in `/phase-add`; the contract text is unchanged (regression test).
 

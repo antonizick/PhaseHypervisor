@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="678" viewBox="0 0 1200 678" role="img" aria-labelledby="tl-title tl-desc" font-family="system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, sans-serif" data-timeline-format="1">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="696" viewBox="0 0 1200 696" role="img" aria-labelledby="tl-title tl-desc" font-family="system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, sans-serif" data-timeline-format="1">
 <title id="tl-title">PHX timeline</title>
-<desc id="tl-desc">Planning and build timeline of PHX, as of 2026-10-31 11:30 CDT. 4 working session(s); 15 phase(s) complete, 0 in progress, 0 blocked. Phase 01 Repository foundation &amp; governance: started 2026-10-26 08:50 CDT, active 1 m. Phase 02 Python scaffold, CLI skeleton &amp; CI: started 2026-10-26 08:53 CDT, active 4 m. Phase 03 Hands-off `/phase` contract &amp; standing rules: started 2026-10-26 08:58 CDT, active 8 m. Phase 04 Plan parser &amp; eligibility engine: started 2026-10-26 09:09 CDT, active 15 m. Phase 05 Session runner &amp; exit classifier: started 2026-10-26 09:27 CDT, active 56 m. Phase 06 Verifier &amp; recovery: started 2026-10-26 15:16 CDT, active 21 m. Phase 07 Supervisor loop, state &amp; notifications: started 2026-10-26 16:08 CDT, active 25 m. Phase 08 Preflight question sweep: started 2026-10-26 16:43 CDT, active 18 m. Phase 09 Roll out to existing projects: started 2026-10-26 17:08 CDT, active 9 m. Phase 10 Pilot runs &amp; tuning: started 2026-10-26 17:35 CDT, active 4 h 47 m. Phase 11 Hardening, security review &amp; QA: started 2026-10-26 23:03 CDT, active 43 m. Phase 12 Release v0.1.0: started 2026-10-27 04:34 CDT, active 6 m. Phase 12a Shareable method package: started 2026-10-27 05:31 CDT, active 16 m. Phase 12b Visual project timeline: started 2026-10-31 10:27 CDT, active 28 m, blocked or paused 25 m. Phase 12c Timeline rollout to existing projects: started 2026-10-31 11:26 CDT, active 4 m.</desc>
+<desc id="tl-desc">Planning and build timeline of PHX, as of 2026-10-31 19:26 CDT. 5 working session(s); 15 phase(s) complete, 0 in progress, 0 blocked. Phase 01 Repository foundation &amp; governance: started 2026-10-26 08:50 CDT, active 1 m. Phase 02 Python scaffold, CLI skeleton &amp; CI: started 2026-10-26 08:53 CDT, active 4 m. Phase 03 Hands-off `/phase` contract &amp; standing rules: started 2026-10-26 08:58 CDT, active 8 m. Phase 04 Plan parser &amp; eligibility engine: started 2026-10-26 09:09 CDT, active 15 m. Phase 05 Session runner &amp; exit classifier: started 2026-10-26 09:27 CDT, active 56 m. Phase 06 Verifier &amp; recovery: started 2026-10-26 15:16 CDT, active 21 m. Phase 07 Supervisor loop, state &amp; notifications: started 2026-10-26 16:08 CDT, active 25 m. Phase 08 Preflight question sweep: started 2026-10-26 16:43 CDT, active 18 m. Phase 09 Roll out to existing projects: started 2026-10-26 17:08 CDT, active 9 m. Phase 10 Pilot runs &amp; tuning: started 2026-10-26 17:35 CDT, active 4 h 47 m. Phase 11 Hardening, security review &amp; QA: started 2026-10-26 23:03 CDT, active 43 m. Phase 12 Release v0.1.0: started 2026-10-27 04:34 CDT, active 6 m. Phase 12a Shareable method package: started 2026-10-27 05:31 CDT, active 16 m. Phase 12b Visual project timeline: started 2026-10-31 10:27 CDT, active 28 m, blocked or paused 25 m. Phase 12c Timeline rollout to existing projects: started 2026-10-31 11:26 CDT, active 4 m.</desc>
 <style>.card{fill:#fcfcfb;stroke:#d9d8d2}.t1{fill:#0b0b0b}.t2{fill:#52514e}.t3{fill:#6f6d68}.grid{stroke:#e1e0d9}.axis{stroke:#c3c2b7}.brk{fill:#f1f0ec}.brke{stroke:#c3c2b7;fill:none}.ph{fill:#2a78d6}.pl{fill:#1baf7a}.tail{stroke:#2a78d6}.tailpl{stroke:#1baf7a}.hb{fill:#fbe1d6}.hl{stroke:#eb6834}.wo{stroke:#eb6834;fill:none}.ap{stroke:#0b0b0b;fill:none}.sep{stroke:#e1e0d9}text{font-variant-numeric:tabular-nums}@media (prefers-color-scheme: dark){.card{fill:#1a1a19;stroke:#3a3a37}.t1{fill:#f0efec}.t2{fill:#c3c2b7}.t3{fill:#a3a19a}.grid{stroke:#2c2c2a}.axis{stroke:#4a4a46}.brk{fill:#262624}.brke{stroke:#4a4a46;fill:none}.ph{fill:#3987e5}.pl{fill:#199e70}.tail{stroke:#3987e5}.tailpl{stroke:#199e70}.hb{fill:#4a2a1c}.hl{stroke:#d95926}.wo{stroke:#d95926;fill:none}.ap{stroke:#f0efec;fill:none}.sep{stroke:#2c2c2a}}</style>
 <defs><pattern id="tl-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect class="hb" width="6" height="6"/><line class="hl" x1="1.5" y1="0" x2="1.5" y2="6" stroke-width="2.4"/></pattern></defs>
-<rect class="card" x="0.5" y="0.5" width="1199" height="677" rx="10"/>
+<rect class="card" x="0.5" y="0.5" width="1199" height="695" rx="10"/>
 <text class="t1" x="24" y="38" font-size="20" font-weight="600">PHX timeline</text>
-<text class="t2" x="24" y="60" font-size="13">Mon 26 Oct 2026 to Sat 31 Oct 2026 · times CDT · as of 2026-10-31 11:30 CDT</text>
+<text class="t2" x="24" y="60" font-size="13">Mon 26 Oct 2026 to Sat 31 Oct 2026 · times CDT · as of 2026-10-31 19:26 CDT</text>
 <rect class="ph" x="24.0" y="79" width="18" height="10" rx="3"/>
 <text class="t2" x="48" y="88" font-size="12">Phase (active)</text>
 <rect class="pl" x="149.4624" y="79" width="18" height="10" rx="3"/>
@@ -18,151 +18,156 @@
 <path class="pl" d="M582.5 78l6 6l-6 6l-6-6z"/>
 <text class="t2" x="597.5" y="88" font-size="12">Planning event (point in time)</text>
 <text class="t1" x="300" y="116" font-size="11" font-weight="600">Mon 26 Oct</text>
-<line class="grid" x1="338.5" x2="338.5" y1="142" y2="620" stroke-width="1"/>
-<text class="t3" x="338.5" y="134" font-size="11" text-anchor="middle">09:00</text>
-<line class="grid" x1="402.7" x2="402.7" y1="142" y2="620" stroke-width="1"/>
-<text class="t3" x="402.7" y="134" font-size="11" text-anchor="middle">10:00</text>
-<rect class="brk" x="434.6" y="120" width="76" height="500"/>
-<path class="brke" stroke-width="1" d="M434.6 120L436.6 126L432.6 132L436.6 138L432.6 144L436.6 150L432.6 156L436.6 162L432.6 168L436.6 174L432.6 180L436.6 186L432.6 192L436.6 198L432.6 204L436.6 210L432.6 216L436.6 222L432.6 228L436.6 234L432.6 240L436.6 246L432.6 252L436.6 258L432.6 264L436.6 270L432.6 276L436.6 282L432.6 288L436.6 294L432.6 300L436.6 306L432.6 312L436.6 318L432.6 324L436.6 330L432.6 336L436.6 342L432.6 348L436.6 354L432.6 360L436.6 366L432.6 372L436.6 378L432.6 384L436.6 390L432.6 396L436.6 402L432.6 408L436.6 414L432.6 420L436.6 426L432.6 432L436.6 438L432.6 444L436.6 450L432.6 456L436.6 462L432.6 468L436.6 474L432.6 480L436.6 486L432.6 492L436.6 498L432.6 504L436.6 510L432.6 516L436.6 522L432.6 528L436.6 534L432.6 540L436.6 546L432.6 552L436.6 558L432.6 564L436.6 570L432.6 576L436.6 582L432.6 588L436.6 594L432.6 600L436.6 606L432.6 612L436.6 618L432.6 620"/>
-<path class="brke" stroke-width="1" d="M510.6 120L512.6 126L508.6 132L512.6 138L508.6 144L512.6 150L508.6 156L512.6 162L508.6 168L512.6 174L508.6 180L512.6 186L508.6 192L512.6 198L508.6 204L512.6 210L508.6 216L512.6 222L508.6 228L512.6 234L508.6 240L512.6 246L508.6 252L512.6 258L508.6 264L512.6 270L508.6 276L512.6 282L508.6 288L512.6 294L508.6 300L512.6 306L508.6 312L512.6 318L508.6 324L512.6 330L508.6 336L512.6 342L508.6 348L512.6 354L508.6 360L512.6 366L508.6 372L512.6 378L508.6 384L512.6 390L508.6 396L512.6 402L508.6 408L512.6 414L508.6 420L512.6 426L508.6 432L512.6 438L508.6 444L512.6 450L508.6 456L512.6 462L508.6 468L512.6 474L508.6 480L512.6 486L508.6 492L512.6 498L508.6 504L512.6 510L508.6 516L512.6 522L508.6 528L512.6 534L508.6 540L512.6 546L508.6 552L512.6 558L508.6 564L512.6 570L508.6 576L512.6 582L508.6 588L512.6 594L508.6 600L512.6 606L508.6 612L512.6 618L508.6 620"/>
-<text class="t2" x="472.6" y="134" font-size="10" text-anchor="middle">4 h 53 m idle</text>
-<line class="grid" x1="539" x2="539" y1="142" y2="620" stroke-width="1"/>
-<text class="t3" x="539" y="134" font-size="11" text-anchor="middle">16:00</text>
-<line class="grid" x1="601.5" x2="601.5" y1="142" y2="620" stroke-width="1"/>
-<text class="t3" x="601.5" y="134" font-size="11" text-anchor="middle">18:00</text>
-<line class="grid" x1="663.9" x2="663.9" y1="142" y2="620" stroke-width="1"/>
-<text class="t3" x="663.9" y="134" font-size="11" text-anchor="middle">20:00</text>
-<line class="grid" x1="726.4" x2="726.4" y1="142" y2="620" stroke-width="1"/>
-<text class="t3" x="726.4" y="134" font-size="11" text-anchor="middle">22:00</text>
-<rect class="brk" x="787.1" y="120" width="76" height="500"/>
-<path class="brke" stroke-width="1" d="M787.1 120L789.1 126L785.1 132L789.1 138L785.1 144L789.1 150L785.1 156L789.1 162L785.1 168L789.1 174L785.1 180L789.1 186L785.1 192L789.1 198L785.1 204L789.1 210L785.1 216L789.1 222L785.1 228L789.1 234L785.1 240L789.1 246L785.1 252L789.1 258L785.1 264L789.1 270L785.1 276L789.1 282L785.1 288L789.1 294L785.1 300L789.1 306L785.1 312L789.1 318L785.1 324L789.1 330L785.1 336L789.1 342L785.1 348L789.1 354L785.1 360L789.1 366L785.1 372L789.1 378L785.1 384L789.1 390L785.1 396L789.1 402L785.1 408L789.1 414L785.1 420L789.1 426L785.1 432L789.1 438L785.1 444L789.1 450L785.1 456L789.1 462L785.1 468L789.1 474L785.1 480L789.1 486L785.1 492L789.1 498L785.1 504L789.1 510L785.1 516L789.1 522L785.1 528L789.1 534L785.1 540L789.1 546L785.1 552L789.1 558L785.1 564L789.1 570L785.1 576L789.1 582L785.1 588L789.1 594L785.1 600L789.1 606L785.1 612L789.1 618L785.1 620"/>
-<path class="brke" stroke-width="1" d="M863.1 120L865.1 126L861.1 132L865.1 138L861.1 144L865.1 150L861.1 156L865.1 162L861.1 168L865.1 174L861.1 180L865.1 186L861.1 192L865.1 198L861.1 204L865.1 210L861.1 216L865.1 222L861.1 228L865.1 234L861.1 240L865.1 246L861.1 252L865.1 258L861.1 264L865.1 270L861.1 276L865.1 282L861.1 288L865.1 294L861.1 300L865.1 306L861.1 312L865.1 318L861.1 324L865.1 330L861.1 336L865.1 342L861.1 348L865.1 354L861.1 360L865.1 366L861.1 372L865.1 378L861.1 384L865.1 390L861.1 396L865.1 402L861.1 408L865.1 414L861.1 420L865.1 426L861.1 432L865.1 438L861.1 444L865.1 450L861.1 456L865.1 462L861.1 468L865.1 474L861.1 480L865.1 486L861.1 492L865.1 498L861.1 504L865.1 510L861.1 516L865.1 522L861.1 528L865.1 534L861.1 540L865.1 546L861.1 552L865.1 558L861.1 564L865.1 570L861.1 576L865.1 582L861.1 588L865.1 594L861.1 600L865.1 606L861.1 612L865.1 618L861.1 620"/>
-<text class="t2" x="825.1" y="134" font-size="10" text-anchor="middle">4 h 48 m idle</text>
-<text class="t1" x="867.1" y="116" font-size="11" font-weight="600">Tue 27 Oct</text>
-<line class="grid" x1="905.7" x2="905.7" y1="142" y2="620" stroke-width="1"/>
-<text class="t3" x="905.7" y="134" font-size="11" text-anchor="middle">05:00</text>
-<rect class="brk" x="976.2" y="120" width="76" height="500"/>
-<path class="brke" stroke-width="1" d="M976.2 120L978.2 126L974.2 132L978.2 138L974.2 144L978.2 150L974.2 156L978.2 162L974.2 168L978.2 174L974.2 180L978.2 186L974.2 192L978.2 198L974.2 204L978.2 210L974.2 216L978.2 222L974.2 228L978.2 234L974.2 240L978.2 246L974.2 252L978.2 258L974.2 264L978.2 270L974.2 276L978.2 282L974.2 288L978.2 294L974.2 300L978.2 306L974.2 312L978.2 318L974.2 324L978.2 330L974.2 336L978.2 342L974.2 348L978.2 354L974.2 360L978.2 366L974.2 372L978.2 378L974.2 384L978.2 390L974.2 396L978.2 402L974.2 408L978.2 414L974.2 420L978.2 426L974.2 432L978.2 438L974.2 444L978.2 450L974.2 456L978.2 462L974.2 468L978.2 474L974.2 480L978.2 486L974.2 492L978.2 498L974.2 504L978.2 510L974.2 516L978.2 522L974.2 528L978.2 534L974.2 540L978.2 546L974.2 552L978.2 558L974.2 564L978.2 570L974.2 576L978.2 582L974.2 588L978.2 594L974.2 600L978.2 606L974.2 612L978.2 618L974.2 620"/>
-<path class="brke" stroke-width="1" d="M1052.2 120L1054.2 126L1050.2 132L1054.2 138L1050.2 144L1054.2 150L1050.2 156L1054.2 162L1050.2 168L1054.2 174L1050.2 180L1054.2 186L1050.2 192L1054.2 198L1050.2 204L1054.2 210L1050.2 216L1054.2 222L1050.2 228L1054.2 234L1050.2 240L1054.2 246L1050.2 252L1054.2 258L1050.2 264L1054.2 270L1050.2 276L1054.2 282L1050.2 288L1054.2 294L1050.2 300L1054.2 306L1050.2 312L1054.2 318L1050.2 324L1054.2 330L1050.2 336L1054.2 342L1050.2 348L1054.2 354L1050.2 360L1054.2 366L1050.2 372L1054.2 378L1050.2 384L1054.2 390L1050.2 396L1054.2 402L1050.2 408L1054.2 414L1050.2 420L1054.2 426L1050.2 432L1054.2 438L1050.2 444L1054.2 450L1050.2 456L1054.2 462L1050.2 468L1054.2 474L1050.2 480L1054.2 486L1050.2 492L1054.2 498L1050.2 504L1054.2 510L1050.2 516L1054.2 522L1050.2 528L1054.2 534L1050.2 540L1054.2 546L1050.2 552L1054.2 558L1050.2 564L1054.2 570L1050.2 576L1054.2 582L1050.2 588L1054.2 594L1050.2 600L1054.2 606L1050.2 612L1054.2 618L1050.2 620"/>
-<text class="t2" x="1014.2" y="134" font-size="10" text-anchor="middle">4 d 4 h idle</text>
-<text class="t1" x="1056.2" y="116" font-size="11" font-weight="600">Sat 31 Oct</text>
-<line class="grid" x1="1059.8" x2="1059.8" y1="142" y2="620" stroke-width="1"/>
-<line class="grid" x1="1132.2" x2="1132.2" y1="142" y2="620" stroke-width="1"/>
-<text class="t3" x="1132.2" y="134" font-size="11" text-anchor="middle">11:00</text>
+<line class="grid" x1="335.6" x2="335.6" y1="142" y2="620" stroke-width="1"/>
+<text class="t3" x="335.6" y="134" font-size="11" text-anchor="middle">09:00</text>
+<line class="grid" x1="394.9" x2="394.9" y1="142" y2="620" stroke-width="1"/>
+<text class="t3" x="394.9" y="134" font-size="11" text-anchor="middle">10:00</text>
+<rect class="brk" x="424.6" y="120" width="57.4" height="500"/>
+<path class="brke" stroke-width="1" d="M424.6 120L426.6 126L422.6 132L426.6 138L422.6 144L426.6 150L422.6 156L426.6 162L422.6 168L426.6 174L422.6 180L426.6 186L422.6 192L426.6 198L422.6 204L426.6 210L422.6 216L426.6 222L422.6 228L426.6 234L422.6 240L426.6 246L422.6 252L426.6 258L422.6 264L426.6 270L422.6 276L426.6 282L422.6 288L426.6 294L422.6 300L426.6 306L422.6 312L426.6 318L422.6 324L426.6 330L422.6 336L426.6 342L422.6 348L426.6 354L422.6 360L426.6 366L422.6 372L426.6 378L422.6 384L426.6 390L422.6 396L426.6 402L422.6 408L426.6 414L422.6 420L426.6 426L422.6 432L426.6 438L422.6 444L426.6 450L422.6 456L426.6 462L422.6 468L426.6 474L422.6 480L426.6 486L422.6 492L426.6 498L422.6 504L426.6 510L422.6 516L426.6 522L422.6 528L426.6 534L422.6 540L426.6 546L422.6 552L426.6 558L422.6 564L426.6 570L422.6 576L426.6 582L422.6 588L426.6 594L422.6 600L426.6 606L422.6 612L426.6 618L422.6 620"/>
+<path class="brke" stroke-width="1" d="M482 120L484 126L480 132L484 138L480 144L484 150L480 156L484 162L480 168L484 174L480 180L484 186L480 192L484 198L480 204L484 210L480 216L484 222L480 228L484 234L480 240L484 246L480 252L484 258L480 264L484 270L480 276L484 282L480 288L484 294L480 300L484 306L480 312L484 318L480 324L484 330L480 336L484 342L480 348L484 354L480 360L484 366L480 372L484 378L480 384L484 390L480 396L484 402L480 408L484 414L480 420L484 426L480 432L484 438L480 444L484 450L480 456L484 462L480 468L484 474L480 480L484 486L480 492L484 498L480 504L484 510L480 516L484 522L480 528L484 534L480 540L484 546L480 552L484 558L480 564L484 570L480 576L484 582L480 588L484 594L480 600L484 606L480 612L484 618L480 620"/>
+<text class="t2" x="453.3" y="134" font-size="10" text-anchor="middle">4 h 53 m</text>
+<line class="grid" x1="566.2" x2="566.2" y1="142" y2="620" stroke-width="1"/>
+<text class="t3" x="566.2" y="134" font-size="11" text-anchor="middle">18:00</text>
+<line class="grid" x1="652.8" x2="652.8" y1="142" y2="620" stroke-width="1"/>
+<text class="t3" x="652.8" y="134" font-size="11" text-anchor="middle">21:00</text>
+<rect class="brk" x="738" y="120" width="57.4" height="500"/>
+<path class="brke" stroke-width="1" d="M738 120L740 126L736 132L740 138L736 144L740 150L736 156L740 162L736 168L740 174L736 180L740 186L736 192L740 198L736 204L740 210L736 216L740 222L736 228L740 234L736 240L740 246L736 252L740 258L736 264L740 270L736 276L740 282L736 288L740 294L736 300L740 306L736 312L740 318L736 324L740 330L736 336L740 342L736 348L740 354L736 360L740 366L736 372L740 378L736 384L740 390L736 396L740 402L736 408L740 414L736 420L740 426L736 432L740 438L736 444L740 450L736 456L740 462L736 468L740 474L736 480L740 486L736 492L740 498L736 504L740 510L736 516L740 522L736 528L740 534L736 540L740 546L736 552L740 558L736 564L740 570L736 576L740 582L736 588L740 594L736 600L740 606L736 612L740 618L736 620"/>
+<path class="brke" stroke-width="1" d="M795.4 120L797.4 126L793.4 132L797.4 138L793.4 144L797.4 150L793.4 156L797.4 162L793.4 168L797.4 174L793.4 180L797.4 186L793.4 192L797.4 198L793.4 204L797.4 210L793.4 216L797.4 222L793.4 228L797.4 234L793.4 240L797.4 246L793.4 252L797.4 258L793.4 264L797.4 270L793.4 276L797.4 282L793.4 288L797.4 294L793.4 300L797.4 306L793.4 312L797.4 318L793.4 324L797.4 330L793.4 336L797.4 342L793.4 348L797.4 354L793.4 360L797.4 366L793.4 372L797.4 378L793.4 384L797.4 390L793.4 396L797.4 402L793.4 408L797.4 414L793.4 420L797.4 426L793.4 432L797.4 438L793.4 444L797.4 450L793.4 456L797.4 462L793.4 468L797.4 474L793.4 480L797.4 486L793.4 492L797.4 498L793.4 504L797.4 510L793.4 516L797.4 522L793.4 528L797.4 534L793.4 540L797.4 546L793.4 552L797.4 558L793.4 564L797.4 570L793.4 576L797.4 582L793.4 588L797.4 594L793.4 600L797.4 606L793.4 612L797.4 618L793.4 620"/>
+<text class="t2" x="766.7" y="134" font-size="10" text-anchor="middle">4 h 48 m</text>
+<text class="t1" x="799.4" y="116" font-size="11" font-weight="600">Tue 27 Oct</text>
+<line class="grid" x1="835" x2="835" y1="142" y2="620" stroke-width="1"/>
+<text class="t3" x="835" y="134" font-size="11" text-anchor="middle">05:00</text>
+<rect class="brk" x="900.4" y="120" width="57.4" height="500"/>
+<path class="brke" stroke-width="1" d="M900.4 120L902.4 126L898.4 132L902.4 138L898.4 144L902.4 150L898.4 156L902.4 162L898.4 168L902.4 174L898.4 180L902.4 186L898.4 192L902.4 198L898.4 204L902.4 210L898.4 216L902.4 222L898.4 228L902.4 234L898.4 240L902.4 246L898.4 252L902.4 258L898.4 264L902.4 270L898.4 276L902.4 282L898.4 288L902.4 294L898.4 300L902.4 306L898.4 312L902.4 318L898.4 324L902.4 330L898.4 336L902.4 342L898.4 348L902.4 354L898.4 360L902.4 366L898.4 372L902.4 378L898.4 384L902.4 390L898.4 396L902.4 402L898.4 408L902.4 414L898.4 420L902.4 426L898.4 432L902.4 438L898.4 444L902.4 450L898.4 456L902.4 462L898.4 468L902.4 474L898.4 480L902.4 486L898.4 492L902.4 498L898.4 504L902.4 510L898.4 516L902.4 522L898.4 528L902.4 534L898.4 540L902.4 546L898.4 552L902.4 558L898.4 564L902.4 570L898.4 576L902.4 582L898.4 588L902.4 594L898.4 600L902.4 606L898.4 612L902.4 618L898.4 620"/>
+<path class="brke" stroke-width="1" d="M957.8 120L959.8 126L955.8 132L959.8 138L955.8 144L959.8 150L955.8 156L959.8 162L955.8 168L959.8 174L955.8 180L959.8 186L955.8 192L959.8 198L955.8 204L959.8 210L955.8 216L959.8 222L955.8 228L959.8 234L955.8 240L959.8 246L955.8 252L959.8 258L955.8 264L959.8 270L955.8 276L959.8 282L955.8 288L959.8 294L955.8 300L959.8 306L955.8 312L959.8 318L955.8 324L959.8 330L955.8 336L959.8 342L955.8 348L959.8 354L955.8 360L959.8 366L955.8 372L959.8 378L955.8 384L959.8 390L955.8 396L959.8 402L955.8 408L959.8 414L955.8 420L959.8 426L955.8 432L959.8 438L955.8 444L959.8 450L955.8 456L959.8 462L955.8 468L959.8 474L955.8 480L959.8 486L955.8 492L959.8 498L955.8 504L959.8 510L955.8 516L959.8 522L955.8 528L959.8 534L955.8 540L959.8 546L955.8 552L959.8 558L955.8 564L959.8 570L955.8 576L959.8 582L955.8 588L959.8 594L955.8 600L959.8 606L955.8 612L959.8 618L955.8 620"/>
+<text class="t2" x="929.1" y="134" font-size="10" text-anchor="middle">4 d 4 h</text>
+<text class="t1" x="961.8" y="116" font-size="11" font-weight="600">Sat 31 Oct</text>
+<line class="grid" x1="965.2" x2="965.2" y1="142" y2="620" stroke-width="1"/>
+<line class="grid" x1="1032" x2="1032" y1="142" y2="620" stroke-width="1"/>
+<text class="t3" x="1032" y="134" font-size="11" text-anchor="middle">11:00</text>
+<rect class="brk" x="1072.8" y="120" width="57.4" height="500"/>
+<path class="brke" stroke-width="1" d="M1072.8 120L1074.8 126L1070.8 132L1074.8 138L1070.8 144L1074.8 150L1070.8 156L1074.8 162L1070.8 168L1074.8 174L1070.8 180L1074.8 186L1070.8 192L1074.8 198L1070.8 204L1074.8 210L1070.8 216L1074.8 222L1070.8 228L1074.8 234L1070.8 240L1074.8 246L1070.8 252L1074.8 258L1070.8 264L1074.8 270L1070.8 276L1074.8 282L1070.8 288L1074.8 294L1070.8 300L1074.8 306L1070.8 312L1074.8 318L1070.8 324L1074.8 330L1070.8 336L1074.8 342L1070.8 348L1074.8 354L1070.8 360L1074.8 366L1070.8 372L1074.8 378L1070.8 384L1074.8 390L1070.8 396L1074.8 402L1070.8 408L1074.8 414L1070.8 420L1074.8 426L1070.8 432L1074.8 438L1070.8 444L1074.8 450L1070.8 456L1074.8 462L1070.8 468L1074.8 474L1070.8 480L1074.8 486L1070.8 492L1074.8 498L1070.8 504L1074.8 510L1070.8 516L1074.8 522L1070.8 528L1074.8 534L1070.8 540L1074.8 546L1070.8 552L1074.8 558L1070.8 564L1074.8 570L1070.8 576L1074.8 582L1070.8 588L1074.8 594L1070.8 600L1074.8 606L1070.8 612L1074.8 618L1070.8 620"/>
+<path class="brke" stroke-width="1" d="M1130.2 120L1132.2 126L1128.2 132L1132.2 138L1128.2 144L1132.2 150L1128.2 156L1132.2 162L1128.2 168L1132.2 174L1128.2 180L1132.2 186L1128.2 192L1132.2 198L1128.2 204L1132.2 210L1128.2 216L1132.2 222L1128.2 228L1132.2 234L1128.2 240L1132.2 246L1128.2 252L1132.2 258L1128.2 264L1132.2 270L1128.2 276L1132.2 282L1128.2 288L1132.2 294L1128.2 300L1132.2 306L1128.2 312L1132.2 318L1128.2 324L1132.2 330L1128.2 336L1132.2 342L1128.2 348L1132.2 354L1128.2 360L1132.2 366L1128.2 372L1132.2 378L1128.2 384L1132.2 390L1128.2 396L1132.2 402L1128.2 408L1132.2 414L1128.2 420L1132.2 426L1128.2 432L1132.2 438L1128.2 444L1132.2 450L1128.2 456L1132.2 462L1128.2 468L1132.2 474L1128.2 480L1132.2 486L1128.2 492L1132.2 498L1128.2 504L1132.2 510L1128.2 516L1132.2 522L1128.2 528L1132.2 534L1128.2 540L1132.2 546L1128.2 552L1132.2 558L1128.2 564L1132.2 570L1128.2 576L1132.2 582L1128.2 588L1132.2 594L1128.2 600L1132.2 606L1128.2 612L1132.2 618L1128.2 620"/>
+<text class="t2" x="1101.5" y="134" font-size="10" text-anchor="middle">7 h 50 m</text>
 <line class="axis" x1="300" x2="1172" y1="142" y2="142" stroke-width="1"/>
 <text class="t1" x="24" y="182" font-size="12" font-weight="600">Planning</text>
 <g id="tl-p00"><title>Planning &amp; spec refinement: 2026-10-26 08:27 CDT to 2026-10-26 08:35 CDT (8 m)</title>
-<rect class="pl" x="303.2" y="171" width="8.6" height="14" rx="3"/>
+<rect class="pl" x="303" y="171" width="7.9" height="14" rx="3"/>
 </g>
-<text class="t2" x="303.2" y="162" font-size="11">00</text>
+<text class="t2" x="303" y="162" font-size="11">00</text>
 <g id="tl-plan1"><title>Phase 12a inserted: 2026-10-27 05:11 CDT to 2026-10-27 05:16 CDT (5 m)</title>
-<rect class="pl" x="920.3" y="171" width="6.7" height="14" rx="3"/>
+<rect class="pl" x="848.5" y="171" width="6.1" height="14" rx="3"/>
 </g>
-<text class="t2" x="920.3" y="162" font-size="11">+12a</text>
+<text class="t2" x="848.5" y="162" font-size="11">+12a</text>
 <g id="tl-pf-064a25a"><title>phx preflight: 2026-10-27 05:28 CDT</title>
-<path class="pl" d="M942.9 171l7 7l-7 7l-7-7z"/>
+<path class="pl" d="M869.4 171l7 7l-7 7l-7-7z"/>
 </g>
 <g id="tl-plan2"><title>Phases 12b and 12c inserted: 2026-10-31 10:00 CDT to 2026-10-31 10:06 CDT (6 m)</title>
-<rect class="pl" x="1059.8" y="171" width="7.2" height="14" rx="3"/>
+<rect class="pl" x="965.2" y="171" width="6.7" height="14" rx="3"/>
 </g>
-<text class="t2" x="1059.8" y="162" font-size="11">+12b, 12c</text>
+<text class="t2" x="965.2" y="162" font-size="11">+12b, 12c</text>
 <g id="tl-pf-e4af278"><title>phx preflight: 2026-10-31 10:21 CDT</title>
-<path class="pl" d="M1085.1 171l7 7l-7 7l-7-7z"/>
+<path class="pl" d="M988.6 171l7 7l-7 7l-7-7z"/>
 </g>
+<g id="tl-plan3"><title>Phase 12d inserted: 2026-10-31 19:20 CDT to 2026-10-31 19:26 CDT (6 m)</title>
+<rect class="pl" x="1143.6" y="171" width="18.9" height="14" rx="3"/>
+</g>
+<text class="t2" x="1143.6" y="162" font-size="11">+12d</text>
 <line class="sep" x1="24" x2="1176" y1="192" y2="192" stroke-width="1"/>
 <text class="t1" x="24" y="210" font-size="12" font-weight="600">01</text>
 <text class="t2" x="58" y="210" font-size="12">Repository foundation &amp; governance</text>
 <g id="tl-p01"><title>Phase 01 Repository foundation &amp; governance, started 2026-10-26 08:50 CDT, finished 2026-10-26 08:51 CDT, merged 2026-10-26 08:51 CDT, active 1 m</title>
-<rect class="ph" x="327.8" y="199" width="4" height="14" rx="3"/>
+<rect class="ph" x="325.7" y="199" width="4" height="14" rx="3"/>
 </g>
-<text class="t2" x="337.8" y="210" font-size="11">1 m</text>
+<text class="t2" x="335.7" y="210" font-size="11">1 m</text>
 <text class="t1" x="24" y="238" font-size="12" font-weight="600">02</text>
 <text class="t2" x="58" y="238" font-size="12">Python scaffold, CLI skeleton &amp; CI</text>
 <g id="tl-p02"><title>Phase 02 Python scaffold, CLI skeleton &amp; CI, started 2026-10-26 08:53 CDT, finished 2026-10-26 08:57 CDT, merged 2026-10-26 08:57 CDT, active 4 m</title>
-<rect class="ph" x="331" y="227" width="4.3" height="14" rx="3"/>
+<rect class="ph" x="328.7" y="227" width="4" height="14" rx="3"/>
 </g>
-<text class="t2" x="341.3" y="238" font-size="11">4 m</text>
+<text class="t2" x="338.7" y="238" font-size="11">4 m</text>
 <text class="t1" x="24" y="266" font-size="12" font-weight="600">03</text>
 <text class="t2" x="58" y="266" font-size="12">Hands-off /phase contract &amp; standin…</text>
 <g id="tl-p03"><title>Phase 03 Hands-off `/phase` contract &amp; standing rules, started 2026-10-26 08:58 CDT, finished 2026-10-26 09:06 CDT, merged 2026-10-26 09:06 CDT, active 8 m</title>
-<rect class="ph" x="336.4" y="255" width="8.6" height="14" rx="3"/>
+<rect class="ph" x="333.6" y="255" width="7.9" height="14" rx="3"/>
 </g>
-<text class="t2" x="351" y="266" font-size="11">8 m</text>
+<text class="t2" x="347.5" y="266" font-size="11">8 m</text>
 <text class="t1" x="24" y="294" font-size="12" font-weight="600">04</text>
 <text class="t2" x="58" y="294" font-size="12">Plan parser &amp; eligibility engine</text>
 <g id="tl-p04"><title>Phase 04 Plan parser &amp; eligibility engine, started 2026-10-26 09:09 CDT, finished 2026-10-26 09:24 CDT, merged 2026-10-26 09:24 CDT, active 15 m</title>
-<rect class="ph" x="348.2" y="283" width="16.1" height="14" rx="3"/>
+<rect class="ph" x="344.5" y="283" width="14.8" height="14" rx="3"/>
 </g>
-<text class="t2" x="370.2" y="294" font-size="11">15 m</text>
+<text class="t2" x="365.3" y="294" font-size="11">15 m</text>
 <text class="t1" x="24" y="322" font-size="12" font-weight="600">05</text>
 <text class="t2" x="58" y="322" font-size="12">Session runner &amp; exit classifier</text>
 <g id="tl-p05"><title>Phase 05 Session runner &amp; exit classifier, started 2026-10-26 09:27 CDT, finished 2026-10-26 10:23 CDT, merged 2026-10-26 10:23 CDT, active 56 m</title>
-<rect class="ph" x="367.4" y="311" width="59.9" height="14" rx="3"/>
+<rect class="ph" x="362.3" y="311" width="55.4" height="14" rx="3"/>
 </g>
-<text class="t2" x="433.4" y="322" font-size="11">56 m</text>
+<text class="t2" x="423.6" y="322" font-size="11">56 m</text>
 <text class="t1" x="24" y="350" font-size="12" font-weight="600">06</text>
 <text class="t2" x="58" y="350" font-size="12">Verifier &amp; recovery</text>
 <g id="tl-p06"><title>Phase 06 Verifier &amp; recovery, started 2026-10-26 15:16 CDT, finished 2026-10-26 15:37 CDT, merged 2026-10-26 15:37 CDT, active 21 m</title>
-<rect class="ph" x="516.1" y="339" width="10.9" height="14" rx="3"/>
+<rect class="ph" x="487.4" y="339" width="10.1" height="14" rx="3"/>
 </g>
-<text class="t2" x="533.1" y="350" font-size="11">21 m</text>
+<text class="t2" x="503.5" y="350" font-size="11">21 m</text>
 <text class="t1" x="24" y="378" font-size="12" font-weight="600">07</text>
 <text class="t2" x="58" y="378" font-size="12">Supervisor loop, state &amp; notificati…</text>
 <g id="tl-p07"><title>Phase 07 Supervisor loop, state &amp; notifications, started 2026-10-26 16:08 CDT, finished 2026-10-26 16:33 CDT, merged 2026-10-26 16:33 CDT, active 25 m</title>
-<rect class="ph" x="543.2" y="367" width="13" height="14" rx="3"/>
+<rect class="ph" x="512.4" y="367" width="12" height="14" rx="3"/>
 </g>
-<text class="t2" x="562.2" y="378" font-size="11">25 m</text>
+<text class="t2" x="530.4" y="378" font-size="11">25 m</text>
 <text class="t1" x="24" y="406" font-size="12" font-weight="600">08</text>
 <text class="t2" x="58" y="406" font-size="12">Preflight question sweep</text>
 <g id="tl-p08"><title>Phase 08 Preflight question sweep, started 2026-10-26 16:43 CDT, finished 2026-10-26 17:01 CDT, merged 2026-10-26 17:01 CDT, active 18 m</title>
-<rect class="ph" x="561.4" y="395" width="9.4" height="14" rx="3"/>
+<rect class="ph" x="529.2" y="395" width="8.7" height="14" rx="3"/>
 </g>
-<text class="t2" x="576.8" y="406" font-size="11">18 m</text>
+<text class="t2" x="543.9" y="406" font-size="11">18 m</text>
 <text class="t1" x="24" y="434" font-size="12" font-weight="600">09</text>
 <text class="t2" x="58" y="434" font-size="12">Roll out to existing projects</text>
 <g id="tl-p09"><title>Phase 09 Roll out to existing projects, started 2026-10-26 17:08 CDT, finished 2026-10-26 17:17 CDT, merged 2026-10-26 17:17 CDT, active 9 m</title>
-<rect class="ph" x="574.4" y="423" width="4.7" height="14" rx="3"/>
+<rect class="ph" x="541.3" y="423" width="4.3" height="14" rx="3"/>
 </g>
-<text class="t2" x="585.1" y="434" font-size="11">9 m</text>
+<text class="t2" x="551.6" y="434" font-size="11">9 m</text>
 <text class="t1" x="24" y="462" font-size="12" font-weight="600">10</text>
 <text class="t2" x="58" y="462" font-size="12">Pilot runs &amp; tuning</text>
 <g id="tl-p10"><title>Phase 10 Pilot runs &amp; tuning, started 2026-10-26 17:35 CDT, finished 2026-10-26 22:22 CDT, merged 2026-10-26 22:22 CDT, active 4 h 47 m</title>
-<rect class="ph" x="588.5" y="451" width="149.4" height="14" rx="3"/>
+<rect class="ph" x="554.2" y="451" width="137.9" height="14" rx="3"/>
 </g>
-<text class="t2" x="743.8" y="462" font-size="11">4 h 47 m</text>
+<text class="t2" x="698.2" y="462" font-size="11">4 h 47 m</text>
 <text class="t1" x="24" y="490" font-size="12" font-weight="600">11</text>
 <text class="t2" x="58" y="490" font-size="12">Hardening, security review &amp; QA</text>
 <g id="tl-p11"><title>Phase 11 Hardening, security review &amp; QA, started 2026-10-26 23:03 CDT, finished 2026-10-26 23:46 CDT, merged 2026-10-26 23:46 CDT, active 43 m</title>
-<rect class="ph" x="759.2" y="479" width="22.4" height="14" rx="3"/>
+<rect class="ph" x="711.9" y="479" width="20.7" height="14" rx="3"/>
 </g>
-<text class="t2" x="787.5" y="490" font-size="11">43 m</text>
+<text class="t2" x="738.5" y="490" font-size="11">43 m</text>
 <text class="t1" x="24" y="518" font-size="12" font-weight="600">12</text>
 <text class="t2" x="58" y="518" font-size="12">Release v0.1.0</text>
 <g id="tl-p12"><title>Phase 12 Release v0.1.0, started 2026-10-27 04:34 CDT, finished 2026-10-27 04:40 CDT, merged 2026-10-27 04:42 CDT, active 6 m</title>
-<rect class="ph" x="871.1" y="507" width="8" height="14" rx="3"/>
-<line class="tail" x1="879.1" x2="881.7" y1="514" y2="514" stroke-width="2"/>
-<line class="tail" x1="881.7" x2="881.7" y1="509" y2="519" stroke-width="2"/>
+<rect class="ph" x="803.1" y="507" width="7.4" height="14" rx="3"/>
+<line class="tail" x1="810.4" x2="812.9" y1="514" y2="514" stroke-width="2"/>
+<line class="tail" x1="812.9" x2="812.9" y1="509" y2="519" stroke-width="2"/>
 </g>
-<text class="t2" x="888.7" y="518" font-size="11">6 m</text>
+<text class="t2" x="819.9" y="518" font-size="11">6 m</text>
 <text class="t1" x="24" y="546" font-size="12" font-weight="600">12a</text>
 <text class="t2" x="58" y="546" font-size="12">Shareable method package</text>
 <g id="tl-p12a"><title>Phase 12a Shareable method package, started 2026-10-27 05:31 CDT, finished 2026-10-27 05:47 CDT, merged 2026-10-27 05:47 CDT, active 16 m</title>
-<rect class="ph" x="946.9" y="535" width="21.3" height="14" rx="3"/>
+<rect class="ph" x="873.1" y="535" width="19.7" height="14" rx="3"/>
 </g>
-<text class="t2" x="974.2" y="546" font-size="11">16 m</text>
+<text class="t2" x="898.7" y="546" font-size="11">16 m</text>
 <text class="t1" x="24" y="574" font-size="12" font-weight="600">12b</text>
 <text class="t2" x="58" y="574" font-size="12">Visual project timeline</text>
 <g id="tl-p12b"><title>Phase 12b Visual project timeline, started 2026-10-31 10:27 CDT, finished 2026-10-31 11:20 CDT, merged 2026-10-31 11:20 CDT, active 28 m, blocked or paused 25 m</title>
-<rect class="ph" x="1092.4" y="563" width="63.9" height="14" rx="3"/>
-<rect id="tl-p12b-w1" fill="url(#tl-hatch)" x="1123.7" y="563" width="30.2" height="14"/>
-<rect class="wo" x="1124.2" y="563.5" width="29.2" height="13" stroke-width="1"/>
+<rect class="ph" x="995.2" y="563" width="59.1" height="14" rx="3"/>
+<rect id="tl-p12b-w1" fill="url(#tl-hatch)" x="1024.2" y="563" width="27.9" height="14"/>
+<rect class="wo" x="1024.7" y="563.5" width="26.9" height="13" stroke-width="1"/>
 </g>
-<text class="t2" x="1086.4" y="574" font-size="11" text-anchor="end">28 m + 25 m blocked</text>
+<text class="t2" x="989.2" y="574" font-size="11" text-anchor="end">28 m + 25 m blocked</text>
 <text class="t1" x="24" y="602" font-size="12" font-weight="600">12c</text>
 <text class="t2" x="58" y="602" font-size="12">Timeline rollout to existing projec…</text>
 <g id="tl-p12c"><title>Phase 12c Timeline rollout to existing projects, started 2026-10-31 11:26 CDT, finished 2026-10-31 11:30 CDT, merged 2026-10-31 11:30 CDT, active 4 m</title>
-<rect class="ph" x="1163.6" y="591" width="4.8" height="14" rx="3"/>
+<rect class="ph" x="1061" y="591" width="4.5" height="14" rx="3"/>
 </g>
-<text class="t2" x="1157.6" y="602" font-size="11" text-anchor="end">4 m</text>
-<text class="t3" x="24" y="646" font-size="11">Generated by scripts/phase_timeline.py from the Phase Log Timeline bullets and git. Idle gaps are collapsed; bar lengths within a session share one scale.</text>
+<text class="t2" x="1071.4" y="602" font-size="11">4 m</text>
+<text class="t3" x="24" y="646" font-size="11">Not started: 12d.</text>
+<text class="t3" x="24" y="664" font-size="11">Generated by scripts/phase_timeline.py from the Phase Log Timeline bullets and git. Idle gaps are collapsed; bar lengths within a session share one scale.</text>
 </svg>

@@ -31,6 +31,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0025 | 2026-10-31 10:06 CDT | Visual project timeline: generated from the Phase Log and git by a stdlib script in the skill; SVG plus Mermaid and table in a marked block; regenerated only on `main`; rollout split into 12b (skill, PHX, recipe) and 12c (four existing repos) | Accepted | 12b, 12c (planning) |
 | ADR-0026 | 2026-10-31 10:21 CDT | Phase 12b/12c pre-decisions: one preview block in 12b, fixtures keep only Timeline bullets and headings, no tag offered, MM3 untracked files don't block the retrofit, 12c Gate auto | Accepted | 12b, 12c (preflight) |
 | ADR-0027 | 2026-10-31 10:48 CDT | Timeline generator design: sqrt-weighted session widths, as-of = latest recorded event, refresh only on `main` in its own commit after `⛔`/resume, Mermaid per session, git fallbacks marked approximate |
+| ADR-0028 | 2026-10-31 19:26 CDT | Run progress feedback: a `progress` event in `run.jsonl` every `progress_interval_s` (default 5 min) and on a stage change, derived only from stream events already parsed (no LLM); a `progress` block in `state.json`; a richer `phx status`; a new `phx watch` that redraws one line; amber stall warning before the idle timeout; ranges only for an ETA; no desktop progress notifications | Accepted | 12d (planning) |
 
 ---
 
@@ -482,3 +483,32 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 
 **Consequences.** The skill and PHX carry `scripts/phase_timeline.py` (byte-identical copies). Templates gain a `## Timeline` heading with markers, §4a in the shared instructions, a drift line in `/phase status` and a refresh step in `/phase-add`; the contract text is unchanged (regression test).
 
+
+## ADR-0028: Run progress feedback, `phx status` and `phx watch` (Phase 12d, planning)
+**Recorded.** 2026-10-31 19:26 CDT (planning for Phase 12d)
+
+**Context.** Nick asked for a log line every five minutes or so while PHX runs, saying what it is working on, how it is going and how long the current phase has left, because a long run is dark: the only movement during a session is `state.json`'s `last_event`, throttled to 30 s and carrying no content. He asked for a better feedback loop if one existed. The runner already receives every stream-json event through `on_event` and throws the content away; per-message token usage is parsed but only tallied at session end.
+
+**Options considered.**
+
+| Question | Option | Pros | Cons |
+|---|---|---|---|
+| Signal | **A. `progress` event in `run.jsonl` every 5 min** | Greppable, durable, appears in `phx log -f` and the journal | Passive; you must be watching |
+| | **B. Richer `phx status`** | The command he already uses; one glance | Snapshot only |
+| | **C. New `phx watch` redrawing one line** | Always current, no scrollback, stalls visible at once; cheap | New CLI surface |
+| | D. Self-replacing notification every 5 min | Ambient | Spam risk; against the silent-by-design notifier |
+| | E. Ask the model for status/ETA | Fluent prose | Touches the phase session, costs tokens, violates ADR-0001 |
+| ETA | **A. Range from completed phases in this plan, with the sample size, never a single number** | Defensible and honest; says "not enough history" when true | Wide or absent early on |
+| | B. Single estimate from the model or the clock | Looks precise | Fabricated; a confident wrong number is worse than none |
+| `progress` frequency | **A. `progress_interval_s`, default 300, plus an immediate event on a stage change** | Matches the request; a stage change is the informative moment | Slightly more log lines |
+| | B. Strict 5-minute tick only | Simplest | A five-minute silent gap right after an obvious transition |
+| Stall signal | **A. One `warning` per quiet spell at half the idle timeout, naming the long tool in flight** | Says "hung" without crying wolf | Needs a threshold |
+| | B. None; the idle timeout speaks for itself | No new logic | 30 minutes of silent doubt is the complaint itself |
+| State | **A. A `progress` block in `state.json`, refreshed through the existing heartbeat** | `status` and `watch` read one file; no second write path | Grows the state file |
+| | B. `watch` tails `run.jsonl` and replays | No state change | Duplicated parsing in the CLI; races |
+| Notifications | **A. None (option D declined by Nick)** | Stays silent and predictable | No ambient signal |
+| | B. Opt-in config flag | Ambient when wanted | Unrequested surface |
+
+**Decision.** A, A, A, A, A, A. Nick chose scope "A + B + C" on 2026-10-31 19:22 CDT and declined the notification. The progress content is derived only from events the runner already parses: the last tool (file or command, redacted and truncated), a coarse stage (`starting`, `working`, `testing`, `finishing`, `unknown`), completed-step counts per tool, running tokens and cost, the age of the last stream event and the elapsed time. An ETA is always a range, taken from the wall times of phases PHX already completed in this plan (Phase Log Timeline bullets, `state.phases` as a fallback), shown as `~25m of ~80m typical left (median of 9 phases)` or `no estimate yet (first phase in this plan)`. The `progress` event carries the same facts in one `reason` line that reads correctly on its own in `phx log`, plus structured fields for `--json`. The stall warning fires once per quiet spell at half `idle_timeout_s` and names the tool in flight (`running uv run pytest (6m) — no event for 14m`) so a long test command is not reported as a hang. `phx watch` reads `state.json` and the lock every ~5 s, redraws one line without raw cursor escapes, prints transitions as ordinary lines, and exits 0 on finish, stop, `Ctrl-C` or a non-TTY. Nothing about launching, classifying, verifying or recovering a session changes: the new hooks are optional, the new state key is optional, and an existing test must pass with no assertion edited.
+
+**Consequences.** A new module `src/phx/progress.py` (pure, unit-tested), a new optional `on_progress` on `run_session`, a new `Progress` block in `RunState`, a new `progress_interval_s` config key (validated, defaults to 300; it does not affect preflight staleness, which covers phase rows and open questions only), a new `phx watch` subcommand in `COMMANDS`, new user-guide, README and architecture text, and the `progress` and stall `warning` names in the user guide's event list. The fake agent gains `tool_use`/`tool_result` emission so the tests read real event shapes. Desktop progress notifications stay out of scope by Nick's decision; a later phase must ask again rather than add them.

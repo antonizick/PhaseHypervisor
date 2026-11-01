@@ -820,3 +820,56 @@ def test_dry_run_reports_preflight(h: Callable[..., H]) -> None:
     assert x.run(dry_run=True, require_preflight=True) == EXIT_ERROR
     assert "would refuse: no preflight recorded" in x.out.getvalue()
     assert x.last_event("dry_run")["end"] == "preflight_missing"
+
+
+# --------------------------------------------------------------------------- progress (Phase 12d)
+
+
+def test_progress_state_is_populated_and_cleared(
+    h: Callable[..., H], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("phx.supervisor.HEARTBEAT_S", 0.0)  # every heartbeat saves
+    x = h().all_auto().decide_q1()
+    x.env["PHX_FAKE_TOOLS"] = "1"
+    x.env["PHX_FAKE_DELAY"] = "0.1"
+    seen: list[Any] = []
+    done = threading.Event()
+
+    def run() -> None:
+        try:
+            x.run()
+        finally:
+            done.set()
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline and not done.is_set():
+        st = load_state(x.state_root / "SMP")
+        if st is not None and st.progress is not None:
+            seen.append(st.progress)
+        time.sleep(0.02)
+    worker.join(timeout=60)
+    assert seen, "state.progress never appeared in state.json"
+    assert any(p.stage in ("starting", "working", "testing", "finishing") for p in seen)
+    assert all(p.activity for p in seen)
+    events = x.events("progress")
+    assert events, "no progress events in run.jsonl"
+    assert "steps" in events[-1]["reason"] and events[-1]["eta"]
+    assert events[-1]["stage"] in ("starting", "working", "testing", "finishing")
+    assert x.state().progress is None  # cleared when the session ended
+
+
+def test_progress_shows_the_wait_not_a_stale_line(h: Callable[..., H]) -> None:
+    x = h(**{"01": ["limit:3600", "complete"], "probe": ["ok"]})
+    seen: list[str] = []
+
+    def on_sleep(clock: FakeClock) -> None:
+        st = load_state(x.state_root / "SMP")
+        if st is not None and st.progress is not None:
+            seen.append(st.progress.activity or "")
+
+    x.clock.on_sleep = on_sleep
+    assert x.run(until="01") == EXIT_FINISHED
+    assert any("waiting for capacity" in s for s in seen)
+    assert x.state().progress is None  # cleared when the wait ended

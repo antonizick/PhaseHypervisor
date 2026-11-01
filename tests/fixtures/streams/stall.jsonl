@@ -1,0 +1,2 @@
+{"type": "system", "subtype": "init", "session_id": "{{session_id}}", "model": "claude-opus-5-5", "permissionMode": "bypassPermissions", "apiKeySource": "none", "cwd": "/repo"}
+{"type": "assistant", "message": {"id": "msg_01", "type": "message", "role": "assistant", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_hang", "name": "Bash", "input": {"command": "uv run pytest"}}], "stop_reason": "tool_use", "usage": {"input_tokens": 12, "output_tokens": 40}}, "parent_tool_use_id": null, "session_id": "{{session_id}}"}

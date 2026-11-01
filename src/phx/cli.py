@@ -4,11 +4,12 @@ import argparse
 import json
 import os
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
 from types import FrameType
@@ -34,20 +35,22 @@ from phx.plan import (
     show_main,
 )
 from phx.preflight import PreflightRefused, freshness, launch, prepare, record
+from phx.progress import fmt_dur, fmt_tokens
 from phx.runner import LauncherError, find_launcher
 from phx.state import RunStatus, load_state, now_ts
 from phx.supervisor import EXIT_ERROR, EXIT_PAUSED, RunOptions, Supervisor
 
 # subcommand -> (help text, phase that implements it)
-COMMANDS: dict[str, tuple[str, int]] = {
-    "preflight": ("ask every foreseeable question before a hands-off run", 8),
-    "run": ("run the remaining phases of a plan unattended", 7),
-    "resume": ("resume a stopped or waiting run", 7),
-    "status": ("show the state of a run", 7),
-    "stop": ("stop a running supervisor", 7),
-    "log": ("show or follow the run log", 7),
-    "answer": ("answer a recorded owner question and unblock its phase", 7),
-    "plan": ("parse a plan read-only and print it, the next phase and any drift", 4),
+COMMANDS: dict[str, tuple[str, str]] = {
+    "preflight": ("ask every foreseeable question before a hands-off run", "8"),
+    "run": ("run the remaining phases of a plan unattended", "7"),
+    "resume": ("resume a stopped or waiting run", "7"),
+    "status": ("show the state of a run", "7"),
+    "watch": ("follow a run live: one redrawing line per repo", "12d"),
+    "stop": ("stop a running supervisor", "7"),
+    "log": ("show or follow the run log", "7"),
+    "answer": ("answer a recorded owner question and unblock its phase", "7"),
+    "plan": ("parse a plan read-only and print it, the next phase and any drift", "4"),
 }
 
 
@@ -113,6 +116,9 @@ def build_parser() -> argparse.ArgumentParser:
         elif name == "status":
             cmd.add_argument("repo", type=Path, nargs="?", help="repo path (default: all repos)")
             cmd.add_argument("--json", action="store_true", help="print JSON")
+        elif name == "watch":
+            cmd.add_argument("repo", type=Path, nargs="?", default=Path("."), help="repo path")
+            cmd.add_argument("--json", action="store_true", help="print one JSON object per change")
         elif name == "stop":
             cmd.add_argument("repo", type=Path, nargs="?", default=Path("."), help="repo path")
             cmd.add_argument(
@@ -318,6 +324,55 @@ def _left(epoch: float) -> str:
     return f"{hours}h {rest // 60:02d}m" if hours else f"{rest // 60}m"
 
 
+# --- live progress (Phase 12d) -------------------------------------------------------
+
+TOOL_ORDER = ("edit", "write", "bash", "read", "grep", "glob", "other")
+
+
+def progress_payload(
+    prog: Mapping[str, Any] | None, now: float | None = None
+) -> dict[str, Any] | None:
+    """The ``state.progress`` block plus ages computed at read time (``status --json``)."""
+    if not prog:
+        return None
+    now = time.time() if now is None else now
+    last = prog.get("last_event")
+    age = round(max(0.0, now - last), 1) if isinstance(last, int | float) else None
+    stall_after = float(prog.get("stall_after_s") or 0.0)
+    out = dict(prog)
+    out["last_event_age_s"] = age
+    out["stalled"] = age is not None and stall_after > 0 and age >= stall_after
+    return out
+
+
+def progress_lines(prog: Mapping[str, Any], now: float | None = None) -> list[str]:
+    """What ``phx status`` prints under ``Phase:`` when a session is live (Phase 12d)."""
+    data = progress_payload(prog, now)
+    if data is None:
+        return []
+    raw_tools = data.get("tools")
+    tools: dict[str, Any] = dict(raw_tools) if isinstance(raw_tools, Mapping) else {}
+    counts = ", ".join(f"{tools[b]} {b}" for b in TOOL_ORDER if tools.get(b))
+    steps = (
+        f"{data.get('steps', 0)} steps ({counts})" if counts else f"{data.get('steps', 0)} steps"
+    )
+    money = f"{fmt_tokens(int(data.get('tokens') or 0))} tokens"
+    if data.get("cost_usd") is not None:
+        money += f", ${float(data['cost_usd']):.2f}"
+    age = data.get("last_event_age_s")
+    age_text = f"last event {fmt_dur(float(age))} ago" if age is not None else "no event yet"
+    line2 = f"{money} · {age_text}"
+    if data.get("eta"):
+        line2 += f" · {data['eta']}"
+    if data.get("stalled"):
+        line2 += " · ⚠ quiet for longer than expected"
+    activity = str(data.get("activity") or "no activity yet")
+    return [
+        f"  Doing:      {activity} ({data.get('stage')}) · {steps}",
+        f"              {line2}",
+    ]
+
+
 def status_report(repo: Path, state_root: Path | None = None) -> dict[str, Any]:
     """Everything ``phx status <repo>`` shows, as JSON-ready data."""
     sdir = state_dir(repo, state_root)
@@ -328,6 +383,7 @@ def status_report(repo: Path, state_root: Path | None = None) -> dict[str, Any]:
         "state_dir": str(sdir),
         "running": asdict(holder) if holder else None,
         "state": state.to_json() if state else None,
+        "progress": progress_payload(state.to_json().get("progress")) if state else None,
         "plan": None,
     }
     if state and state.wait:
@@ -383,6 +439,10 @@ def _print_status(report: dict[str, Any]) -> None:
                 f"({state.get('classification') or 'running'}), provider "
                 f"{state.get('provider') or '-'}"
             )
+            prog = state.get("progress")
+            if isinstance(prog, Mapping):
+                for line in progress_lines(prog):
+                    print(line)
         wait = state.get("wait")
         if wait:
             print(
@@ -461,6 +521,186 @@ def _cmd_status(args: argparse.Namespace) -> int:
             detail += f": {state.pause.reason}"
         print(f"{name}: {live}; last run {detail} (phase {state.phase or '-'})")
     return 0
+
+
+# --------------------------------------------------------------------------- watch (Phase 12d)
+
+WATCH_POLL_S = 5.0
+_AMBER, _RESET = "\x1b[33m", "\x1b[0m"
+_TERMINAL = ("finished", "stopped", "failed")
+
+
+def watch_payload(
+    state: Mapping[str, Any] | None, holder: Mapping[str, Any] | None, now: float | None = None
+) -> dict[str, Any]:
+    """One ``phx watch --json`` object: the state plus progress ages (pure)."""
+    now = time.time() if now is None else now
+    state = state if isinstance(state, Mapping) else {}
+    prog = state.get("progress")
+    wait = state.get("wait")
+    pause = state.get("pause")
+    return {
+        "ts": now_ts(now),
+        "status": state.get("status"),
+        "phase": state.get("phase"),
+        "attempt": state.get("attempt"),
+        "progress": progress_payload(prog, now) if isinstance(prog, Mapping) else None,
+        "wait": dict(wait) if isinstance(wait, Mapping) else None,
+        "pause": dict(pause) if isinstance(pause, Mapping) else None,
+        "running": dict(holder) if isinstance(holder, Mapping) else None,
+        "frame": watch_frame(state, holder, now),
+    }
+
+
+def watch_frame(
+    state: Mapping[str, Any] | None, holder: Mapping[str, Any] | None, now: float | None = None
+) -> str:
+    """The one line ``phx watch`` redraws in place (pure formatting)."""
+    now = time.time() if now is None else now
+    if not state:
+        if holder:
+            return f"supervisor pid {holder.get('pid')} is running; waiting for state.json"
+        return "no PHX run recorded yet"
+    bits = [f"{state.get('phase') or '-'} attempt {state.get('attempt') or 0}"]
+    prog = state.get("progress")
+    p = progress_payload(prog, now) if isinstance(prog, Mapping) else None
+    if p is not None:
+        bits.append(f"{fmt_dur(float(p.get('elapsed_s') or 0))} elapsed")
+        bits.append(str(p.get("stage") or "unknown"))
+        if p.get("activity"):
+            bits.append(str(p["activity"]))
+        bits.append(f"{p.get('steps', 0)} steps")
+        money = f"{fmt_tokens(int(p.get('tokens') or 0))} tokens"
+        if p.get("cost_usd") is not None:
+            money += f" ${float(p['cost_usd']):.2f}"
+        bits.append(money)
+        if p.get("last_event_age_s") is not None:
+            bits.append(f"evt {fmt_dur(float(p['last_event_age_s']))} ago")
+        if p.get("eta"):
+            bits.append(str(p["eta"]))
+    else:
+        bits.append(str(state.get("status") or "?"))
+        wait = state.get("wait")
+        if isinstance(wait, Mapping) and wait.get("until"):
+            bits.append(f"wakes {now_ts(float(wait['until']))}")
+    line = " · ".join(bit for bit in bits if bit)
+    return "⚠ " + line if p is not None and p.get("stalled") else line
+
+
+def watch_signature(
+    state: Mapping[str, Any] | None, holder: Mapping[str, Any] | None, now: float | None = None
+) -> tuple[Any, ...]:
+    """What counts as a change for ``--json`` and non-TTY output.
+
+    The stall flag is time-dependent on purpose: going amber is a change worth a line.
+    """
+    state = state if isinstance(state, Mapping) else {}
+    prog = state.get("progress")
+    payload = progress_payload(prog, now) if isinstance(prog, Mapping) else None
+    p = dict(prog) if isinstance(prog, Mapping) else {}
+    wait = state.get("wait")
+    pause = state.get("pause")
+    return (
+        state.get("status"),
+        state.get("phase"),
+        state.get("attempt"),
+        state.get("session_id"),
+        p.get("stage"),
+        p.get("activity"),
+        p.get("steps"),
+        p.get("tokens"),
+        p.get("cost_usd"),
+        p.get("last_event"),
+        bool(payload and payload.get("stalled")),
+        wait.get("until") if isinstance(wait, Mapping) else None,
+        pause.get("reason") if isinstance(pause, Mapping) else None,
+        holder.get("pid") if isinstance(holder, Mapping) else None,
+    )
+
+
+def watch_notice(state: Mapping[str, Any] | None, repo: str) -> tuple[str, list[str]] | None:
+    """``(kind, lines)`` when the state warrants a normal line, not just the frame."""
+    if not isinstance(state, Mapping):
+        return None
+    status = state.get("status")
+    if status == "waiting":
+        wait = state.get("wait")
+        wait_d: Mapping[str, Any] = wait if isinstance(wait, Mapping) else {}
+        wake = now_ts(float(wait_d["until"])) if wait_d.get("until") else "unknown"
+        return "waiting", [f"run waiting: {wait_d.get('reason') or 'usage limit'}; wakes {wake}"]
+    if status == "paused":
+        pause = state.get("pause")
+        pause_d: Mapping[str, Any] = pause if isinstance(pause, Mapping) else {}
+        lines = [f"run paused: {pause_d.get('reason') or state.get('end_reason') or ''}"]
+        ids = pause_d.get("question_ids") or []
+        if ids:
+            lines.append(f'  answer: phx answer {repo} {ids[0]} "…", then phx resume {repo}')
+        else:
+            lines.append(f"  when ready: phx resume {repo}")
+        return "paused", lines
+    if status in _TERMINAL:
+        return str(status), [f"run {status}: {state.get('end_reason') or ''}"]
+    return None
+
+
+def _cmd_watch(args: argparse.Namespace) -> int:
+    repo = _repo(args.repo)
+    sdir = state_dir(repo, args.state_dir)
+    tty = sys.stdout.isatty() and not args.json
+    width = shutil.get_terminal_size((100, 24)).columns
+
+    def frame_line(data: Mapping[str, Any] | None, holder: Mapping[str, Any] | None) -> str:
+        line = watch_frame(data, holder)
+        prog = data.get("progress") if isinstance(data, Mapping) else None
+        p = progress_payload(prog) if isinstance(prog, Mapping) else None
+        return _AMBER + line + _RESET if p and p.get("stalled") and tty else line
+
+    def clear_line() -> None:
+        sys.stdout.write("\r" + " " * (width - 1) + "\r")
+
+    def redraw(data: Mapping[str, Any] | None, holder: Mapping[str, Any] | None) -> None:
+        line = frame_line(data, holder)
+        sys.stdout.write("\r" + line[: width - 1].ljust(width - 1))
+        sys.stdout.flush()
+
+    last_sig: tuple[Any, ...] | None = None
+    last_status: str | None = None
+    try:
+        while True:
+            state = load_state(sdir)
+            data = state.to_json() if state else None
+            holder = running(repo)
+            holder_d = asdict(holder) if holder else None
+            sig = watch_signature(data, holder_d)
+            status = data.get("status") if isinstance(data, Mapping) else None
+            changed = sig != last_sig or status != last_status
+            if changed:
+                if status != last_status:
+                    notice = watch_notice(data, str(repo))
+                    if notice:
+                        if tty:
+                            clear_line()
+                        for line in notice[1]:
+                            print(line, flush=True)
+                if args.json:
+                    print(json.dumps(watch_payload(data, holder_d)), flush=True)
+                elif not tty:
+                    print(frame_line(data, holder_d), flush=True)
+                elif status not in _TERMINAL:
+                    redraw(data, holder_d)
+                last_sig, last_status = sig, status
+            elif tty:
+                redraw(data, holder_d)
+            if status in _TERMINAL:
+                if tty:
+                    clear_line()
+                    print(frame_line(data, holder_d))
+                return 0
+            time.sleep(WATCH_POLL_S)
+    except KeyboardInterrupt:
+        if tty:
+            sys.stdout.write("\n")
+        return 0
 
 
 # --------------------------------------------------------------------------- stop
@@ -691,6 +931,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "run": _cmd_run,
         "resume": _cmd_run,
         "status": _cmd_status,
+        "watch": _cmd_watch,
         "stop": _cmd_stop,
         "log": _cmd_log,
         "answer": _cmd_answer,

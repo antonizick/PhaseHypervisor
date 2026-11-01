@@ -29,6 +29,7 @@ from typing import IO, Any
 from phx.classify import Classification, classify
 from phx.logging import EventLog
 from phx.paths import Config, sessions_dir
+from phx.progress import ProgressSnapshot, ProgressTracker
 from phx.redact import redact, redact_text
 
 PERMISSION_MODE = "bypassPermissions"
@@ -362,6 +363,8 @@ def run_session(
     extra_args: Sequence[str] = (),
     cancel: threading.Event | None = None,
     on_start: Callable[[str], None] | None = None,
+    on_progress: Callable[[ProgressSnapshot], None] | None = None,
+    tracker: ProgressTracker | None = None,
 ) -> SessionOutcome:
     """Run one session to its end and classify it.
 
@@ -371,9 +374,19 @@ def run_session(
     ``cancel`` (Phase 07, ``phx stop``): once set, the session's process group is stopped
     like a timeout and the session classifies as ``timeout`` with kind ``stopped``.
     ``on_start`` receives the session ID once the process has started.
+    ``on_progress`` (Phase 12d) is called at most every ``progress_interval_s`` and at
+    once on a stage change, with a snapshot from ``tracker`` (a fresh one is created
+    when a callback is given without one). The stall ``warning`` event comes from the
+    same tracker. Without both, nothing about the run changes.
     """
     config = config or Config()
     timeouts = timeouts or Timeouts.from_config(config)
+    if tracker is None and on_progress is not None:
+        tracker = ProgressTracker(
+            phase=phase,
+            idle_timeout_s=timeouts.idle_s,
+            interval_s=float(config.progress_interval_s),
+        )
     base_env = dict(os.environ if env is None else env)
     launcher = launcher or find_launcher(base_env)
     if launcher.warning:
@@ -445,8 +458,28 @@ def run_session(
     open_streams = 2
     timed_out: str | None = None
     fd: int | None = os.open(transcript, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    last_emit = started
+    last_stage: str | None = tracker.stage if tracker is not None else None
+
+    def tick() -> None:
+        """Stall warning and ``on_progress`` cadence, every loop turn (Phase 12d)."""
+        nonlocal last_emit, last_stage
+        if tracker is None:
+            return
+        warn = tracker.stall_warning()
+        if warn is not None:
+            log.event("warning", phase=phase, **warn)
+        if on_progress is None:
+            return
+        stage = tracker.stage
+        now = time.monotonic()
+        if stage != last_stage or now - last_emit >= tracker.interval_s:
+            last_emit, last_stage = now, stage
+            on_progress(tracker.snapshot())
+
     try:
         while open_streams:
+            tick()
             now = time.monotonic()
             if cancel is not None and cancel.is_set():
                 timed_out = "stopped"
@@ -500,6 +533,8 @@ def run_session(
             last_event_wall = time.time()
             events += 1
             recent.append(event)
+            if tracker is not None:
+                tracker.feed(event)
             if event.get("type") == "result":
                 result = event
             elif event.get("type") == "assistant":

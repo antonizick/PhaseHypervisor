@@ -12,6 +12,7 @@
 | Verifier and recovery | `verify.py`, `recover.py`, `triage.py` | 06 | independent post-phase checks, blocked-status repair, retry/resume |
 | Supervisor | `supervisor.py`, `locks.py`, `state.py`, `notify.py`, `vault.py`, `detach.py` | 07 | `phx run / status / resume / stop / log / answer`, locks, state, waits, notifications, detached runs, vault summary |
 | Preflight | `preflight.py`, `prompts/PHX_preflight.md` | 08 | one interactive question sweep before a hands-off run; staleness check in `phx run` |
+| Live progress | `progress.py` | 12d | stream-event-derived session activity, step counts, ETA and stall warnings for `phx status` and `phx watch` |
 | Method package (plugin) | `.claude-plugin/marketplace.json`, `plugins/phased-project/` | 12a | the `phased-project` skill and templates (which write each repo's `/phase` and `/phase-add`) and `/phx`, as a Claude Code plugin; not Python, not imported by `phx` |
 
 ## Phase 02 modules (built)
@@ -52,7 +53,7 @@ Runtime state lives outside the repo in `~/.local/state/phx/<repo-name>/` (`run.
 
 ## Phase 05: session runner and exit classifier (`runner.py`, `classify.py`, built)
 ```
-run_session(repo, state, phase, prompt, alias, log, config, resume?) ──► SessionOutcome
+run_session(repo, state, phase, prompt, alias, log, config, resume?, on_progress?, tracker?) ──► SessionOutcome
   find_launcher       ai-provider on PATH → ~/.local/bin/ai-provider ($HOME of the given env) → claude (logged warning, R7)
   provider_snapshot   `ai-provider get`; on OpenRouter `ai-provider env` parsed in memory against an allowlist → mapped model
   build_argv          <launcher> -p <prompt> --model <alias> --permission-mode bypassPermissions
@@ -60,12 +61,15 @@ run_session(repo, state, phase, prompt, alias, log, config, resume?) ──► S
                       [--max-turns N] [--max-budget-usd X  (OpenRouter + config only, R9)]
   build_env           + PHX_AUTO=1, − ANTHROPIC_MODEL
   Popen               cwd = repo main checkout, own process group, stdin /dev/null
-  stream loop         stdout lines → redacted → sessions/<phase>-<n>.jsonl; JSON events → on_event (heartbeat), last 20 kept,
-                      `result` remembered; stderr → redacted 50-line tail
+  stream loop         stdout lines → redacted → sessions/<phase>-<n>.jsonl; JSON events → on_event (heartbeat),
+                      tracker.feed (Phase 12d), last 20 kept, `result` remembered; stderr → redacted 50-line tail
+  tick (Phase 12d)    every loop turn: stall `warning` once per quiet spell (half the idle timeout, names the tool
+                      in flight), `on_progress(snapshot)` at most every progress_interval_s or at once on a stage change
   timeouts            idle (no event for idle_timeout_s) / wall (wall_timeout_s) → SIGTERM group, SIGKILL after 10 s
   classify(...)       → Classification;  Usage.from_result(result) → tokens, cost, durations, per-model usage
   run.jsonl           `launch` (argv, cwd, session, transcript, provider, mapped model, budget, timeouts),
-                      `launcher_fallback`, `timeout`, `session_end` (class, reason, reset_at, kind, result line, tokens, cost)
+                      `launcher_fallback`, `warning` (stall), `timeout`, `session_end` (class, reason, reset_at,
+                      kind, result line, tokens, cost)
   (permission_mode, extra_args: only for the tool-less triage session, Phase 06)
 probe(state, log) ──► Classification   `-p ok --model haiku --max-turns 1`, cwd = state dir, no PHX_AUTO,
                                         clean answer = complete (R8)
@@ -169,7 +173,7 @@ Supervisor.run
 | Module | Role |
 |---|---|
 | `locks.py` | `RunLock` (machine-wide `phx.lock` then `<repo-name>.lock`, exclusive `flock`, 2 s retry, one-line JSON body `pid`/`repo`/`started`/`phase`/`unit`, `update(phase=…)`, release truncates); `running(repo)` reads a held lock (shared probe, like the contract's shell check); `main_checkout`, `repo_name` (`git rev-parse --git-common-dir`). Files are never deleted. |
-| `state.py` | `RunState` (run ID, status `running`/`waiting`/`paused`/`stopped`/`finished`/`failed`, PID, unit, phase, attempt, recoveries, session ID, last class, provider, heartbeat, `Wait`, `Pause`, `sessions` phase → last PHX session, per-phase `PhaseTotals` sessions/tokens/cost/wait/outcome, totals, completed phases, end reason); `save_state` writes temp + fsync + rename, mode 0600. |
+| `state.py` | `RunState` (run ID, status `running`/`waiting`/`paused`/`stopped`/`finished`/`failed`, PID, unit, phase, attempt, recoveries, session ID, last class, provider, heartbeat, `Wait`, `Pause`, `Progress` (Phase 12d: live session activity, optional), `sessions` phase → last PHX session, per-phase `PhaseTotals` sessions/tokens/cost/wait/outcome/wall time, totals, completed phases, end reason); `save_state` writes temp + fsync + rename, mode 0600. |
 | `supervisor.py` | `Supervisor(repo, options=RunOptions(pause_after, max_phases, until, dry_run, resume), state_root, env, clock, notifier, unit, proc_root, exclude, triage, vault)`. `run()` → exit code. `request_stop()` from signal handlers. `Clock` protocol (`now`, `sleep(seconds, stop)`) so tests run waits on a fake clock. Dry run simulates completions without lock, state or launches. |
 | `notify.py` | `Notifier.send(Note)`: `notify-send --app-name=phx --urgency=… --hint=boolean:suppress-sound:true`; skipped (logged) without display, bus or binary. Builders: `phase_complete`, `blocked`, `waiting`, `provider_switch`, `verification_failed`, `paused`, `finished`. |
 | `vault.py` | `note_path` (CLAUDE.md on `main`: "Obsidian project note \`…\`"), `summary_line`, `append_line` (end of `## Log`, `updated:`), `append_summary` (atomic write; skipped and logged when no note or no Log section). |
@@ -254,6 +258,24 @@ git log HEAD ── claim / blocked / resume / merge / preflight  ──┼─ f
 - **Axis:** activity spans merged into working sessions; gaps over `--gap-minutes` become breaks; session width ∝ √length. "As of" is the latest recorded event, so output is a function of repo state only.
 - **Writes:** only between `<!-- phase-timeline:start … -->` and `<!-- phase-timeline:end -->`, via a temp file and `os.replace`. `--check` compares, `--print` writes the block to stdout. Exit 2 for a missing plan or markers, or markers before the phase table.
 - **Compatibility with `phx`:** the block sits after the phase table, its table has no `Status` column and it uses no `##`/`###` headings, so `plan.parse_phase_table` and `verify.phase_log_entries` read the same (tests; `phx plan` byte-identical on five repos).
+
+## Phase 12d: run progress, live `phx status` and `phx watch` (`progress.py`, ADR-0028, built)
+```
+stream events ──► ProgressTracker.feed (pure parsing, never raises)   tool_use/tool_result trail,
+                  per-message usage deduped by message id, result cost   redacted descriptions
+        │
+        ├─► run_session tick: on_progress(snapshot) every progress_interval_s or on a stage change
+        │                    stall `warning` once per quiet spell (half the idle timeout)
+        ├─► supervisor._progress: `progress` event (reason line + structured fields) → run.jsonl
+        ├─► supervisor._heartbeat (30 s): state.progress = Progress.from_snapshot(tracker.snapshot())
+        └─► phx status / phx watch read state.json: activity, stage, steps, tokens, cost,
+            last-event age and the ETA (median of completed phases from the plan's Timeline
+            bullets, else this run's wall times; always a range or "no estimate yet")
+```
+- **`progress.py`** is pure and stdlib-only: `ProgressTracker` (stage heuristic `starting`/`working`/`testing`/`finishing`/`unknown`; steps = completed `tool_result`s bucketed `edit`/`write`/`bash`/`read`/`grep`/`glob`/`other`), `plan_durations` (Phase Log Timeline bullets, blocked spans subtracted), `eta_text`/`median`, `progress_reason`/`progress_fields`, `fmt_dur`/`fmt_tokens`. A malformed event is ignored, never fatal; tool commands and text are redacted and truncated.
+- **Hooks are optional:** `run_session(on_progress=None, tracker=None)` keeps every existing caller and test unchanged; the supervisor passes its tracker so `_heartbeat` can refresh `state.progress` through the existing save path (no second writer). `state.progress` is cleared when a session ends and set to "waiting for capacity" during a usage-limit wait.
+- **`phx watch`** (`cli.py`): polls `state.json` and the lock every `WATCH_POLL_S` (5 s), redraws one line with `\r` (no cursor escapes), amber on a stall, normal lines for pause/wait transitions with the `phx resume`/`phx answer` hint, exits 0 on terminal states and Ctrl-C; `--json` prints one object per change. Pure helpers `watch_frame`, `watch_payload`, `watch_signature`, `watch_notice`.
+- **Nothing else changes:** no LLM call anywhere (ADR-0001), no change to `recover.py`, `verify.py`, the contract or `session_end`, and desktop progress notifications stay out of scope (declined by Nick 2026-10-31 19:22 CDT).
 
 ## Interface with phase sessions
 PHX and a phase session talk only through the repo and one line of output, defined in [PHX_AUTO_MODE_CONTRACT.md](PHX_AUTO_MODE_CONTRACT.md) (contract version 1, Phase 03):

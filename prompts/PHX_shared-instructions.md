@@ -74,7 +74,8 @@ PhaseHypervisor/
 │   ├── runner.py  classify.py            (Phase 05: launch, stream-json, exit classes)
 │   ├── verify.py  recover.py  triage.py  (Phase 06)
 │   ├── supervisor.py  locks.py  notify.py  vault.py  (Phase 07)
-│   └── preflight.py                      (Phase 08)
+│   ├── preflight.py                      (Phase 08)
+│   └── progress.py                       (Phase 12d: live session activity, ETA, stall warnings)
 └── tests/
     ├── fixtures/plans/                   (copies of MM3, CL, OCC, YTPL2 plans; sample plan)
     ├── fixtures/streams/                 (stream-json samples incl. usage-limit)

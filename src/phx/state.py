@@ -11,7 +11,10 @@ import os
 import time
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from phx.progress import ProgressSnapshot
 
 STATE_FILE = "state.json"
 
@@ -34,6 +37,7 @@ class PhaseTotals:
     cost_usd: float = 0.0
     wait_s: float = 0.0
     outcome: str | None = None  # last decision rule: complete, blocked, usage_limit, …
+    wall_s: float = 0.0  # session wall time (the ETA fallback sample, Phase 12d)
 
 
 @dataclass
@@ -62,6 +66,54 @@ class Wait:
 
 
 @dataclass
+class Progress:
+    """What the current session is doing, refreshed through the heartbeat (Phase 12d).
+
+    Optional on :class:`RunState`: a ``state.json`` written before Phase 12d simply
+    has none. Ages (``last_event``, ``since``) are epochs so ``phx status`` and
+    ``phx watch`` compute "how long ago" at read time.
+    """
+
+    phase: str | None = None
+    attempt: int = 0
+    stage: str = "unknown"  # starting | working | testing | finishing | unknown | waiting
+    activity: str | None = None  # "editing src/phx/supervisor.py", or the wait message
+    last_tool: str | None = None
+    last_text: str | None = None
+    steps: int = 0
+    tools: dict[str, int] = field(default_factory=dict)
+    tokens: int = 0
+    cost_usd: float | None = None
+    since: float | None = None  # session start, wall epoch
+    last_event: float | None = None  # last stream event, wall epoch
+    elapsed_s: float = 0.0
+    eta: str = ""
+    stall_after_s: float = 0.0  # quiet seconds before the line is suspicious
+    in_flight: str | None = None
+
+    @classmethod
+    def from_snapshot(cls, snap: "ProgressSnapshot") -> "Progress":
+        return cls(
+            phase=snap.phase,
+            attempt=snap.attempt,
+            stage=snap.stage,
+            activity=snap.activity,
+            last_tool=snap.last_tool,
+            last_text=snap.last_text,
+            steps=snap.steps,
+            tools=dict(snap.tools),
+            tokens=snap.tokens,
+            cost_usd=snap.cost_usd,
+            since=snap.since_wall,
+            last_event=snap.last_event_wall,
+            elapsed_s=snap.elapsed_s,
+            eta=snap.eta,
+            stall_after_s=snap.stall_after_s,
+            in_flight=snap.in_flight,
+        )
+
+
+@dataclass
 class RunState:
     run_id: str = ""
     repo: str = ""
@@ -79,6 +131,7 @@ class RunState:
     last_event: str | None = None  # time of the last stream event (heartbeat)
     wait: Wait | None = None
     pause: Pause | None = None
+    progress: Progress | None = None  # live session activity (Phase 12d)
     sessions: dict[str, str] = field(default_factory=dict)  # phase -> last PHX session ID
     phases: dict[str, PhaseTotals] = field(default_factory=dict)
     tokens: int = 0
@@ -100,6 +153,8 @@ class RunState:
             values["wait"] = _build(Wait, values["wait"])
         if isinstance(values.get("pause"), dict):
             values["pause"] = _build(Pause, values["pause"])
+        if isinstance(values.get("progress"), dict):
+            values["progress"] = _build(Progress, values["progress"])
         values["phases"] = {
             k: _build(PhaseTotals, v)
             for k, v in (values.get("phases") or {}).items()

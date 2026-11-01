@@ -61,3 +61,15 @@ def test_bool_is_not_a_number() -> None:
         parse_config("test_timeout_s = true\n", "x")
     with pytest.raises(ValueError, match="max_budget_usd must be float"):
         parse_config("max_budget_usd = false\n", "x")
+
+
+def test_progress_interval_s_validated(  # Phase 12d
+    tmp_path: Path,
+) -> None:
+    assert Config().progress_interval_s == 300
+    assert parse_config("progress_interval_s = 60\n", "x").progress_interval_s == 60
+    for body in ("progress_interval_s = 0\n", "progress_interval_s = -5\n"):
+        with pytest.raises(ValueError, match="progress_interval_s must be greater than 0"):
+            parse_config(body, "x")
+    with pytest.raises(ValueError, match="progress_interval_s must be int"):
+        parse_config("progress_interval_s = true\n", "x")

@@ -427,3 +427,71 @@ def test_timeouts_from_config() -> None:
 def test_fakes_are_executable() -> None:
     for name in ("claude", "ai-provider"):
         assert os.access(FAKES / name, os.X_OK)
+
+
+# --- live progress (Phase 12d) -------------------------------------------------------
+
+
+def test_on_progress_fires_on_each_stage_change(
+    tmp_path: Path, state: Path, log: EventLog, env: dict[str, str]
+) -> None:
+    env["PHX_FAKE_STREAM"] = str(STREAMS / "progress_tools.jsonl")
+    seen: list[str] = []
+    out = go(tmp_path, state, log, env, on_progress=lambda snap: seen.append(snap.stage))
+    assert out.classification.cls is ExitClass.COMPLETE
+    # the whole stream runs in under the default interval, so only stage changes fire
+    assert seen == ["starting", "working", "testing", "finishing"]
+
+
+def test_on_progress_cadence_for_a_silent_session(
+    tmp_path: Path, state: Path, log: EventLog, env: dict[str, str]
+) -> None:
+    env["PHX_FAKE_HANG"] = "3"
+    seen: list[str] = []
+    out = go(
+        tmp_path,
+        state,
+        log,
+        env,
+        config=Config(progress_interval_s=1),
+        expect_result_line=False,
+        on_progress=lambda snap: seen.append(snap.stage),
+    )
+    assert out.classification.cls is ExitClass.COMPLETE
+    # one emit per interval while silent: at the cadence, never a flood
+    assert 2 <= len(seen) <= 5
+
+
+def test_stall_warning_once_per_quiet_spell(
+    tmp_path: Path, state: Path, log: EventLog, env: dict[str, str]
+) -> None:
+    env |= {"PHX_FAKE_STREAM": str(STREAMS / "stall.jsonl"), "PHX_FAKE_HANG": "5"}
+    out = go(
+        tmp_path,
+        state,
+        log,
+        env,
+        timeouts=Timeouts(idle_s=4, wall_s=60, term_grace_s=1),
+        on_progress=lambda snap: None,
+    )
+    warns = [e for e in events(state) if e["event"] == "warning"]
+    assert len(warns) == 1  # once per quiet spell
+    assert warns[0]["reason"].startswith("running uv run pytest")
+    assert warns[0]["tool"] == "running uv run pytest"
+    assert warns[0]["stalled_for_s"] >= 2.0
+    assert warns[0]["idle_timeout_s"] == 4.0
+    # the timeout behaves exactly as before
+    assert out.classification.cls is ExitClass.TIMEOUT and out.timed_out == "idle"
+
+
+def test_progress_hook_leaves_accounting_unchanged(
+    tmp_path: Path, state: Path, log: EventLog, env: dict[str, str]
+) -> None:
+    env["PHX_FAKE_STREAM"] = str(STREAMS / "progress_tools.jsonl")
+    plain = go(tmp_path, state, log, env)
+    hooked = go(tmp_path, state, log, env, on_progress=lambda snap: None)
+    assert hooked.usage == plain.usage
+    assert hooked.classification.cls is plain.classification.cls
+    ends = [e for e in events(state) if e["event"] == "session_end"]
+    assert ends[0]["tokens"] == ends[1]["tokens"]
+    assert ends[0]["cost_usd"] == ends[1]["cost_usd"] == 1.2345

@@ -27,3 +27,5 @@ Claude Code `--output-format stream-json --verbose` streams that the runner and 
 | `probe_ok.jsonl` | complete (probe) | synthetic | One-turn `ok` answer |
 | `probe_real.jsonl` | complete (probe) | real | The Phase 05 live `haiku` probe on Anthropic Pro, including a real `rate_limit_event` (`status: allowed`, `unifiedWindows`) |
 | `triage.jsonl` | complete (triage) | synthetic | Phase 06: a tool-less one-turn `haiku` summary of a blocked phase |
+| `progress_tools.jsonl` | complete | synthetic | Phase 12d: text plus `Edit`/`Bash` `tool_use`+`tool_result` pairs (stage changes for `on_progress`), then the `complete.jsonl` result |
+| `stall.jsonl` | (hangs) | synthetic | Phase 12d: one `Bash` `tool_use` with no result, then silence — for the stall `warning` test (pair with `PHX_FAKE_HANG`) |

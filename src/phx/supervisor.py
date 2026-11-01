@@ -44,6 +44,13 @@ from phx.plan import (
     show_main,
 )
 from phx.preflight import freshness
+from phx.progress import (
+    ProgressSnapshot,
+    ProgressTracker,
+    eta_durations,
+    progress_fields,
+    progress_reason,
+)
 from phx.recover import (
     Action,
     Decision,
@@ -63,7 +70,7 @@ from phx.runner import (
     probe,
     run_session,
 )
-from phx.state import Pause, RunState, RunStatus, Wait, load_state, now_ts, save_state
+from phx.state import Pause, Progress, RunState, RunStatus, Wait, load_state, now_ts, save_state
 from phx.vault import append_summary
 from phx.verify import (
     CheckStatus,
@@ -201,6 +208,8 @@ class Supervisor:
         self._last_beat = 0.0
         self._state_unsaved = False
         self._held_pause: Pause | None = None  # the pause `phx resume` clears once it starts
+        self._tracker: ProgressTracker | None = None  # live session activity (Phase 12d)
+        self._plan_file: str | None = None
 
     # ------------------------------------------------------------------ public
 
@@ -342,6 +351,7 @@ class Supervisor:
             try:
                 plan = load_plan(self.repo)
                 plan.check_contract()
+                self._plan_file = plan.plan_file
             except ContractError as exc:
                 return End(EndKind.FAILED, f"{exc}; PHX will not run this repo", "contract")
             except PlanError as exc:
@@ -657,6 +667,13 @@ class Supervisor:
             self.state.attempt += 1
             self.state.status = RunStatus.RUNNING
             self.state.session_id = resume
+            self._tracker = ProgressTracker(
+                phase=p.id,
+                attempt=self.state.attempt,
+                durations=self._eta_durations(),
+                idle_timeout_s=float(self.config.idle_timeout_s),
+                interval_s=float(self.config.progress_interval_s),
+            )
             self._save()
             outcome = run_session(
                 repo=self.repo,
@@ -672,6 +689,8 @@ class Supervisor:
                 cancel=self.stop_event,
                 on_start=partial(self._session_started, p.id),
                 on_event=self._heartbeat,
+                on_progress=self._progress,
+                tracker=self._tracker,
             )
             self._account(outcome)
             if self.stop_event.is_set():
@@ -765,19 +784,44 @@ class Supervisor:
         if now - self._last_beat >= HEARTBEAT_S:
             self._last_beat = now
             self.state.last_event = now_ts()
+            if self._tracker is not None:
+                self.state.progress = Progress.from_snapshot(self._tracker.snapshot())
             self._save()
+
+    def _progress(self, snap: ProgressSnapshot) -> None:
+        """``on_progress`` (Phase 12d): log the event; the heartbeat saves the state."""
+        self.state.progress = Progress.from_snapshot(snap)
+        self.log.event(
+            "progress",
+            phase=snap.phase,
+            reason=progress_reason(snap),
+            **progress_fields(snap),
+        )
+
+    def _eta_durations(self) -> list[float]:
+        """Completed-phase wall times: the plan's Phase Log, else this run's phases."""
+        text = show_main(self.repo, self._plan_file) if self._plan_file else None
+        done = [
+            t.wall_s
+            for pid, t in self.state.phases.items()
+            if t.wall_s > 0 and pid in self.state.completed
+        ]
+        return eta_durations(text, done)
 
     def _account(self, outcome: SessionOutcome) -> None:
         t = self.state.totals(outcome.phase)
         t.sessions += 1
         t.tokens += outcome.usage.total_tokens
         t.cost_usd += outcome.usage.cost_usd or 0.0
+        t.wall_s += max(0.0, outcome.ended_at - outcome.started_at)
         self.state.tokens += outcome.usage.total_tokens
         self.state.cost_usd += outcome.usage.cost_usd or 0.0
         self.state.session_id = outcome.session_id
         self.state.sessions[outcome.phase] = outcome.session_id
         self.state.classification = str(outcome.classification.cls)
         self.state.provider = outcome.provider.provider
+        self.state.progress = None  # the session is over; no stale activity line
+        self._tracker = None
         self._save()
 
     # ------------------------------------------------------------------ usage-limit wait
@@ -822,6 +866,12 @@ class Supervisor:
         """Wait out a usage limit (ADR-0006). ``None`` means: resume now."""
         self.state.wait = wait
         self.state.status = RunStatus.WAITING
+        self.state.progress = Progress(
+            phase=wait.phase,
+            stage="waiting",
+            activity=f"waiting for capacity, wakes at {_fmt_epoch(wait.until)}",
+            eta="",
+        )
         self._save()
         resume_at = _fmt_epoch(wait.until)
         self.log.event(
@@ -930,6 +980,7 @@ class Supervisor:
         self.state.totals(wait.phase).wait_s += max(0.0, self.clock.now() - wait.started)
         self.state.wait = None
         self.state.status = RunStatus.RUNNING
+        self.state.progress = None
         self._save()
 
     # ------------------------------------------------------------------ ending a run

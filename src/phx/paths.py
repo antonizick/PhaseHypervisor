@@ -16,6 +16,7 @@ class Config:
     max_budget_usd: float | None = None
     poll_interval_s: int = 300
     limit_poll_interval_s: int = 900
+    progress_interval_s: int = 300  # seconds between `progress` log events (Phase 12d)
     triage: bool = True
     idle_timeout_s: int = 1800  # no stream events for this long: kill the session
     wall_timeout_s: int = 21600  # hard cap on one session
@@ -77,4 +78,9 @@ def parse_config(text: str, source: str) -> Config:
             ok = False
         if not ok:
             raise ValueError(f"{source}: {key} must be {expected.__name__}")
+    if (
+        isinstance(data.get("progress_interval_s"), int | float)
+        and data["progress_interval_s"] <= 0
+    ):
+        raise ValueError(f"{source}: progress_interval_s must be greater than 0")
     return Config(**data)

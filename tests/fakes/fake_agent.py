@@ -11,7 +11,9 @@ appended to ``<scenario>.calls.jsonl``. Phase actions change the repo like a rea
 would (claim, worktree, merge, ``⛔`` with a question) and print a stream-json run with
 a ``PHX-RESULT`` line. Actions: ``complete``, ``block:<question id>``, ``limit``,
 ``limit:<seconds to reset>``, ``crash``, ``hang``, ``refuse``, ``noop``; probe: ``ok``,
-``limit``, ``limit:<seconds>``, ``auth``.
+``limit``, ``limit:<seconds>``, ``auth``. With ``PHX_FAKE_TOOLS=1`` a phase action also
+emits realistic ``tool_use``/``tool_result`` pairs (``hang``: one left in flight) for
+the Phase 12d progress tests; without it every existing stream is unchanged.
 """
 
 import json
@@ -40,6 +42,9 @@ def git(cwd: Path, *args: str) -> str:
 
 
 def emit(event: dict[str, Any]) -> None:
+    delay = float(os.environ.get("PHX_FAKE_DELAY") or 0)  # spaces lines out (Phase 12d)
+    if delay:
+        time.sleep(delay)
     sys.stdout.write(json.dumps(event) + "\n")
     sys.stdout.flush()
 
@@ -79,6 +84,51 @@ def phx_result(session: str, phase: str, status: str, reason: str, **kw: Any) ->
         "question_ids": kw.get("question_ids", []),
     }
     result(session, f"Done.\n\nPHX-RESULT: {json.dumps(line, separators=(',', ':'))}")
+
+
+def tools(
+    session: str,
+    pairs: list[tuple[str, str, dict[str, Any]]] | None = None,
+    *,
+    unanswered: bool = False,
+) -> None:
+    """Realistic ``tool_use``/``tool_result`` pairs; only with ``PHX_FAKE_TOOLS=1``.
+
+    Phase 12d progress tests need real event shapes to read; without the variable the
+    stream of every existing scenario stays byte-for-byte unchanged. ``unanswered``
+    emits the ``tool_use`` blocks with no results — a long command left in flight.
+    """
+    if os.environ.get("PHX_FAKE_TOOLS") != "1":
+        return
+    if pairs is None:
+        pairs = [
+            ("toolu-read", "Read", {"file_path": "src/phx/plan.py"}),
+            ("toolu-edit", "Edit", {"file_path": "src/phx/supervisor.py"}),
+            ("toolu-test", "Bash", {"command": "uv run pytest"}),
+            ("toolu-commit", "Bash", {"command": "git commit -m feat"}),
+        ]
+    for tid, name, inp in pairs:
+        emit(
+            {
+                "type": "assistant",
+                "message": {
+                    "id": f"msg-{tid}",
+                    "usage": {"input_tokens": 100, "output_tokens": 10},
+                    "content": [{"type": "tool_use", "id": tid, "name": name, "input": inp}],
+                },
+                "session_id": session,
+            }
+        )
+        if unanswered:
+            continue
+        emit(
+            {
+                "type": "user",
+                "message": {
+                    "content": [{"type": "tool_result", "tool_use_id": tid, "content": "ok"}]
+                },
+            }
+        )
 
 
 def limit(session: str, reset_in: int | None) -> None:
@@ -206,6 +256,7 @@ class Agent:
         git(self.repo, "worktree", "remove", str(self.worktree))
         git(self.repo, "branch", "-q", "-d", self.branch)
         init(session)
+        tools(session)
         phx_result(session, self.phase, "complete", "all checks passed", merged=True)
 
     def block(self, session: str, qid: str) -> None:
@@ -228,6 +279,7 @@ class Agent:
         )
         commit_plan(self.repo, text, f"chore(plan): phase {self.phase} blocked")
         init(session)
+        tools(session)
         phx_result(session, self.phase, "blocked", f"needs question {qid}", question_ids=[qid])
 
 
@@ -303,6 +355,7 @@ def main(args: list[str]) -> int:
     elif name == "hang":
         agent.claim()
         init(session)
+        tools(session, [("toolu-hang", "Bash", {"command": "uv run pytest"})], unanswered=True)
         for _ in range(600):
             time.sleep(0.1)
         return 0

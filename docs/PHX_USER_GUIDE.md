@@ -24,6 +24,7 @@ phx preflight ~/Work/YTPL2         # one interactive session: answer what the re
 phx run ~/Work/YTPL2 --dry-run     # what it would run, in order; launches nothing
 phx run ~/Work/YTPL2 --detach      # run hands-off in the background
 phx status ~/Work/YTPL2            # where it is, what it waits for, tokens and cost so far
+phx watch ~/Work/YTPL2             # follow it live: one redrawing line (Ctrl-C to stop)
 phx log ~/Work/YTPL2 -f            # follow every decision as it happens
 ```
 The repo must carry the hands-off contract (`PHX-CONTRACT: 1` in `.claude/commands/phase.md`; Phase 09 migrated MeetingMaster3, chessloopDeploy, OCC and YTPL2) and live under `~/Work` (spec S1; the variable `PHX_WORK_ROOT` overrides that root).
@@ -108,6 +109,21 @@ phx status ~/Work/YTPL2 --json
 ```
 "supervisor gone" means the last run was running or waiting when its process died (crash, kill, reboot); the next `phx run` carries on from `state.json`.
 
+While a phase session runs, `status` also shows what it is doing (Phase 12d): a `Doing:` line with the current activity (`editing src/phx/supervisor.py`, `running uv run pytest`, …) and the coarse stage (`starting`, `working`, `testing`, `finishing`, `unknown`), the completed-step counts per tool, live tokens and cost, how long ago the last stream event arrived, and an honest ETA — always a range with its sample size, e.g. `~25m of ~80m typical left (median of 9 phases)`, or `no estimate yet (first phase in this plan)`. It is derived from events PHX already reads, so it costs no tokens and never asks the model. With no live session (an older `state.json`, or between sessions) nothing extra is printed. During a usage-limit wait the line says `waiting for capacity, wakes at …`.
+
+## `phx watch`: keep an eye on it
+```bash
+phx watch ~/Work/YTPL2           # one line, redrawn in place about every 5 seconds
+phx watch ~/Work/YTPL2 --json    # one JSON object per change, for scripting
+```
+The line covers phase and attempt, elapsed time, stage, the current activity, steps, tokens, cost, the age of the last stream event and the ETA, e.g.:
+
+```
+12d attempt 1 · 47m elapsed · testing · running uv run pytest · 38 steps · 1.23M tokens $1.83 · evt 12s ago · ~25m of ~80m typical left (median of 9 phases)
+```
+
+When the session goes quiet for longer than half the idle timeout the line gets a `⚠` prefix and turns amber (in a terminal) — a long test command in flight is named instead of crying wolf. Normal lines are printed when the run pauses (with the `phx resume` / `phx answer` hint), waits or ends; `watch` keeps running across a pause or wait and exits `0` when the run finishes, stops or fails, on Ctrl-C, and it reports cleanly on a repo with no run yet. Without a terminal it prints one line per change instead of redrawing.
+
 ## `phx stop`: stop cleanly
 ```bash
 phx stop ~/Work/YTPL2 [--timeout 120]
@@ -120,7 +136,7 @@ phx log ~/Work/YTPL2            # last 40 events, one line each
 phx log ~/Work/YTPL2 -f         # follow
 phx log ~/Work/YTPL2 -n 0 --json   # everything, raw JSON
 ```
-`~/.local/state/phx/<repo-name>/run.jsonl` holds every decision with its reason: `run_start`, `plan` (next eligible phase and why each other phase waits), `select` (what runs and why), `session_dropped` (a recorded session forgotten because its phase was finished outside PHX), `launch` (full command line, provider), `session_end` (exit class, tokens, cost; a session stopped or cut off by a limit before its final result event counts the tokens of its turns, with cost unknown), `verify`, `decision`, `retry`, `wait_start`, `provider_check`, `provider_switch`, `wake`, `probe`, `wait_extend`, `wait_end`, `notify`, `run_end` (finished, paused, stopped or failed, with the reason and totals), `vault`. Session transcripts are in `sessions/<phase>-<n>.jsonl` beside it, and the current state in `state.json`. Everything is redacted before it is written.
+`~/.local/state/phx/<repo-name>/run.jsonl` holds every decision with its reason: `run_start`, `plan` (next eligible phase and why each other phase waits), `select` (what runs and why), `session_dropped` (a recorded session forgotten because its phase was finished outside PHX), `launch` (full command line, provider), `progress` (what the running session is doing, at most every `progress_interval_s` and at once on a stage change: stage, last tool, step counts, tokens, cost, last-event age, ETA; Phase 12d), `warning` (an unsupported test command, a stale preflight, or a session quiet for longer than expected — once per quiet spell, naming any long tool in flight), `session_end` (exit class, tokens, cost; a session stopped or cut off by a limit before its final result event counts the tokens of its turns, with cost unknown), `verify`, `decision`, `retry`, `wait_start`, `provider_check`, `provider_switch`, `wake`, `probe`, `wait_extend`, `wait_end`, `notify`, `run_end` (finished, paused, stopped or failed, with the reason and totals), `vault`. Session transcripts are in `sessions/<phase>-<n>.jsonl` beside it, and the current state in `state.json`. Everything is redacted before it is written.
 
 ## Usage limits and switching provider
 When a Pro 5-hour or weekly limit stops a phase, PHX records the stop, notifies you with the resume time and waits: until the announced reset time plus 2 minutes, or 30 min, 1 h, 2 h, 4 h, then every 6 h when no reset time is given. Then one tiny `haiku` probe checks that capacity is back and the **same session** resumes (`--resume`). The wait survives suspend, `phx stop` and restarts.
@@ -201,6 +217,7 @@ Optional, committed on `main`, never containing secrets. Unknown keys or wrong t
 | `wall_timeout_s` | `21600` | Hard cap on one phase session (Phase 05) |
 | `poll_interval_s` | `300` | How often a usage-limit wait re-checks `ai-provider get` for a switch to OpenRouter (Phase 07) |
 | `limit_poll_interval_s` | `900` | After a known reset time has passed and the probe still hits the limit, how often to probe again (Phase 07) |
+| `progress_interval_s` | `300` | Seconds between `progress` log events while a session runs; a stage change always emits one at once. Must be greater than 0 (Phase 12d) |
 | `triage` | `true` | When a phase blocks, needs review or fails verification, one tool-less `haiku` turn writes a ≤ 150-word summary for the notification and `run.jsonl` (Phase 06) |
 
 Session transcripts land in `~/.local/state/phx/<repo-name>/sessions/<phase>-<n>.jsonl` (redacted), and every launch and its classified ending in `run.jsonl` beside it.

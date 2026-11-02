@@ -33,6 +33,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0027 | 2026-10-31 10:48 CDT | Timeline generator design: sqrt-weighted session widths, as-of = latest recorded event, refresh only on `main` in its own commit after `⛔`/resume, Mermaid per session, git fallbacks marked approximate | Accepted | 12b |
 | ADR-0028 | 2026-10-31 19:26 CDT | Run progress feedback: a `progress` event in `run.jsonl` every `progress_interval_s` (default 5 min) and on a stage change, derived only from stream events already parsed (no LLM); a `progress` block in `state.json`; a richer `phx status`; a new `phx watch` that redraws one line; amber stall warning before the idle timeout; ranges only for an ETA; no desktop progress notifications | Accepted (built 2026-10-31, see ADR-0029) | 12d (planning; built in 12d) |
 | ADR-0029 | 2026-10-31 20:15 CDT | Phase 12d build decisions: steps are completed `tool_result`s; tool-trail stage heuristic; one shared tracker with a single save path; ETA fallback `PhaseTotals.wall_s`; stall computed where the clock runs (runner warns, status/watch read); declined notifications recorded; no spec amendment | Accepted | 12d |
+| ADR-0030 | 2026-11-02 15:34 CST | The supervisor refreshes the generated timeline itself (claim, every 60 s when stale, after each session, at run end, open bars every 30 min) on a clean `main`, in its own commit; `--as-of TS` for open bars; agents also refresh after the claim | Accepted | ad hoc fix |
 
 ---
 
@@ -533,3 +534,18 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 **Out-of-scope repair:** the ADR index row for ADR-0027 was missing its Status and Phase cells (a Phase 12b slip); completed as `| Accepted | 12b |` while appending this entry.
 
 **Consequences.** `progress.py` (pure, tested), `ProgressTracker` + `ProgressSnapshot` in the runner, `Progress` in `state.json` (optional; older state loads unchanged), `PhaseTotals.wall_s`, config key `progress_interval_s` (default 300, must be > 0; it does not affect preflight staleness, which covers phase rows and open questions only), `phx watch` in `COMMANDS` (phase 12d), and the user-guide, README and architecture text. Tests gained tool chatter behind `PHX_FAKE_TOOLS` in the fake agent (existing scenario output unchanged).
+
+
+## ADR-0030: The supervisor keeps the timeline current
+**Recorded.** 2026-11-02 15:34 CST (ad hoc fix, interactive)
+
+**Context.** Nick saw the P11 plan's timeline show only planning while phase 03 ran. ADR-0027 had agents refresh it only at close-out, block and resume, and the claim commit was status-only, so a running phase never appeared; nothing verified or repaired a missed refresh, and an open bar ended at the latest recorded event, so it could not grow.
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Tell agents to refresh after the claim as well | No code | Still prose an agent can skip; open bars still frozen |
+| B. `phx` refreshes it on `main` (chosen), plus A | Deterministic; repairs misses; works on projects with older prompts | The supervisor commits to `main` while an agent works in its worktree |
+| C. Live uncommitted refresh | Always fresh | Dirties `main`, breaking merges |
+
+**Decision.** B. `phx.timeline.refresh` runs only on a clean `main` with no git lock and never raises: within 60 s of any stale check (the claim included), after every session, at run end, and with `--as-of` (the supervisor's clock) at least every 30 min to extend open bars. The generator takes `--as-of TS` but still never reads the clock; `--check` honours the as-of the block records. A project whose script copy lacks `--as-of` still refreshes without it.
+**Consequences.** More `docs(plan): refresh timeline` commits on `main` (about two per hour of a running phase at most). A merge that conflicts over the generated block takes either side and re-runs `--write` (unchanged rule). A running `phx` process must be restarted to load this. Prompts changed: shared instructions §4a and the skill template.

@@ -24,7 +24,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Protocol, TextIO
 
-from phx import notify
+from phx import notify, timeline
 from phx.classify import ExitClass
 from phx.locks import LockBusy, RunLock, main_checkout
 from phx.logging import EventLog
@@ -93,6 +93,7 @@ RESET_MARGIN_S = 120  # wake this long after the announced reset time (ADR-0006)
 BACKOFF_S = (1800, 3600, 7200, 14400, 21600)  # no reset time given: 30 min … 6 h (spec R8)
 WAKE_STEP_S = 60.0  # longest single sleep; the wall clock is re-read after each one
 HEARTBEAT_S = 30.0  # how often a stream event refreshes state.json
+TIMELINE_CHECK_S = 60.0  # how often a running phase checks that the timeline is current
 
 
 class Clock(Protocol):
@@ -206,6 +207,8 @@ class Supervisor:
         self.launcher: Launcher | None = None
         self.lock: RunLock | None = None
         self._last_beat = 0.0
+        self._last_timeline = 0.0
+        self._last_growth = 0.0
         self._state_unsaved = False
         self._held_pause: Pause | None = None  # the pause `phx resume` clears once it starts
         self._tracker: ProgressTracker | None = None  # live session activity (Phase 12d)
@@ -693,6 +696,7 @@ class Supervisor:
                 tracker=self._tracker,
             )
             self._account(outcome)
+            self._refresh_timeline()
             if self.stop_event.is_set():
                 self.state.totals(p.id).outcome = "stopped"
                 return End(
@@ -779,8 +783,19 @@ class Supervisor:
         self.state.sessions[phase] = session_id
         self._save()
 
+    def _refresh_timeline(self, *, grow: bool = False) -> None:
+        """Keep the plan's generated timeline current (ADR-0030); never raises."""
+        result = timeline.refresh(self.repo, grow=grow)
+        self._last_timeline = time.monotonic()
+        if result.committed or result.reason.startswith(("error", "generator", "git ")):
+            self.log.event("timeline", reason=result.reason, committed=result.committed)
+        if result.committed:
+            self._last_growth = self._last_timeline
+
     def _heartbeat(self, _event: dict[str, Any]) -> None:
         now = time.monotonic()
+        if now - self._last_timeline >= TIMELINE_CHECK_S:
+            self._refresh_timeline(grow=now - self._last_growth >= timeline.GROWTH_S)
         if now - self._last_beat >= HEARTBEAT_S:
             self._last_beat = now
             self.state.last_event = now_ts()
@@ -986,6 +1001,7 @@ class Supervisor:
     # ------------------------------------------------------------------ ending a run
 
     def _finish(self, end: End) -> int:
+        self._refresh_timeline()
         status = {
             EndKind.FINISHED: RunStatus.FINISHED,
             EndKind.PAUSED: RunStatus.PAUSED,

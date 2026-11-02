@@ -357,6 +357,17 @@ def test_print_mode(tmp_path: Path) -> None:
     assert not (root / "docs").exists()
 
 
+def test_as_of_extends_open_bars_and_check_keeps_it(tmp_path: Path) -> None:
+    root = _phx_repo(tmp_path)
+    assert run(root, "--write", "--as-of", "2026-10-21 16:00 CDT").returncode == 0
+    text = (root / "XYZ_IMPLEMENTATION_PLAN.md").read_text()
+    assert "as of 2026-10-21 16:00 CDT" in text  # 05 is open: its bar now runs to 16:00
+    assert run(root, "--check").returncode == 0  # the recorded as-of is kept, not recomputed
+    # an earlier time than the latest recorded event is ignored
+    assert run(root, "--write", "--as-of", "2026-10-01 00:00 CDT").returncode == 0
+    assert "as of 2026-10-21 12:00 CDT" in (root / "XYZ_IMPLEMENTATION_PLAN.md").read_text()
+
+
 @pytest.mark.parametrize(
     "mutate",
     [

@@ -199,8 +199,8 @@ waited and merged. It is **generated, never drawn by hand**, by `scripts/phase_t
   event, not the clock), so two runs give identical bytes.
 - **When it runs:** only on `main`, never on a phase branch, so parallel branches never conflict over it:
   after the merge at every close-out, in the `⛔` commit (block) and the resume commit, and before the
-  `/phase-add` planning commit. The claim commit stays status-only; the new bar appears at the next block,
-  resume or close-out. `/phase status` runs `--check` and reports "timeline stale" (expected right after a claim)
+  `/phase-add` planning commit. The claim commit stays status-only, but the next commit refreshes the timeline so the running
+  phase shows at once (`phx` also does it while a phase runs). `/phase status` runs `--check` and reports "timeline stale" (expected right after a claim)
   but never writes. **Conflict rule:** if the block or the SVG ever conflicts, take either side and re-run
   `--write`; never merge it by hand.
 - **Changing it:** the script is the same file in every repo. Improve it in the skill, then copy it over.

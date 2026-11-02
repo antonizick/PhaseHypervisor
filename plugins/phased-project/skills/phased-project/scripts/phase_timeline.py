@@ -482,7 +482,7 @@ class Builder:
         return min(times) if times else None
 
     # ---- build -------------------------------------------------------------------------
-    def build(self, prefix: str | None) -> Timeline:
+    def build(self, prefix: str | None, as_of_at: str | None = None) -> Timeline:
         phases: list[PhaseRecord] = []
         not_shown: list[str] = []
         not_started: list[str] = []
@@ -519,6 +519,10 @@ class Builder:
         if used:
             latest = max(used, key=lambda m: m.at)
             as_of = Moment(latest.at, self.clock.zone_for(latest.at))
+            # a later "now" lets an open bar grow between recorded events
+            later = self.clock.parse(as_of_at) if as_of_at else None
+            if later is not None and later.at > latest.at:
+                as_of = later
         zones = sorted({m.zone for m in used})
         return Timeline(prefix, phases, planning, not_started, not_shown, as_of, zones)
 
@@ -682,14 +686,14 @@ _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 BURST_GAP = timedelta(hours=2)
 
 
-def build_timeline(repo: Path) -> tuple[Timeline, Path, list[str], int]:
+def build_timeline(repo: Path, as_of: str | None = None) -> tuple[Timeline, Path, list[str], int]:
     plan, prefix = locate_plan(repo)
     lines = plan.read_text(encoding="utf-8").splitlines()
     rows, table_end = parse_phase_table(lines)
     entries = parse_phase_log(lines)
     builder = Builder(rows, entries, git_commits(repo))
     builder.clock.saw("\n".join(lines))
-    return builder.build(prefix), plan, lines, table_end
+    return builder.build(prefix, as_of), plan, lines, table_end
 
 
 # ------------------------------------------------------------------------------------- spans/axis
@@ -1537,9 +1541,19 @@ def final_report(repo: Path, prefix: str | None) -> Path | None:
     return None
 
 
-def outputs(repo: Path, gap_minutes: int, vault_note: Path | None) -> dict[Path, str]:
+def recorded_as_of(plan: Path) -> str | None:
+    """The "as of" stamp the plan's generated block already carries, if any."""
+    text = plan.read_text(encoding="utf-8")
+    start = text.find(_START_PREFIX)
+    m = re.search(rf"as of ({_TS})", text[start:]) if start >= 0 else None
+    return m.group(1) if m else None
+
+
+def outputs(
+    repo: Path, gap_minutes: int, vault_note: Path | None, as_of: str | None = None
+) -> dict[Path, str]:
     """Every output file and the full text it should have."""
-    tl, plan, _lines, table_end = build_timeline(repo)
+    tl, plan, _lines, table_end = build_timeline(repo, as_of)
     svg_path = repo / "docs" / (f"{tl.prefix}_TIMELINE.svg" if tl.prefix else "TIMELINE.svg")
     result: dict[Path, str] = {svg_path: render_svg(tl, gap_minutes)}
     plan_text = plan.read_text(encoding="utf-8")
@@ -1575,6 +1589,12 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--print", action="store_true", help="print the block (default)")
     ap.add_argument("--vault-note", type=Path, help="also update this note (no image)")
     ap.add_argument("--gap-minutes", type=int, default=60, help="idle gap to collapse (60)")
+    ap.add_argument(
+        "--as-of",
+        metavar="TS",
+        help="draw open bars up to this time (YYYY-MM-DD HH:MM TZ) if later than the "
+        "latest recorded event; --check keeps the time the block already records",
+    )
     args = ap.parse_args(argv)
     if args.gap_minutes < 1:
         print("phase_timeline: --gap-minutes must be at least 1", file=sys.stderr)
@@ -1582,7 +1602,10 @@ def main(argv: list[str] | None = None) -> int:
     repo = args.repo.resolve()
     try:
         if args.write or args.check:
-            wanted = outputs(repo, args.gap_minutes, args.vault_note)
+            as_of = args.as_of
+            if as_of is None and args.check:
+                as_of = recorded_as_of(locate_plan(repo)[0])
+            wanted = outputs(repo, args.gap_minutes, args.vault_note, as_of)
         else:
             tl, _plan, _lines, _end = build_timeline(repo)
             svg = f"docs/{tl.prefix}_TIMELINE.svg" if tl.prefix else "docs/TIMELINE.svg"

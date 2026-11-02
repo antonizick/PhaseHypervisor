@@ -4,6 +4,9 @@ All notable changes to PhaseHypervisor are recorded here. The format follows [Ke
 
 ## [Unreleased]
 
+### Fixed
+- The generated timeline now stays current while a project builds. Before, only an agent following prose refreshed it, and only at close-out, block and resume, so the phase in progress never appeared and nothing repaired a missed refresh. `phx` now refreshes it itself on a clean `main` (`src/phx/timeline.py`): within a minute of any recorded change (including the claim), after every session ends and when a run ends, and it redraws open bars at least every 30 minutes, always as its own `docs(plan): refresh timeline` commit. `scripts/phase_timeline.py` gains `--as-of TS` (the caller supplies the time, the generator still never reads the clock; `--check` keeps the recorded as-of). The shared instructions also tell agents to refresh right after the claim commit. ADR-0030.
+
 ### Added
 - Phase 12a: the method is shareable. The `phased-project` skill (with its templates, which write each repo's `/phase` and `/phase-add`) and the `/phx` command now live in this repo as a Claude Code plugin: marketplace `phasehypervisor` (`.claude-plugin/marketplace.json`), plugin `phased-project` 0.1.0 (`plugins/phased-project/`). Install with `/plugin install phased-project --marketplace antonizick/PhaseHypervisor` (names are namespaced: `/phased-project:phased-project`, `/phased-project:phx`) or by copying two paths into `~/.claude`. New public guide `docs/PHX_GETTING_STARTED.md` and `examples/CLAUDE.user.md` (optional settings and standing rules). `tests/test_plugin_package.py` (manifests, rendering with and without settings, deny-list, fixed contract text, regression against the pre-12a skill, fresh-`HOME` install by the guide). ADR-0024; spec amendment R23.
 

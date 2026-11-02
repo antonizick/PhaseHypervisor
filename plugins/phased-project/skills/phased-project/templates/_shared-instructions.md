@@ -67,7 +67,7 @@ A question is **open** while its Status cell starts with `Open`; `Answered …`,
 ## 4a. Visual timeline (`scripts/phase_timeline.py`)
 The plan's `## Timeline` block, `docs/{{PREFIX}}_TIMELINE.svg`{{#VAULT}}, the vault note's timeline{{/VAULT}} and the final report's timeline (once it exists) are generated. Refresh them **only on `main`, never on a phase branch**, so parallel branches never conflict over them:
 `python3 scripts/phase_timeline.py --write{{#VAULT}} --vault-note "{{VAULT_NOTE_PATH}}"{{/VAULT}}`, then commit the plan, the SVG and the final report (if present) together: `docs(plan): refresh timeline`.
-- When: after the merge at close-out, after the `⛔` commit (§1b) and after the resume commit. The claim commit stays status-only; the new bar appears at the next block, resume or close-out.
+- When: after the merge at close-out, after the `⛔` commit (§1b) and after the resume commit. The claim commit stays status-only, but refresh in its own `docs(plan): refresh timeline` commit right after it so the running phase shows at once. Under `phx` the supervisor also does this itself while a phase runs, so a miss here is repaired.
 - If the block or the SVG ever conflicts, take either side and re-run `--write`; never merge it by hand.
 - `python3 scripts/phase_timeline.py --check` exits 1 when the outputs are stale (right after a claim this is expected).
 

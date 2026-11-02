@@ -13,6 +13,7 @@
 | Supervisor | `supervisor.py`, `locks.py`, `state.py`, `notify.py`, `vault.py`, `detach.py` | 07 | `phx run / status / resume / stop / log / answer`, locks, state, waits, notifications, detached runs, vault summary |
 | Preflight | `preflight.py`, `prompts/PHX_preflight.md` | 08 | one interactive question sweep before a hands-off run; staleness check in `phx run` |
 | Live progress | `progress.py` | 12d | stream-event-derived session activity, step counts, ETA and stall warnings for `phx status` and `phx watch` |
+| Timeline upkeep | `timeline.py` | ad hoc (ADR-0030) | best-effort refresh of the project's generated timeline on a clean `main`: when stale (claim, close-out), after each session, at run end, and every 30 min to extend open bars; one `docs(plan): refresh timeline` commit each; never raises |
 | Method package (plugin) | `.claude-plugin/marketplace.json`, `plugins/phased-project/` | 12a | the `phased-project` skill and templates (which write each repo's `/phase` and `/phase-add`) and `/phx`, as a Claude Code plugin; not Python, not imported by `phx` |
 
 ## Phase 02 modules (built)

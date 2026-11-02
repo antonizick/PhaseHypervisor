@@ -109,7 +109,7 @@ Runtime state lives outside the repo: `~/.local/state/phx/<repo-name>/` (`run.js
 ## 4a. Visual timeline (`scripts/phase_timeline.py`, ADR-0027)
 The plan's `## Timeline` block, `docs/PHX_TIMELINE.svg`, the vault note's timeline and `docs/PHX_FINAL-REPORT.md` §5 are generated. Refresh them **only on `main`, never on a phase branch**, so parallel branches never conflict over them:
 `python3 scripts/phase_timeline.py --write --vault-note "/home/nick/Documents/02 Projects/PHX Implementation Plan.md"`, then commit the plan, the SVG and the final report together: `docs(plan): refresh timeline`.
-- When: after the merge at close-out, after the `⛔` commit (§1b) and after the resume commit. The claim commit stays status-only; the new bar appears at the next block, resume or close-out.
+- When: after the merge at close-out, after the `⛔` commit (§1b) and after the resume commit. The claim commit stays status-only, but refresh in its own `docs(plan): refresh timeline` commit right after it so the running phase shows at once. Under `phx` the supervisor also does this itself while a phase runs, so a miss here is repaired.
 - If the block or the SVG ever conflicts, take either side and re-run `--write`; never merge it by hand.
 - `python3 scripts/phase_timeline.py --check` exits 1 when the outputs are stale (right after a claim this is expected).
 - The script is the skill's `plugins/phased-project/skills/phased-project/scripts/phase_timeline.py`; the two copies stay byte-identical (a test checks this).

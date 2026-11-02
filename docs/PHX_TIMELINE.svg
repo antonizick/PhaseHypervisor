@@ -54,25 +54,25 @@
 <g id="tl-p00"><title>Planning &amp; spec refinement: 2026-10-26 08:27 CDT to 2026-10-26 08:35 CDT (8 m)</title>
 <rect class="pl" x="302.7" y="171" width="7.2" height="14" rx="3"/>
 </g>
-<text class="t2" x="302.7" y="162" font-size="11">00</text>
+<text class="t2" x="302.7" y="162" font-size="11">00 Planning &amp; spec refinement</text>
 <g id="tl-plan1"><title>Phase 12a inserted: 2026-10-27 05:11 CDT to 2026-10-27 05:16 CDT (5 m)</title>
 <rect class="pl" x="813.4" y="171" width="5.6" height="14" rx="3"/>
 </g>
-<text class="t2" x="813.4" y="162" font-size="11">+12a</text>
+<text class="t2" x="813.4" y="162" font-size="11">Phase 12a insert…</text>
 <g id="tl-pf-064a25a"><title>phx preflight: 2026-10-27 05:28 CDT</title>
 <path class="pl" d="M832.5 171l7 7l-7 7l-7-7z"/>
 </g>
 <g id="tl-plan2"><title>Phases 12b and 12c inserted: 2026-10-31 10:00 CDT to 2026-10-31 10:06 CDT (6 m)</title>
 <rect class="pl" x="925.7" y="171" width="6.1" height="14" rx="3"/>
 </g>
-<text class="t2" x="925.7" y="162" font-size="11">+12b, 12c</text>
+<text class="t2" x="925.7" y="162" font-size="11">Phases 12b and 12c insert…</text>
 <g id="tl-pf-e4af278"><title>phx preflight: 2026-10-31 10:21 CDT</title>
 <path class="pl" d="M947.1 171l7 7l-7 7l-7-7z"/>
 </g>
 <g id="tl-plan3"><title>Phase 12d inserted: 2026-10-31 19:20 CDT to 2026-10-31 19:26 CDT (6 m)</title>
 <rect class="pl" x="1089.5" y="171" width="7" height="14" rx="3"/>
 </g>
-<text class="t2" x="1089.5" y="162" font-size="11">+12d</text>
+<text class="t2" x="1089.5" y="162" font-size="11">Phase 12d i…</text>
 <line class="sep" x1="24" x2="1176" y1="192" y2="192" stroke-width="1"/>
 <text class="t1" x="24" y="210" font-size="12" font-weight="600">01</text>
 <text class="t2" x="58" y="210" font-size="12">Repository foundation &amp; governance</text>

@@ -37,6 +37,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0031 | 2026-11-05 02:26 CST | README benefits: real unedited P11 timeline snapshot as lead example, native status-table excerpt, short first-person note signed by handle only | Accepted | 12e |
 | ADR-0032 | 2026-11-05 04:06 CST | `phx report`: read-only aggregation of the existing `run.jsonl` records across projects, deterministic evidence-cited recommendations (no LLM), terminal/JSON/Markdown/vault/SVG outputs, honest about manual sessions and list-price cost | Accepted | 12f |
 | ADR-0033 | 2026-11-05 04:55 CST | `phx report` charges each run its increase over a resumed session's running totals, keeps cost with no known price apart, and also counts a completion found on resume | Accepted | 12f |
+| ADR-0034 | 2026-11-05 05:21 CST | `phx report` project summaries: README opening as the description, `phx` and manual phases listed for the window, reads each repo's `main` (amends ADR-0032's data-source row), resource totals stay `phx`-only | Accepted | 12g |
 
 ---
 
@@ -615,3 +616,19 @@ A fourth: a verification killed by SIGTERM logs `verify` outcome `failed`, and t
 
 **Consequences.** Non-completing cost is a lower bound (R2 says so), and a chain's cost can land on a later provider's row. The report reads no new field, so `run.jsonl` is unchanged. **Known gap, left out of scope by the phase prompt:** `PhaseTotals`, `phx status`, `run_end` and the vault run summary still sum running totals, so they overstate resumed phases; the report's header states the amount. A later phase should make them agree.
 
+## ADR-0034: `phx report` describes projects from their READMEs and lists `phx` and manual phases
+**Recorded.** 2026-11-05 05:21 CST (planning for Phase 12g)
+
+**Context.** Nick asked that `phx report` summarise the projects and their descriptions for the period it covers. `run.jsonl` holds neither descriptions nor phase names, and ADR-0032 limited the reporter to it. Manual `/phase` work leaves no run log but does appear in the plan's Phase Log. The reporter calls no model, so a description has to be extracted.
+
+| Decision | Option | Pros | Cons |
+|---|---|---|---|
+| Description | **A. README opening on `main`** (chosen) | Works today with no setup; written for readers | The heuristic can pick an awkward sentence |
+| | B. Optional config `description`, then README | Exact wording on demand | One more setting to keep up |
+| | C. Plan or spec opening | Always present in phased repos | Written for agents; less readable |
+| Worked on | **A. `phx` and manual phases, manual tagged time only** (chosen) | Fullest picture of the period | Two sources, and a Phase Log parser in `src/phx` |
+| | B. `phx` phases only | Simple; consistent with the tables | A period of manual work looks empty |
+
+**Decision.** A on both rows (Nick, 2026-11-05 05:21 CST). This amends ADR-0032's data-source row: the reporter may also read `README.md` and the plan from each repo's `main`, read-only. Transcripts stay unread. Manual phases appear only in the new section, never in a total, rule or chart. README and plan text are untrusted and are sanitised before output. `--no-repos` keeps logs-only output.
+
+**Consequences.** The report now depends on repos being present; a missing one is a note, not a failure. Projects with no state directory stay invisible. A poor description is fixed by editing the README's opening paragraph. Real descriptions go only to the terminal and the vault note, never into public files.

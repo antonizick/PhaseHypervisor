@@ -19,6 +19,7 @@ from phx.report import projects as P
 from phx.report import render as R
 from phx.report import rules as RU
 from phx.report import svg as S
+from phx.vault import vault_root
 from report_events import DAY
 
 STATE = ev.FIXTURES
@@ -906,3 +907,10 @@ def test_never_writes_under_the_state_root(
 def test_global_state_dir_works_too(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--state-dir", str(STATE), "report"]) == 0
     assert "2 project(s)" in capsys.readouterr().out
+
+
+def test_tests_cannot_reach_the_real_vault() -> None:
+    """Phase 12h: a default `phx report` writes to the vault, so this must never be real."""
+    root = vault_root()
+    assert root != Path.home() / "Documents"
+    assert not root.exists()

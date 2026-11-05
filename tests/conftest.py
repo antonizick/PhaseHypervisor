@@ -30,6 +30,12 @@ def _isolated_git(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(key, value)
 
 
+@pytest.fixture(autouse=True)
+def _isolated_vault(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Point the vault at a path that does not exist, so no test reaches the real one."""
+    monkeypatch.setenv("PHX_VAULT_ROOT", str(tmp_path / "no-vault"))
+
+
 @pytest.fixture
 def make_repo(tmp_path: Path) -> RepoFactory:
     """Build a git repo on ``main`` from a fixture folder and/or ``{path: text}``."""

@@ -5,7 +5,7 @@
 Status: v0.1.0, public. The [final report](docs/PHX_FINAL-REPORT.md) has the definition-of-done evidence, measured results and known limitations.
 
 ## Why use it
-PHX is built on the `phased-project` method: a spec, a plan of phases, and one self-contained prompt per phase, each run in its own Claude Code session on the model the plan names. You get three things out of it. They come from the method, so they work with manual `/phase` runs too; `phx` adds the hands-off runner on top.
+PHX is built on the `phased-project` method: a spec, a plan of phases, and one self-contained prompt per phase, each run in its own Claude Code session on the model the plan names. You get five things out of it. The documentation, charts, timeline and security phase come from the method, so they work with manual `/phase` runs too; `phx` adds the hands-off runner and the per-run cost and token records.
 
 ### Documentation that stays accurate
 Every project gets a spec with amendments, an ADR log, a plan, self-contained phase prompts, a timestamped Phase Log and, at the end, a final report. Updating them is a required step of closing a phase, so they are kept current as the work goes rather than written afterwards. [Project P11](https://github.com/antonizick/project1111) (a local image studio, built with this method) is a public example: its [plan](https://github.com/antonizick/project1111/blob/main/P11_IMPLEMENTATION_PLAN.md), [48 ADRs](https://github.com/antonizick/project1111/blob/main/docs/P11_DECISIONS.md), [phase prompts](https://github.com/antonizick/project1111/tree/main/prompts), [threat model](https://github.com/antonizick/project1111/blob/main/docs/P11_THREAT-MODEL.md) and [final report](https://github.com/antonizick/project1111/blob/main/docs/P11_FINAL-REPORT.md) are all there to read.
@@ -43,6 +43,14 @@ Its summary totals: elapsed 2 d 17 h, active phase time 1 d 20 h, blocked or pau
 
 Regenerated whenever a phase is claimed, blocked, resumed or closed; see the plan's [Timeline](PHX_IMPLEMENTATION_PLAN.md#timeline).
 </details>
+
+### Security posture built into the plan
+Every plan the method writes includes a hardening phase just before the release: a written threat model, scanners, security review and QA. The release phase depends on it, and the plan's dependencies (which `phx` enforces) keep it from starting first. Findings are recorded and resolved in the plan (as ADRs and Phase Log follow-ups) rather than left in someone's head. PHX did this for itself: see its [threat model](docs/PHX_THREAT_MODEL.md) and [SECURITY.md](SECURITY.md). Because agents may run with bypassed permissions, `phx` also stops and asks, or blocks the phase with a question in hands-off mode, before any action that looks high-risk or irreversible.
+
+### Resource use you can measure and tune
+Time is recorded for every phase and planning session: a timestamped Timeline bullet in the Phase Log, drawn on the chart above. The plan names the model for each phase, so model choice is on the record. When `phx` runs the phases, it also logs every decision with its reason to `~/.local/state/phx/<repo>/run.jsonl`, keeps tokens, cost and sessions per phase in `state.json`, and appends a run summary to your project note. After a project you can see where the hours, models, tokens and dollars went, and decide where a cheaper model or a smaller phase would have done the job.
+
+Those records are plain JSONL and Markdown, so month-to-month and quarter-to-quarter trends in time, cost, completed phases and cost per phase are a short script away. PHX does not yet ship a trend report of its own.
 
 > I've used this method on several projects now. The timeline is my favourite part: it shows planning and each phase of the build, including the idle gaps and the blocked stretches.
 > — `antonizick`

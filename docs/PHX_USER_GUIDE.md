@@ -138,6 +138,103 @@ phx log ~/Work/YTPL2 -n 0 --json   # everything, raw JSON
 ```
 `~/.local/state/phx/<repo-name>/run.jsonl` holds every decision with its reason: `run_start`, `plan` (next eligible phase and why each other phase waits), `select` (what runs and why), `session_dropped` (a recorded session forgotten because its phase was finished outside PHX), `launch` (full command line, provider), `progress` (what the running session is doing, at most every `progress_interval_s` and at once on a stage change: stage, last tool, step counts, tokens, cost, last-event age, ETA; Phase 12d), `warning` (an unsupported test command, a stale preflight, or a session quiet for longer than expected — once per quiet spell, naming any long tool in flight), `session_end` (exit class, tokens, cost; a session stopped or cut off by a limit before its final result event counts the tokens of its turns, with cost unknown), `verify`, `decision`, `retry`, `wait_start`, `provider_check`, `provider_switch`, `wake`, `probe`, `wait_extend`, `wait_end`, `notify`, `run_end` (finished, paused, stopped or failed, with the reason and totals), `vault`. Session transcripts are in `sessions/<phase>-<n>.jsonl` beside it, and the current state in `state.json`. Everything is redacted before it is written.
 
+## `phx report`: where the time and money went
+```bash
+phx report                          # every project, by month; the pilot sandbox left out
+phx report --by quarter             # or --by year
+phx report my-repo other-repo       # named repos (a name or a path)
+phx report --all --exclude my-repo  # --all includes the pilot sandbox
+phx report --since 2026-Q3 --until 2026-11-30   # YYYY-MM-DD, YYYY-MM, YYYY-Qn or YYYY
+phx report --json                   # the schema 1 document below
+phx report --markdown report.md     # or --markdown alone to print it
+phx report --svg charts/            # four SVG charts
+phx report --vault                  # a new timestamped note in the vault
+```
+Read-only, offline and quick: it reads `run.jsonl`, never the session transcripts, calls no model and writes nothing under the state root. `--state-root PATH` reads another root, and `--top N` sets the rows per table (default 10). `--svg` and `--vault` work alongside any output form. `--vault` writes `04 Resources/PHX Reports/PHX Report YYYY-MM-DD HHMM.md` under `PHX_VAULT_ROOT` (default `~/Documents`), links each project note it can find and never overwrites a file. Per-project figures belong there, not in a public repo.
+
+**What it cannot see.** Only sessions `phx` launched are measured. Manual `/phase` sessions leave no token or cost record, so they are absent, not estimated.
+
+### What the numbers mean
+| Figure | Definition |
+|---|---|
+| Active time | Sum of `session_end.duration_s` |
+| Waiting | Usage-limit waits. A wait a stop interrupted ends at that stop; one still open is not counted |
+| Gate and other pauses | From a paused `run_end` to the project's next `run_start`, split into `review_gate`/`owner_gate` and the rest |
+| Completion | A `verify` with outcome `complete`, or a `session_dropped` that found the phase ✅, after at least one session of that phase. Reporting it again adds none |
+| First attempt | A completion with exactly one session and no retry or timeout |
+| Non-completing (`Lost`) | Tokens, cost and time of sessions whose class is not `complete` |
+| Cache-read share | Cache reads as a share of input, cache reads and cache writes |
+
+**Cost.** Cost is the list-price equivalent PHX recorded, not an invoice. Three things to know:
+- `~` marks a figure containing cost with no known price. For a model Claude Code does not know (typically through OpenRouter), `costBasis` is `unknown` and the figure is a fallback rate, not what the provider charged. The header gives the amount.
+- `unknown` means no cost was recorded. It is left out of sums, counted in `sessions_without_cost`, and never shown as `$0`.
+- A resumed session reports running totals for its session ID, so each run is charged its increase. A killed run reports nothing; its tokens are known from its messages, but its cost lands on the next run that reports one. So the non-completing cost share is a lower bound. The header states how much repeated cost was removed. That amount is still inside `phx status` and `run_end`, which is why they can show more than this report.
+
+**Tables.** A session counts under its primary model (most tokens) for sessions and active time; tokens and cost go to the model that used them, so every table adds up to the totals. Periods with no data are shown as such, and the change column reads `n/a` with no previous period or a previous value of zero.
+
+### Reading a recommendation
+Each one names its rule, its evidence, an action and the threshold that fired:
+```text
+[R2 advice] A large share of spend went to sessions that did not complete their phase
+  - 3 of 10 sessions did not complete: 1 usage_limit, 2 timeout
+  - 24% of known cost ($6.00) and 41% of active time (2h 10m); cost is a lower bound
+  - sample-project 07: 2 session(s), 1h 30m
+  Action: Read `phx log` for those phases: split work that outruns a session or usage window...
+  Fired on: non-completing share of cost or time >= 20%
+```
+The rules advise; nothing changes the plan or `.phx/config.toml`. To disagree with one, check its evidence against `phx log`, then ignore it: a recommendation is a fixed rule over the numbers and knows nothing of why a phase was hard. A rule short of data says `not enough data for <rule> (n, needs m)` rather than guessing, and with nothing to report the section says `Nothing crossed a threshold.`
+
+| Rule | Fires when | Minimum sample |
+|---|---|---|
+| R1 cost concentration | A phase costs at least 3× its model's median and $2 above it | 5 phases per model |
+| R2 non-completing spend | At least 20% of cost or active time | 10 sessions |
+| R3 model fit | Strongest model: first attempt, at most half the median cost, at most 30 min (fully priced phases only). Balanced model: at least 2 non-completing sessions or blocks. Advisory wording only | 5 phases per tier |
+| R4 cache efficiency | Cache-read share under 50% on a model with at least 1M tokens | 5 sessions |
+| R5 waiting | Waits at least 25% of active plus waiting time (with a time pattern when 60% of 5 or more waits share a slot); or a median gate pause of at least 4 h | 3 waits; 3 gate pauses |
+| R6 timeouts | At least 3 idle kills and half those phases later completed; a session within 10% of the wall cap; or the longest session at most 25% of the cap | 20 sessions for the last |
+| R7 trend | Cost per phase or non-completing share up at least 10% twice running | 3 periods of 3 sessions |
+| R8 providers | Session completion rates at least 25 points apart. The table is always shown | 2 providers of 10 sessions |
+
+The thresholds and the reason for each live in one table at the top of `src/phx/report/rules.py`, and `--json` prints them.
+
+### Example (synthetic data)
+```text
+PHX report: 2 project(s), start to latest, by quarter, data through 2026-07-01 00:01 UTC
+...
+By quarter
+Period      Cost   Change  Tokens  Active  Done  Cost/phase   Change  Lost
+2025-Q4    $2.00      n/a     10k     10m     1       $2.00      n/a    0%
+2026-Q1    $8.50  ▲ +325%     32k     40m     2       $4.25  ▲ +112%   35%
+2026-Q2   ~$9.00    ▲ +6%     20k     20m     2       $4.50    ▲ +6%    0%
+2026-Q3  unknown      n/a       0     10m     0     unknown      n/a   n/a
+
+By model
+Model               Sessions  Tokens     Cost  Cost share  Active  Done  Cache read
+claude-opus-5-5            5     49k   $14.50         74%     50m     4         93%
+vendor/other-model         1     10k   ~$5.00         26%     10m     1         92%
+opus (alias)               2    3.1k  unknown         n/a     20m     0         98%
+```
+
+### `--json` (schema 1)
+Top-level keys: `schema` (1), `scope`, `caveats`, `totals`, `periods`, `models`, `providers`, `projects`, `phases`, `recommendations`, `not_enough_data`, `thresholds`, `warnings`. Each row holds the same fields as `totals`; a period adds `period`, `has_data`, `change` and `cost_by_model`. Fields may be added within schema 1; a rename or removal raises it.
+```json
+{
+  "schema": 1,
+  "scope": {"projects": ["sample"], "by": "quarter", "since": null, "until": null,
+            "data_through": "2026-07-01 00:01 UTC", "open_spans": 0},
+  "totals": {"sessions": 8, "cost_usd": 19.5, "unverified_cost_usd": 5.0,
+             "sessions_without_cost": 2, "repeated_cost_usd": 3.0, "phases_completed": 5,
+             "tokens": {"input": 700, "output": 1300, "cache_read": 56000, "cache_write": 3700,
+                        "total": 61700},
+             "cost_per_phase": 3.9, "noncompleting_cost_share": 0.15, "...": "..."},
+  "recommendations": [{"id": "R2", "severity": "advice", "title": "...", "evidence": ["..."],
+                       "action": "...", "threshold": "..."}],
+  "thresholds": {"r2_share": {"value": 0.2, "reason": "one fifth lost is worth finding out why"}}
+}
+```
+
+**Charts.** `--svg DIR` writes `phx-report-cost.svg`, `-cost-per-phase.svg`, `-active-hours.svg` and `-model-mix.svg`, 830 px wide, following the viewer's light or dark mode. Each states its scope and data-through time, marks periods with no data and carries a plain-text line under the chart. The same logs give byte-identical files.
+
 ## Usage limits and switching provider
 When a Pro 5-hour or weekly limit stops a phase, PHX records the stop, notifies you with the resume time and waits: until the announced reset time plus 2 minutes, or 30 min, 1 h, 2 h, 4 h, then every 6 h when no reset time is given. Then one tiny `haiku` probe checks that capacity is back and the **same session** resumes (`--resume`). The wait survives suspend, `phx stop` and restarts.
 

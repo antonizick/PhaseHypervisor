@@ -50,7 +50,7 @@ Every plan the method writes includes a hardening phase just before the release:
 ### Resource use you can measure and tune
 Time is recorded for every phase and planning session: a timestamped Timeline bullet in the Phase Log, drawn on the chart above. The plan names the model for each phase, so model choice is on the record. When `phx` runs the phases, it also logs every decision with its reason to `~/.local/state/phx/<repo>/run.jsonl`, keeps tokens, cost and sessions per phase in `state.json`, and appends a run summary to your project note. After a project you can see where the hours, models, tokens and dollars went, and decide where a cheaper model or a smaller phase would have done the job.
 
-Those records are plain JSONL and Markdown, so month-to-month and quarter-to-quarter trends in time, cost, completed phases and cost per phase are a short script away. PHX does not yet ship a trend report of its own.
+`phx report` reads those records back: time, waits, models, tokens, cost and completed phases per month, quarter or year across every project, with the change from the previous period and recommendations from fixed rules that cite their numbers. It covers `phx`-launched sessions only (manual `/phase` sessions leave no token or cost record), it labels cost as a list-price equivalent rather than an invoice, and it calls no model.
 
 > I've used this method on several projects now. The timeline is my favourite part: it shows planning and each phase of the build, including the idle gaps and the blocked stretches.
 > — `antonizick`
@@ -95,6 +95,7 @@ Full details for every command are in [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUI
 | `phx status [<repo>]` | Run state, plus a live `Doing:` line with step counts, tokens, cost and an ETA range |
 | `phx watch <repo>` | One redrawing line of live progress; turns amber before the idle timeout |
 | `phx log [-f]` | The run's event log |
+| `phx report [<repo>…] [--all] [--by month\|quarter\|year] [--since X] [--until Y] [--json] [--markdown [PATH]] [--svg DIR] [--vault]` | Read-only resource trends and recommendations across runs and projects |
 | `phx answer <repo> <#> "<answer>"` / `phx resume` | Answer a blocking owner question and continue |
 | `phx stop` | Stop a run |
 | `/phx status\|run\|resume\|preflight [repo]` | The same from inside Claude Code (typed `/phased-project:phx` when installed as a plugin) |

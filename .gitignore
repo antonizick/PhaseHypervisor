@@ -18,6 +18,7 @@ venv/
 .phx/state*
 .phx/*.lock
 run.jsonl
+!tests/fixtures/report/state/*/run.jsonl
 sessions/
 *.session.jsonl
 

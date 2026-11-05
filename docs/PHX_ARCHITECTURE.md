@@ -1,6 +1,6 @@
 # PHX Architecture
 
-> Skeleton from Phase 01; Phase 02, 04, 05, 06, 07, 08, 11 and 12a components documented below. Each later phase fills in its components; keep this file in sync with the code.
+> Skeleton from Phase 01; Phase 02, 04, 05, 06, 07, 08, 11 and 12a, 12d and 12f components documented below. Each later phase fills in its components; keep this file in sync with the code.
 
 ## Components
 | Component | Module (planned) | Phase | Role |
@@ -13,6 +13,7 @@
 | Supervisor | `supervisor.py`, `locks.py`, `state.py`, `notify.py`, `vault.py`, `detach.py` | 07 | `phx run / status / resume / stop / log / answer`, locks, state, waits, notifications, detached runs, vault summary |
 | Preflight | `preflight.py`, `prompts/PHX_preflight.md` | 08 | one interactive question sweep before a hands-off run; staleness check in `phx run` |
 | Live progress | `progress.py` | 12d | stream-event-derived session activity, step counts, ETA and stall warnings for `phx status` and `phx watch` |
+| Resource report | `report/` (`load.py`, `model.py`, `rules.py`, `render.py`, `svg.py`) | 12f | read-only aggregation of `run.jsonl` into period trends and fixed-rule recommendations; terminal, JSON, Markdown, vault and SVG output |
 | Timeline upkeep | `timeline.py` | ad hoc (ADR-0030) | best-effort refresh of the project's generated timeline on a clean `main`: when stale (claim, close-out), after each session, at run end, and every 30 min to extend open bars; one `docs(plan): refresh timeline` commit each; never raises |
 | Method package (plugin) | `.claude-plugin/marketplace.json`, `plugins/phased-project/` | 12a | the `phased-project` skill and templates (which write each repo's `/phase` and `/phase-add`) and `/phx`, as a Claude Code plugin; not Python, not imported by `phx` |
 
@@ -277,6 +278,21 @@ stream events ──► ProgressTracker.feed (pure parsing, never raises)   tool
 - **Hooks are optional:** `run_session(on_progress=None, tracker=None)` keeps every existing caller and test unchanged; the supervisor passes its tracker so `_heartbeat` can refresh `state.progress` through the existing save path (no second writer). `state.progress` is cleared when a session ends and set to "waiting for capacity" during a usage-limit wait.
 - **`phx watch`** (`cli.py`): polls `state.json` and the lock every `WATCH_POLL_S` (5 s), redraws one line with `\r` (no cursor escapes), amber on a stall, normal lines for pause/wait transitions with the `phx resume`/`phx answer` hint, exits 0 on terminal states and Ctrl-C; `--json` prints one object per change. Pure helpers `watch_frame`, `watch_payload`, `watch_signature`, `watch_notice`.
 - **Nothing else changes:** no LLM call anywhere (ADR-0001), no change to `recover.py`, `verify.py`, the contract or `session_end`, and desktop progress notifications stay out of scope (declined by Nick 2026-10-31 19:22 CDT).
+
+## Phase 12f: resource report (`report/`, ADR-0032, ADR-0033, built)
+```text
+~/.local/state/phx/<repo>/run.jsonl  (read only; transcripts are never opened)
+  └─► load.py    tolerant reader: drops rehearsals, skips symlinks, bad lines become warnings
+  └─► model.py   extract(): one project's sessions and marks, chain state resolved first
+                 build(): apply the window, then Totals per period, project, model, provider, phase
+  └─► rules.py   THRESHOLDS plus R1..R8: pure functions, recommendations and "not enough data"
+  └─► render.py  Section list → terminal and Markdown; schema 1 JSON; timestamped vault note
+  └─► svg.py     four charts in the timeline's style
+```
+- **Attribution (ADR-0033).** A resumed session keeps its ID and reports running `cost_usd` and `usage.models`, so `extract()` charges each `session_end` the increase over its chain. This must run before any `--since` filter, or a window would treat a running total as new spend.
+- **One `Totals` class** serves every grouping, so tables add up by construction. A session counts under its primary model (most tokens) for time and session count; tokens and cost go to the model that used them.
+- **Output depends only on the logs.** "As of" is the newest record, not the clock, which is what makes SVG output byte-identical.
+- **Boundaries.** No import of the runner or supervisor, no provider call, and nothing written under the state root (a test runs it on a read-only tree).
 
 ## Interface with phase sessions
 PHX and a phase session talk only through the repo and one line of output, defined in [PHX_AUTO_MODE_CONTRACT.md](PHX_AUTO_MODE_CONTRACT.md) (contract version 1, Phase 03):

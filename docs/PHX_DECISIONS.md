@@ -36,6 +36,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0030 | 2026-11-02 15:34 CST | The supervisor refreshes the generated timeline itself (claim, every 60 s when stale, after each session, at run end, open bars every 30 min) on a clean `main`, in its own commit; `--as-of TS` for open bars; agents also refresh after the claim | Accepted | ad hoc fix |
 | ADR-0031 | 2026-11-05 02:26 CST | README benefits: real unedited P11 timeline snapshot as lead example, native status-table excerpt, short first-person note signed by handle only | Accepted | 12e |
 | ADR-0032 | 2026-11-05 04:06 CST | `phx report`: read-only aggregation of the existing `run.jsonl` records across projects, deterministic evidence-cited recommendations (no LLM), terminal/JSON/Markdown/vault/SVG outputs, honest about manual sessions and list-price cost | Accepted | 12f |
+| ADR-0033 | 2026-11-05 04:55 CST | `phx report` charges each run its increase over a resumed session's running totals, keeps cost with no known price apart, and also counts a completion found on resume | Accepted | 12f |
 
 ---
 
@@ -588,3 +589,29 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 
 **Decision.** A on every row (Nick, 2026-11-05 04:04 CST; the data-source row is the planning default). The report is read-only and never writes under the state root; a missing field is added to the existing event, additively, not to a new log. Unknown cost is never `$0`; cost is labelled list-price, not an invoice; the header says manual sessions are not measured. Thresholds sit in one table with a reason each; a rule below its minimum sample reports "not enough data". Recommendations are advisory: the command changes neither the plan nor `config.toml`.
 **Consequences.** Real figures and private repo names stay out of public files; public examples are synthetic. Per-project tables go only to the vault note. Manual-session usage stays a known gap (a possible later phase could estimate time from Phase Log Timeline bullets, but not tokens).
+
+## ADR-0033: `phx report` charges increases, separates unpriced cost, counts completions found on resume
+**Recorded.** 2026-11-05 04:55 CST (Phase 12f)
+
+**Context.** ADR-0032 and the phase prompt defined the figures as plain sums of `session_end`. The real logs disproved three assumptions:
+1. `--resume` keeps the session ID, and for such a session `cost_usd` and `usage.models` are running totals of the whole chain, while the top-level token counts cover that run only, sometimes only its last turns. Summing double-counts: on the reference data the plain sum, and PHX's own `run_end` totals, are well above the spend the chains report. The top-level tokens undercount: a resumed run can show a small fraction of what its per-model totals gained.
+2. A killed run has no result, so it reports cost unknown; its spend reappears in the next snapshot of the chain. Token arithmetic confirms this exactly (killed run plus next run's top-level counts equals the next snapshot).
+3. For a model Claude Code does not know, `costBasis` is `unknown` and `costUSD` is a fallback rate (the figures match Opus rates exactly), so it is not what OpenRouter charged. It was a large part of the reference data.
+
+A fourth: a verification killed by SIGTERM logs `verify` outcome `failed`, and the resume logs `session_dropped` "phase NN is ✅ Complete", so counting only `verify` missed a completed phase.
+
+| Decision | Option | Pros | Cons |
+|---|---|---|---|
+| Attribution | **A. Charge the per-model increase along the chain** (chosen) | Matches the chain's real total; fits resumes across providers; correct under `--since` | Needs chain state; a killed run's cost lands on the next run |
+| | B. Sum `session_end` as the prompt says | Simple | Overstates every resumed phase |
+| | C. Sum per-message usage from transcripts | Finest | Forbidden by ADR-0032, and gives no cost |
+| Unknown-basis cost | **A. Include it, mark it `~`, state the amount** (chosen) | Honest; no pricing table; totals still match the logs | Totals mix two kinds of figure |
+| | B. Exclude it | Purer total | Hides real recorded spend |
+| | C. Reprice it | Could approach the true charge | Pricing tables are out of scope (phase prompt) |
+| Completion | **A. `verify` complete or `session_dropped` ✅, after a session of that phase** (chosen) | Counts the interrupted case; repeats add none, across resumes too | Goes past the prompt's wording |
+| | B. `verify` only, once per run | The prompt's wording | Misses real completions; a resume is a new run, so per-run dedupe misses repeats |
+
+**Decision.** A on every row. A run with no usable totals is charged the tokens it summed from messages, with cost unknown, and those tokens are removed from the next increase; a limit's all-zero placeholder entry counts as no totals. `run_end.phases` is not used. Records without `costBasis` count as priced only for `claude-*` models. R3 compares only phases with fully priced cost, and its action points to the plan's rationale rather than quoting it, because the reporter reads only `run.jsonl`.
+
+**Consequences.** Non-completing cost is a lower bound (R2 says so), and a chain's cost can land on a later provider's row. The report reads no new field, so `run.jsonl` is unchanged. **Known gap, left out of scope by the phase prompt:** `PhaseTotals`, `phx status`, `run_end` and the vault run summary still sum running totals, so they overstate resumed phases; the report's header states the amount. A later phase should make them agree.
+

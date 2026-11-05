@@ -1,0 +1,39 @@
+{"epoch": 1767052800.0, "event": "run_start", "phase": null, "reason": "", "run_id": "r1767052800", "repo": "/repos/sample", "options": {"dry_run": false}}
+{"epoch": 1767052900.0, "event": "launch", "phase": "01", "reason": "fresh session", "session_id": "s1", "argv": ["ai-provider", "run", "--model", "opus"], "provider": "anthropic", "idle_timeout_s": 1800, "wall_timeout_s": 21600}
+{"epoch": 1767053500.0, "event": "session_end", "phase": "01", "reason": "", "session_id": "s1", "duration_s": 600.0, "class": "complete", "cost_usd": 2.0, "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0, "cost_usd": 2.0, "models": {"claude-opus-5-5": {"inputTokens": 100, "outputTokens": 200, "cacheReadInputTokens": 9000, "cacheCreationInputTokens": 700, "costUSD": 2.0, "costBasis": "list"}}}}
+{"epoch": 1767053510.0, "event": "verify", "phase": "01", "reason": "", "outcome": "complete"}
+{"epoch": 1767053700.0, "event": "run_end", "phase": null, "reason": "", "status": "finished", "rule": "all_complete"}
+{"epoch": 1767312000.0, "event": "dry_run", "phase": null, "reason": "", "steps": []}
+{"epoch": 1767311500.0, "event": "run_start", "phase": null, "reason": "", "run_id": "r1767311500", "repo": "/repos/sample", "options": {"dry_run": true}}
+{"epoch": 1767311600.0, "event": "launch", "phase": "99", "reason": "fresh session", "session_id": "ghost", "argv": ["ai-provider", "run", "--model", "opus"], "provider": "anthropic", "idle_timeout_s": 1800, "wall_timeout_s": 21600}
+{"epoch": 1767311700.0, "event": "session_end", "phase": "99", "reason": "", "session_id": "ghost", "duration_s": 600.0, "class": "complete", "cost_usd": 500.0, "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0, "cost_usd": 500.0, "models": {"claude-opus-5-5": {"inputTokens": 100, "outputTokens": 200, "cacheReadInputTokens": 9000, "cacheCreationInputTokens": 700, "costUSD": 500.0, "costBasis": "list"}}}}
+{"epoch": 1767311800.0, "event": "run_end", "phase": null, "reason": "", "status": "finished", "rule": "all_complete"}
+{"epoch": 1767312000.0, "event": "run_start", "phase": null, "reason": "", "run_id": "r1767312000", "repo": "/repos/sample", "options": {"dry_run": false}}
+{"epoch": 1767312100.0, "event": "launch", "phase": "02", "reason": "fresh session", "session_id": "s2", "argv": ["ai-provider", "run", "--model", "opus"], "provider": "anthropic", "idle_timeout_s": 1800, "wall_timeout_s": 21600}
+{"epoch": 1767312700.0, "event": "session_end", "phase": "02", "reason": "", "session_id": "s2", "duration_s": 600.0, "class": "usage_limit", "cost_usd": 3.0, "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0, "cost_usd": 3.0, "models": {"claude-opus-5-5": {"inputTokens": 100, "outputTokens": 200, "cacheReadInputTokens": 9000, "cacheCreationInputTokens": 700, "costUSD": 3.0, "costBasis": "list"}}}}
+{"epoch": 1767312701.0, "event": "wait_start", "phase": "02", "reason": ""}
+{"epoch": 1767316301.0, "event": "wait_end", "phase": "02", "reason": "", "waited_s": 3600.0}
+{"epoch": 1767316302.0, "event": "retry", "phase": "02", "reason": ""}
+{"epoch": 1767316303.0, "event": "launch", "phase": "02", "reason": "fresh session", "session_id": "s2", "argv": ["ai-provider", "run", "--model", "opus"], "provider": "anthropic", "idle_timeout_s": 1800, "wall_timeout_s": 21600}
+{"epoch": 1767317000.0, "event": "timeout", "phase": "02", "reason": "idle timeout; stopping process group"}
+{"epoch": 1767317001.0, "event": "session_end", "phase": "02", "reason": "", "session_id": "s2", "duration_s": 600.0, "class": "timeout", "cost_usd": null, "usage": {"input_tokens": 10, "output_tokens": 20, "cache_read_input_tokens": 3000, "cache_creation_input_tokens": 40, "cost_usd": null, "models": {}}}
+{"epoch": 1767317002.0, "event": "retry", "phase": "02", "reason": ""}
+{"epoch": 1767317003.0, "event": "launch", "phase": "02", "reason": "fresh session", "session_id": "s2", "argv": ["ai-provider", "run", "--model", "opus"], "provider": "anthropic", "idle_timeout_s": 1800, "wall_timeout_s": 21600}
+{"epoch": 1767318000.0, "event": "session_end", "phase": "02", "reason": "", "session_id": "s2", "duration_s": 600.0, "class": "complete", "cost_usd": 7.0, "usage": {"input_tokens": 5, "output_tokens": 6, "cache_read_input_tokens": 7, "cache_creation_input_tokens": 8, "cost_usd": 7.0, "models": {"claude-opus-5-5": {"inputTokens": 300, "outputTokens": 500, "cacheReadInputTokens": 20000, "cacheCreationInputTokens": 900, "costUSD": 7.0, "costBasis": "list"}}}}
+{"epoch": 1767318010.0, "event": "verify", "phase": "02", "reason": "", "outcome": "complete"}
+{"epoch": 1767318020.0, "event": "run_end", "phase": null, "reason": "", "status": "paused", "rule": "review_gate"}
+{"epoch": 1775088000.0, "event": "run_start", "phase": null, "reason": "", "run_id": "r1775088000", "repo": "/repos/sample", "options": {"dry_run": false}}
+{"epoch": 1775088000.0, "event": "resume", "phase": "02", "reason": ""}
+{"epoch": 1775088001.0, "event": "verify", "phase": "02", "reason": "", "outcome": "complete"}
+{"epoch": 1775088100.0, "event": "launch", "phase": "03", "reason": "fresh session", "session_id": "s3", "argv": ["ai-provider", "run", "--model", "opus"], "provider": "anthropic", "idle_timeout_s": 1800, "wall_timeout_s": 21600}
+{"epoch": 1775088700.0, "event": "session_end", "phase": "03", "reason": "", "session_id": "s3", "duration_s": 600.0, "class": "complete", "cost_usd": 4.0, "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0, "cost_usd": 4.0, "models": {"claude-opus-5-5": {"inputTokens": 100, "outputTokens": 200, "cacheReadInputTokens": 9000, "cacheCreationInputTokens": 700, "costUSD": 4.0, "costBasis": "list"}}}}
+{"epoch": 1775088710.0, "event": "verify", "phase": "03", "reason": "", "outcome": "complete"}
+{"epoch": 1775088900.0, "event": "run_end", "phase": null, "reason": "", "status": "finished", "rule": "all_complete"}
+{"epoch": 1782777600.0, "event": "run_start", "phase": null, "reason": "", "run_id": "r1782777600", "repo": "/repos/sample", "options": {"dry_run": false}}
+{"epoch": 1782777700.0, "event": "launch", "phase": "04", "reason": "fresh session", "session_id": "s4", "argv": ["ai-provider", "run", "--model", "sonnet"], "provider": "openrouter", "idle_timeout_s": 1800, "wall_timeout_s": 21600}
+{"epoch": 1782778500.0, "event": "session_end", "phase": "04", "reason": "", "session_id": "s4", "duration_s": 600.0, "class": "complete", "cost_usd": 5.0, "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0, "cost_usd": 5.0, "models": {"vendor/other-model": {"inputTokens": 100, "outputTokens": 200, "cacheReadInputTokens": 9000, "cacheCreationInputTokens": 700, "costUSD": 5.0, "costBasis": "unknown"}}}}
+{"epoch": 1782778510.0, "event": "verify", "phase": "04", "reason": "", "outcome": "complete"}
+{"epoch": 1782778600.0, "event": "launch", "phase": "05", "reason": "fresh session", "session_id": "s5", "argv": ["ai-provider", "run", "--model", "opus"], "provider": "anthropic", "idle_timeout_s": 1800, "wall_timeout_s": 21600}
+{"epoch": 1782864060.0, "event": "session_end", "phase": "05", "reason": "", "session_id": "s5", "duration_s": 600.0, "class": "crash", "cost_usd": null, "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0, "cost_usd": null, "models": {}}}
+{"epoch": 1782864120.0, "event": "run_end", "phase": null, "reason": "", "status": "finished", "rule": "all_complete"}
+{"epoch": 17, "event": "trunca

@@ -36,6 +36,11 @@ from phx.plan import (
 )
 from phx.preflight import PreflightRefused, freshness, launch, prepare, record
 from phx.progress import fmt_dur, fmt_tokens
+from phx.report import load as report_load
+from phx.report import model as report_model
+from phx.report import render as report_render
+from phx.report import rules as report_rules
+from phx.report import svg as report_svg
 from phx.runner import LauncherError, find_launcher
 from phx.state import RunStatus, load_state, now_ts
 from phx.supervisor import EXIT_ERROR, EXIT_PAUSED, RunOptions, Supervisor
@@ -51,6 +56,7 @@ COMMANDS: dict[str, tuple[str, str]] = {
     "log": ("show or follow the run log", "7"),
     "answer": ("answer a recorded owner question and unblock its phase", "7"),
     "plan": ("parse a plan read-only and print it, the next phase and any drift", "4"),
+    "report": ("resource trends and recommendations across runs, read-only", "12f"),
 }
 
 
@@ -138,6 +144,29 @@ def build_parser() -> argparse.ArgumentParser:
             cmd.add_argument(
                 "--force", action="store_true", help="also overwrite a question that is not open"
             )
+        elif name == "report":
+            cmd.add_argument("repos", nargs="*", metavar="repo", help="repo names or paths")
+            cmd.add_argument("--all", action="store_true", help="every repo, the pilot included")
+            cmd.add_argument(
+                "--by", choices=report_model.PERIODS, default="month", help="trend period"
+            )
+            cmd.add_argument("--since", metavar="WHEN", help="YYYY-MM-DD, YYYY-MM, YYYY-Qn or YYYY")
+            cmd.add_argument("--until", metavar="WHEN", help="the same; inclusive")
+            cmd.add_argument(
+                "--exclude", action="append", default=[], metavar="repo", help="leave a repo out"
+            )
+            cmd.add_argument("--state-root", type=Path, help="read this state root")
+            cmd.add_argument("--top", type=int, default=10, help="rows per table (default 10)")
+            cmd.add_argument("--json", action="store_true", help="print the schema 1 JSON")
+            cmd.add_argument(
+                "--markdown",
+                nargs="?",
+                const="-",
+                metavar="PATH",
+                help="print Markdown, or write it to PATH",
+            )
+            cmd.add_argument("--svg", type=Path, metavar="DIR", help="write four SVG charts to DIR")
+            cmd.add_argument("--vault", action="store_true", help="write a timestamped vault note")
     return parser
 
 
@@ -923,6 +952,71 @@ def _cmd_preflight(args: argparse.Namespace) -> int:
     return code
 
 
+def _report_names(args: argparse.Namespace, root: Path) -> list[str]:
+    """The projects to report: named ones, or all known ones with the pilot left out."""
+    known = report_load.projects(root)
+    if args.repos:
+        names = [r if r in known else Path(r).resolve().name for r in args.repos]
+    elif args.all:
+        names = known
+    else:
+        names = [n for n in known if n != report_load.PILOT]
+    unknown = [n for n in names if n not in known]
+    if unknown:
+        raise ValueError(f"no run log for: {', '.join(unknown)}")
+    excluded = {Path(e).name for e in args.exclude}
+    return [n for n in names if n not in excluded]
+
+
+def _cmd_report(args: argparse.Namespace) -> int:
+    root = args.state_root or args.state_dir or default_state_root()
+    try:
+        if args.repos and args.all:
+            raise ValueError("name repos or use --all, not both")
+        if args.top < 1:
+            raise ValueError("--top must be at least 1")
+        names = _report_names(args, root)
+        loaded = report_load.load(root, names)
+        report = report_model.build(
+            loaded.sources,
+            by=args.by,
+            since=args.since,
+            until=args.until,
+            warnings=loaded.warnings,
+        )
+    except ValueError as exc:
+        print(f"phx: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    if not report.sessions and not report.marks and not report.warnings:
+        print(f"phx: no recorded runs under {root} for that selection")
+        return 0
+    recommendations, notes = report_rules.evaluate(report)
+    if args.svg is not None:
+        for path in report_svg.write_charts(report, args.svg):
+            print(f"wrote {path}", file=sys.stderr)
+    if args.vault:
+        _path, message = report_render.write_vault(
+            report, recommendations, notes, top=args.top, state_root=root
+        )
+        print(message, file=sys.stderr)
+    if args.json:
+        print(report_render.to_json(report, recommendations, notes), end="")
+    elif args.markdown is not None:
+        text = report_render.to_markdown(report, recommendations, notes, top=args.top)
+        if args.markdown == "-":
+            print(text, end="")
+        else:
+            Path(args.markdown).write_text(text, encoding="utf-8")
+            print(f"wrote {args.markdown}", file=sys.stderr)
+    else:
+        color = sys.stdout.isatty() and "NO_COLOR" not in os.environ
+        print(
+            report_render.to_text(report, recommendations, notes, top=args.top, color=color),
+            end="",
+        )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     handlers = {
@@ -935,5 +1029,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         "stop": _cmd_stop,
         "log": _cmd_log,
         "answer": _cmd_answer,
+        "report": _cmd_report,
     }
     return handlers[args.command](args)

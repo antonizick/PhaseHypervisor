@@ -1,0 +1,5 @@
+{"epoch": 1770681600.0, "event": "run_start", "phase": null, "reason": "", "run_id": "r1770681600", "repo": "/repos/sample", "options": {"dry_run": false}}
+{"epoch": 1770681700.0, "event": "launch", "phase": "01", "reason": "fresh session", "session_id": "b1", "argv": ["ai-provider", "run", "--model", "opus"], "provider": "anthropic", "idle_timeout_s": 1800, "wall_timeout_s": 21600}
+{"epoch": 1770682300.0, "event": "session_end", "phase": "01", "reason": "", "session_id": "b1", "duration_s": 600.0, "class": "complete", "cost_usd": 1.5, "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0, "cost_usd": 1.5, "models": {"claude-opus-5-5": {"inputTokens": 100, "outputTokens": 200, "cacheReadInputTokens": 9000, "cacheCreationInputTokens": 700, "costUSD": 1.5, "costBasis": "list"}}}}
+{"epoch": 1770682310.0, "event": "verify", "phase": "01", "reason": "", "outcome": "complete"}
+{"epoch": 1770682500.0, "event": "run_end", "phase": null, "reason": "", "status": "finished", "rule": "all_complete"}

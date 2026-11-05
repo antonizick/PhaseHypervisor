@@ -38,6 +38,7 @@ from phx.preflight import PreflightRefused, freshness, launch, prepare, record
 from phx.progress import fmt_dur, fmt_tokens
 from phx.report import load as report_load
 from phx.report import model as report_model
+from phx.report import projects as report_projects
 from phx.report import render as report_render
 from phx.report import rules as report_rules
 from phx.report import svg as report_svg
@@ -156,6 +157,9 @@ def build_parser() -> argparse.ArgumentParser:
                 "--exclude", action="append", default=[], metavar="repo", help="leave a repo out"
             )
             cmd.add_argument("--state-root", type=Path, help="read this state root")
+            cmd.add_argument(
+                "--no-repos", action="store_true", help="read the logs only: no Projects section"
+            )
             cmd.add_argument("--top", type=int, default=10, help="rows per table (default 10)")
             cmd.add_argument("--json", action="store_true", help="print the schema 1 JSON")
             cmd.add_argument(
@@ -987,16 +991,25 @@ def _cmd_report(args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(f"phx: {exc}", file=sys.stderr)
         return EXIT_ERROR
-    if not report.sessions and not report.marks and not report.warnings:
+    repos = report_projects.Repos()
+    summaries: list[report_model.ProjectSummary] | None = None
+    warnings: list[str] = []
+    if not args.no_repos:
+        repos = report_projects.find_repos(loaded.sources, os.environ)
+        summaries, warnings = report_projects.gather(report, repos)
+    worked = any(s.phases for s in summaries or [])
+    if not report.sessions and not report.marks and not report.warnings and not worked:
         print(f"phx: no recorded runs under {root} for that selection")
         return 0
+    report.summaries = summaries
+    report.warnings += warnings
     recommendations, notes = report_rules.evaluate(report)
     if args.svg is not None:
         for path in report_svg.write_charts(report, args.svg):
             print(f"wrote {path}", file=sys.stderr)
     if args.vault:
         _path, message = report_render.write_vault(
-            report, recommendations, notes, top=args.top, state_root=root
+            report, recommendations, notes, top=args.top, repos=repos
         )
         print(message, file=sys.stderr)
     if args.json:

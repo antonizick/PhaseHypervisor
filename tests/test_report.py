@@ -15,6 +15,7 @@ import report_events as ev
 from phx.cli import COMMANDS, main
 from phx.report import load as L
 from phx.report import model as M
+from phx.report import projects as P
 from phx.report import render as R
 from phx.report import rules as RU
 from phx.report import svg as S
@@ -732,7 +733,7 @@ def test_axis_tops() -> None:
 def test_vault_note_is_new_every_time(tmp_path: Path) -> None:
     r = fixture_report()
     env = {"PHX_VAULT_ROOT": str(tmp_path)}
-    kwargs: dict[str, Any] = {"top": 5, "state_root": STATE, "env": env, "now": ev.JAN_02_2026}
+    kwargs: dict[str, Any] = {"top": 5, "repos": P.Repos(), "env": env, "now": ev.JAN_02_2026}
     first, _ = R.write_vault(r, [], [], **kwargs)
     second, _ = R.write_vault(r, [], [], **kwargs)
     assert first is not None and second is not None
@@ -748,7 +749,7 @@ def test_vault_missing_is_a_message(tmp_path: Path) -> None:
         [],
         [],
         top=5,
-        state_root=STATE,
+        repos=P.Repos(),
         env={"PHX_VAULT_ROOT": str(tmp_path / "none")},
     )
     assert path is None
@@ -764,15 +765,6 @@ def test_vault_links_only_notes_that_exist(tmp_path: Path, monkeypatch: pytest.M
     monkeypatch.setattr(R, "note_path", lambda repo: paths.get(repo.name))
     repos = {name: Path("/r") / name for name in [*paths, "none"]}
     assert R.project_links(repos, vault) == {"yes": "Alpha"}
-
-
-def test_repo_paths_come_from_the_latest_run_start(tmp_path: Path) -> None:
-    (tmp_path / "p").mkdir()
-    events = [ev.run_start(1.0, repo="/old"), ev.run_start(2.0, repo="/new")]
-    (tmp_path / "p" / "run.jsonl").write_text(ev.lines(events) + '{"event": "run_start"\n')
-    r = report([ev.end("1", 1.0, "s")])
-    r.projects = ["p", "gone"]
-    assert R.repo_paths(r, tmp_path) == {"p": Path("/new")}
 
 
 # --- CLI -----------------------------------------------------------------------------

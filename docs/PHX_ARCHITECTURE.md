@@ -13,7 +13,7 @@
 | Supervisor | `supervisor.py`, `locks.py`, `state.py`, `notify.py`, `vault.py`, `detach.py` | 07 | `phx run / status / resume / stop / log / answer`, locks, state, waits, notifications, detached runs, vault summary |
 | Preflight | `preflight.py`, `prompts/PHX_preflight.md` | 08 | one interactive question sweep before a hands-off run; staleness check in `phx run` |
 | Live progress | `progress.py` | 12d | stream-event-derived session activity, step counts, ETA and stall warnings for `phx status` and `phx watch` |
-| Resource report | `report/` (`load.py`, `model.py`, `rules.py`, `render.py`, `svg.py`) | 12f | read-only aggregation of `run.jsonl` into period trends and fixed-rule recommendations; terminal, JSON, Markdown, vault and SVG output |
+| Resource report | `report/` (`load.py`, `model.py`, `rules.py`, `render.py`, `svg.py`, `projects.py`) | 12f, 12g | read-only aggregation of `run.jsonl` into period trends and fixed-rule recommendations, plus project summaries read from each repo's `main`; terminal, JSON, Markdown, vault and SVG output |
 | Timeline upkeep | `timeline.py` | ad hoc (ADR-0030) | best-effort refresh of the project's generated timeline on a clean `main`: when stale (claim, close-out), after each session, at run end, and every 30 min to extend open bars; one `docs(plan): refresh timeline` commit each; never raises |
 | Method package (plugin) | `.claude-plugin/marketplace.json`, `plugins/phased-project/` | 12a | the `phased-project` skill and templates (which write each repo's `/phase` and `/phase-add`) and `/phx`, as a Claude Code plugin; not Python, not imported by `phx` |
 
@@ -293,6 +293,21 @@ stream events ──► ProgressTracker.feed (pure parsing, never raises)   tool
 - **One `Totals` class** serves every grouping, so tables add up by construction. A session counts under its primary model (most tokens) for time and session count; tokens and cost go to the model that used them.
 - **Output depends only on the logs.** "As of" is the newest record, not the clock, which is what makes SVG output byte-identical.
 - **Boundaries.** No import of the runner or supervisor, no provider call, and nothing written under the state root (a test runs it on a read-only tree).
+
+## Phase 12g: project summaries (`report/projects.py`, ADR-0034, built)
+```text
+Source list (from load.py)
+  └─► find_repos()  latest run_start.repo, else $PHX_WORK_ROOT/<project>; checked against the root
+  └─► gather()      one `git show` each of README.md and the plan on main
+        ├─► describe()         first prose paragraph, cleaned, then capped
+        ├─► parse_phase_table  names (no prompt reads, so not load_plan)
+        ├─► parse_phase_log()  one span per phase; a small parser, not the timeline generator
+        └─► merge_phases()     Report.sessions and marks plus the log, filtered like build()
+  └─► report.summaries         render.py: Projects section; JSON `project_summaries`
+```
+- **Apart from the figures.** `model.build` stays pure and summaries attach to the `Report` after it, so no total, rule or chart can depend on repo text. `summaries is None` means `--no-repos`, and every output then matches a report without the section.
+- **Untrusted text.** `clean()` (escapes, control and format characters, redaction) runs before the 300-character cap, so a cut cannot leave half a secret unredacted, and on everything before it is stored. `inert()` adds Markdown neutralisation at render time. Each paragraph is capped before the inline patterns run, which bounds them on hostile text.
+- **An empty window is not always empty.** `_cmd_report` exits early with "no recorded runs" only if no project has a phase in the window either, so a window of manual work still reports.
 
 ## Interface with phase sessions
 PHX and a phase session talk only through the repo and one line of output, defined in [PHX_AUTO_MODE_CONTRACT.md](PHX_AUTO_MODE_CONTRACT.md) (contract version 1, Phase 03):

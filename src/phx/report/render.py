@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from phx.progress import fmt_dur, fmt_tokens
-from phx.report.model import Period, Report, Totals
+from phx.report.model import Period, PhaseWork, ProjectSummary, Report, Totals
+from phx.report.projects import Repos, inert
 from phx.report.rules import (
     THRESHOLDS,
     Recommendation,
@@ -66,6 +67,12 @@ def caveats(report: Report) -> list[str]:
             f"A resumed session reports running totals, so each run is charged its increase: "
             f"{money(t.repeated_cost_usd)} that repeats earlier runs is left out here (and is "
             "still inside the totals in `phx status` and `run_end`)."
+        )
+    if report.summaries is not None:
+        out.append(
+            "Projects: descriptions are each README's opening on main. A manual phase has no "
+            "phx session in the window; it comes from the plan and carries time only, in no "
+            "figure below."
         )
     return out
 
@@ -171,11 +178,67 @@ def _recommendation_lines(rec: Recommendation) -> list[str]:
     ]
 
 
+def _phase_state(work: PhaseWork) -> str:
+    source = "phx" if work.source == "phx" else "manual, time only"
+    finished = "finished in period" if work.finished_in_period else "not finished in period"
+    return f"{source}, {finished}"
+
+
+def _project_lines(summary: ProjectSummary, top: int, markdown: bool) -> list[str]:
+    show = inert if markdown else str
+    if summary.description is not None:
+        about = show(summary.description)
+    else:
+        about = f"No description: {show(summary.description_note or 'none found')}."
+    shown = summary.phases[:top]
+    hidden = len(summary.phases) - len(shown)
+    rows = [(show(w.phase), show(w.name) if w.name else "", _phase_state(w)) for w in shown]
+    empty = "No recorded work in this period."
+    more = f"and {hidden} more"
+    if markdown:
+        items = [f"- {pid}{f' {name}' if name else ''} ({state})" for pid, name, state in rows]
+        return [
+            f"### {show(summary.project)}",
+            "",
+            f"**What it is:** {about}",
+            "",
+            *(items or [empty]),
+            *([f"- {more}"] if hidden else []),
+            "",
+        ]
+    id_width = max((len(pid) for pid, _, _ in rows), default=0)
+    name_width = max((len(name) for _, name, _ in rows), default=0)
+    return [
+        summary.project,
+        f"  {about}",
+        *(
+            f"  {pid.ljust(id_width)}  {name.ljust(name_width)}  {state}"
+            for pid, name, state in rows
+        ),
+        *([] if rows else [f"  {empty}"]),
+        *([f"  {more}"] if hidden else []),
+        "",
+    ]
+
+
+def _projects_section(summaries: list[ProjectSummary], top: int, markdown: bool) -> Section:
+    lines = [line for s in summaries for line in _project_lines(s, top, markdown)]
+    return Section("Projects", lines=lines[:-1])
+
+
 def sections(
-    report: Report, recommendations: list[Recommendation], notes: list[str], top: int
+    report: Report,
+    recommendations: list[Recommendation],
+    notes: list[str],
+    top: int,
+    *,
+    markdown: bool = False,
 ) -> list[Section]:
     t = report.totals
-    out = [_totals_section(t)]
+    out: list[Section] = []
+    if report.summaries:
+        out.append(_projects_section(report.summaries, top, markdown))
+    out.append(_totals_section(t))
     out.append(
         Section(
             f"By {report.by}",
@@ -238,7 +301,8 @@ def sections(
 
 def scope_line(report: Report) -> str:
     span = f"{report.since or 'start'} to {report.until or 'latest'}"
-    return f"{len(report.projects)} project(s), {span}, by {report.by}, data through {report.as_of}"
+    data = f"data through {report.as_of}" if report.data_through is not None else "no run data"
+    return f"{len(report.projects)} project(s), {span}, by {report.by}, {data}"
 
 
 def to_text(
@@ -298,7 +362,7 @@ def to_markdown(
     ]
     if links:
         out += ["", "**Project notes:** " + ", ".join(f"[[{v}]]" for _, v in sorted(links.items()))]
-    for section in sections(report, recommendations, notes, top):
+    for section in sections(report, recommendations, notes, top, markdown=True):
         out += ["", f"## {section.title}", ""]
         if section.title == "Recommendations":
             out += _recommendations_md(section.lines)
@@ -329,7 +393,7 @@ def _totals_rows(rows: Mapping[str, Totals], key: str) -> list[dict[str, Any]]:
 
 def to_json(report: Report, recommendations: list[Recommendation], notes: list[str]) -> str:
     """The stable ``schema: 1`` document (fields are documented in the user guide)."""
-    payload = {
+    payload: dict[str, Any] = {
         "schema": SCHEMA,
         "scope": {
             "projects": report.projects,
@@ -370,6 +434,8 @@ def to_json(report: Report, recommendations: list[Recommendation], notes: list[s
         "thresholds": {k: asdict(v) for k, v in THRESHOLDS.items()},
         "warnings": report.warnings,
     }
+    if report.summaries is not None:
+        payload["project_summaries"] = [asdict(s) for s in report.summaries]
     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
 
 
@@ -386,34 +452,13 @@ def project_links(repos: Mapping[str, Path], root: Path) -> dict[str, str]:
     return links
 
 
-def repo_paths(report: Report, root: Path) -> dict[str, Path]:
-    """Each project's repo path, from its log's latest ``run_start``."""
-    out: dict[str, Path] = {}
-    for project in report.projects:
-        try:
-            text = (root / project / "run.jsonl").read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        for line in reversed(text.splitlines()):
-            if '"run_start"' not in line:
-                continue
-            try:
-                repo = json.loads(line).get("repo")
-            except ValueError:
-                continue
-            if isinstance(repo, str):
-                out[project] = Path(repo)
-                break
-    return out
-
-
 def write_vault(
     report: Report,
     recommendations: list[Recommendation],
     notes: list[str],
     *,
     top: int,
-    state_root: Path,
+    repos: Repos,
     env: Mapping[str, str] | None = None,
     now: float | None = None,
 ) -> tuple[Path | None, str]:
@@ -421,7 +466,7 @@ def write_vault(
     root = vault_root(env).resolve()
     if not root.is_dir():
         return None, f"no vault at {root} (set PHX_VAULT_ROOT); note skipped"
-    links = project_links(repo_paths(report, state_root), root)
+    links = project_links(repos.paths, root)
     text = to_markdown(report, recommendations, notes, top=top, links=links)
     stamp = now_ts(now)
     folder = root / VAULT_FOLDER

@@ -581,6 +581,29 @@ class PhaseUse:
     totals: Totals
 
 
+@dataclass(frozen=True)
+class PhaseWork:
+    """One phase active in the report's window (Phase 12g)."""
+
+    phase: str
+    name: str | None  # from the plan; None if the plan has no such row
+    source: str  # "phx", or "manual" with no ``phx`` session in the window: time only
+    started: str
+    finished: str | None
+    finished_in_period: bool
+
+
+@dataclass(frozen=True)
+class ProjectSummary:
+    """What a project is and what was worked on; apart from every resource figure."""
+
+    project: str
+    repo_found: bool
+    description: str | None
+    description_note: str | None  # why there is no description
+    phases: list[PhaseWork]
+
+
 @dataclass
 class Report:
     by: str
@@ -598,6 +621,7 @@ class Report:
     marks: list[Mark]
     open_spans: int
     warnings: list[str] = field(default_factory=list)
+    summaries: list[ProjectSummary] | None = None  # None: repos were not read (--no-repos)
 
     @property
     def as_of(self) -> str:

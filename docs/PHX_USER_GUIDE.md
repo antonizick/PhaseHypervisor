@@ -149,10 +149,43 @@ phx report --json                   # the schema 1 document below
 phx report --markdown report.md     # or --markdown alone to print it
 phx report --svg charts/            # four SVG charts
 phx report --vault                  # a new timestamped note in the vault
+phx report --no-repos               # logs only: no Projects section, no repo opened
 ```
-Read-only, offline and quick: it reads `run.jsonl`, never the session transcripts, calls no model and writes nothing under the state root. `--state-root PATH` reads another root, and `--top N` sets the rows per table (default 10). `--svg` and `--vault` work alongside any output form. `--vault` writes `04 Resources/PHX Reports/PHX Report YYYY-MM-DD HHMM.md` under `PHX_VAULT_ROOT` (default `~/Documents`), links each project note it can find and never overwrites a file. Per-project figures belong there, not in a public repo.
+Read-only, offline and quick: it reads `run.jsonl`, plus `README.md` and the plan from each project's `main` with `git show` for the Projects section, never the session transcripts. It calls no model, fetches nothing, and writes nothing under the state root or in a repo. `--state-root PATH` reads another root, and `--top N` sets the rows per table (default 10). `--svg` and `--vault` work alongside any output form. `--vault` writes `04 Resources/PHX Reports/PHX Report YYYY-MM-DD HHMM.md` under `PHX_VAULT_ROOT` (default `~/Documents`), links each project note it can find and never overwrites a file. Per-project figures belong there, not in a public repo.
 
 **What it cannot see.** Only sessions `phx` launched are measured. Manual `/phase` sessions leave no token or cost record, so they are absent, not estimated.
+
+### The Projects section
+The report opens with what each project is and what was worked on in the window:
+```text
+Projects
+sample-project
+  Sample Project is a local web service for managing notes through a plain JSON API.
+  07   Search index   phx, finished in period
+  07a  Search filters manual, time only, finished in period
+  08   Export         manual, time only, not finished in period
+  and 2 more
+
+quiet-project
+  A digest maker for notes
+  No recorded work in this period.
+```
+
+| Piece | Where it comes from |
+|---|---|
+| Repo | The log's latest `run_start.repo`, else `$PHX_WORK_ROOT/<project>` (default `~/Work`) if that is a git repo. A path that is missing falls through to the second; a repo outside the work root is skipped with a warning |
+| Description | The first prose paragraph of `README.md` on `main`, reduced to plain text and capped at 300 characters. Headings, images, badges, HTML, quotes, code, tables, lists, link-only lines and `Status:`-style label lines are skipped. A bold tagline is used if no paragraph qualifies, and also when the first paragraph sits under a later `##` heading |
+| Phases | `phx` sessions in the window, then the plan's Phase Log Timeline bullets. A `-triage` session counts as its phase. Planning entries and phase 00 are skipped |
+| Phase names | The plan's phase table on `main`; the ID alone if the plan has no such row |
+| Window | A phase is listed if its span from start to finish overlaps the window. A block inside the span does not split it, and a phase with no finish stays active. `--top` limits phases per project |
+
+`phx` means a session ran in this window. `manual` means none did: that phase comes from the plan, carries time only, and is in no total, rule or chart, so a phase `phx` ran in an earlier window can show as `manual` if it was still open in this one. All resource figures stay `phx`-launched only.
+
+**To fix a poor description,** edit the opening paragraph of the README and merge it to `main`. There is no separate setting (ADR-0034).
+
+A project with nothing in the window stays listed with "No recorded work in this period". A project with no state directory is not found, since nothing lists it. If a Timeline zone such as `CDT` is not one of the local zone's names, that timestamp falls back to its date and a warning says so. A missing repo, README or plan is a note or warning and the other projects still report.
+
+**`--no-repos`** opens no repo: no Projects section, and no project links in a vault note. Everything else matches a report without this section. README and plan text are untrusted: control characters and escapes are removed, secrets redacted, and Markdown and vault output neutralised, so a hostile README cannot move the cursor, forge a section or plant a vault link.
 
 ### What the numbers mean
 | Figure | Definition |
@@ -216,7 +249,7 @@ opus (alias)               2    3.1k  unknown         n/a     20m     0         
 ```
 
 ### `--json` (schema 1)
-Top-level keys: `schema` (1), `scope`, `caveats`, `totals`, `periods`, `models`, `providers`, `projects`, `phases`, `recommendations`, `not_enough_data`, `thresholds`, `warnings`. Each row holds the same fields as `totals`; a period adds `period`, `has_data`, `change` and `cost_by_model`. Fields may be added within schema 1; a rename or removal raises it.
+Top-level keys: `schema` (1), `scope`, `caveats`, `totals`, `periods`, `models`, `providers`, `projects`, `phases`, `recommendations`, `not_enough_data`, `thresholds`, `warnings`, and `project_summaries` (added in Phase 12g, absent with `--no-repos`). Each summary holds `project`, `repo_found`, `description`, `description_note` (why there is none) and `phases`, each with `phase`, `name`, `source` (`phx` or `manual`), `started`, `finished` and `finished_in_period`. A project-summary field never feeds a total. Each row holds the same fields as `totals`; a period adds `period`, `has_data`, `change` and `cost_by_model`. Fields may be added within schema 1; a rename or removal raises it.
 ```json
 {
   "schema": 1,

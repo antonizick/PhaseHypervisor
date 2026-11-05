@@ -2,7 +2,8 @@
 
 One bad line or file never stops a report: it becomes a warning and the rest is
 reported. Symlinks are skipped so a link in the state root cannot pull in a file from
-outside it. Session transcripts are never opened (ADR-0032).
+outside it. Session transcripts are never opened (ADR-0032). This module reads logs only;
+``projects.py`` adds what the report reads from each repo's ``main`` (ADR-0034).
 """
 
 import json

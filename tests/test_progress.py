@@ -186,7 +186,7 @@ def test_malformed_events_never_raise() -> None:
 
 def test_tool_description_is_redacted_and_truncated() -> None:
     t = tracker()
-    secret = "sk-or-v1-" + "f" * 40
+    secret = "sk-or-v1-" + "f" * 40  # pragma: allowlist secret
     t.feed(assistant(tool_use("u1", "Bash", {"command": f"curl -H 'X: {secret}' {'q' * 200}"})))
     snap = t.snapshot()
     assert snap.tool_desc is not None

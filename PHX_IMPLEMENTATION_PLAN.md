@@ -139,7 +139,7 @@ gantt
     12e README benefits and examples :done, p12es6, 2026-11-05 02:35, 2026-11-05 02:45
     12f phx report - resource trends and optimization recommendations :done, p12fs6, 2026-11-05 04:38, 2026-11-05 04:58
     12g phx report project summaries for the period :done, p12gs6, 2026-11-05 05:23, 2026-11-05 05:41
-    12h phx report saves a vault note and charts by default :done, p12hs6, 2026-11-05 06:29, 2026-11-05 06:35
+    12h phx report saves a vault note and charts by default :done, p12hs6, 2026-11-05 06:27, 2026-11-05 06:35
 ```
 
 | Phase | Name | Started | Finished | Merged | Active | Blocked | Claim |
@@ -173,9 +173,9 @@ gantt
 | 12e | README benefits and examples | 2026-11-05 02:35 CST | 02:45 | 02:45 | 10 m |  | `03b2394` |
 | 12f | `phx report`: resource trends and optimization recommendations | 2026-11-05 04:38 CST | 04:58 | 04:58 | 20 m |  | `54989ce` |
 | 12g | `phx report` project summaries for the period | 2026-11-05 05:23 CST | 05:41 | 05:41 | 18 m |  | `7887915` |
-| 12h | `phx report` saves a vault note and charts by default | 2026-11-05 06:29 CST | 06:35 | 06:35 | 6 m |  | `4f95358` |
+| 12h | `phx report` saves a vault note and charts by default | 2026-11-05 06:27 CST | 06:35 | 06:35 | 8 m |  | `4f95358` |
 
-**Totals:** elapsed 9 d 23 h (first recorded start to 2026-11-05 06:35 CST) · active phase time 10 h 49 m (sum over phases) · blocked or paused 25 m · idle 9 d 4 h in 5 gap(s) over 60 min.
+**Totals:** elapsed 9 d 23 h (first recorded start to 2026-11-05 06:35 CST) · active phase time 10 h 51 m (sum over phases) · blocked or paused 25 m · idle 9 d 4 h in 5 gap(s) over 60 min.
 <!-- phase-timeline:end -->
 
 ### Model rationale
@@ -685,11 +685,11 @@ gantt
 - **Files:** `prompts/PHX_phase-12h-report-default-save.md` (new), this plan (row, graph, model rationale, Last updated, this entry), `docs/PHX_DECISIONS.md` (ADR-0035, index row), vault note row and log line, timeline.
 
 ### 2026-11-05 06:35 CST: Phase 12h: `phx report` saves a vault note and charts by default (✅ Complete)
-- **Timeline:** started 2026-11-05 06:29 CST (claim commit 4f95358) · finished 2026-11-05 06:35 CST · merged 2026-11-05 06:35 CST
+- **Timeline:** started 2026-11-05 06:27 CST (claim commit 4f95358) · finished 2026-11-05 06:35 CST · merged 2026-11-05 06:35 CST
 - **Model:** ran as claude-opus-5-5 (interactive session; plan lists Opus 5.5)
 - **Built:** `render.save_report` and `reserve_chart_folder`, a `charts` argument on `to_markdown` and `write_vault` for a `## Charts` section, `--no-save`, and the default rule in `_cmd_report`. An autouse `_isolated_vault` fixture in `tests/conftest.py` landed first, in its own commit. Docs: user guide, README, architecture, threat model T22, spec R27, changelog, `report/__init__.py`.
 - **Deviations:** none from ADR-0035. The prompt's `--no-save` conflict with `--vault` or `--svg` is an error, as specified; with `--json` or `--markdown` it does nothing.
 - **Real check:** a real `phx report` wrote a note and `charts2026-11-05-0632`, stdout byte-identical to `--no-save`. All 4 embed targets exist and parse as XML; they were not opened in Obsidian itself. `--json` added nothing; `--by quarter` saved a pair, removed afterwards as check output. The 06:32 pair is kept as the first real output. State root unchanged by size and mtime.
 - **Found, not touched:** one other project's main checkout has uncommitted edits dated 2026-11-04 07:05, before this phase. The report reads `main` through `git show`, so they did not affect it.
 - **Follow-ups:** nothing prunes old notes and folders (out of scope, ADR-0035).
-- **Tests:** 779 passed, 1 skipped (the opt-in redaction audit), 25 more than 12g. ruff, ruff format, mypy --strict and pre-commit clean.
+- **Tests:** 779 passed, 1 skipped (the opt-in redaction audit), 26 more than 12g. ruff, ruff format, mypy --strict and pre-commit clean.

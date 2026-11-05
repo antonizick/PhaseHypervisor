@@ -34,6 +34,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0028 | 2026-10-31 19:26 CDT | Run progress feedback: a `progress` event in `run.jsonl` every `progress_interval_s` (default 5 min) and on a stage change, derived only from stream events already parsed (no LLM); a `progress` block in `state.json`; a richer `phx status`; a new `phx watch` that redraws one line; amber stall warning before the idle timeout; ranges only for an ETA; no desktop progress notifications | Accepted (built 2026-10-31, see ADR-0029) | 12d (planning; built in 12d) |
 | ADR-0029 | 2026-10-31 20:15 CDT | Phase 12d build decisions: steps are completed `tool_result`s; tool-trail stage heuristic; one shared tracker with a single save path; ETA fallback `PhaseTotals.wall_s`; stall computed where the clock runs (runner warns, status/watch read); declined notifications recorded; no spec amendment | Accepted | 12d |
 | ADR-0030 | 2026-11-02 15:34 CST | The supervisor refreshes the generated timeline itself (claim, every 60 s when stale, after each session, at run end, open bars every 30 min) on a clean `main`, in its own commit; `--as-of TS` for open bars; agents also refresh after the claim | Accepted | ad hoc fix |
+| ADR-0031 | 2026-11-05 02:26 CST | README benefits: real unedited P11 timeline snapshot as lead example, native status-table excerpt, short first-person note signed by handle only | Accepted | 12e |
 
 ---
 
@@ -549,3 +550,20 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 
 **Decision.** B. `phx.timeline.refresh` runs only on a clean `main` with no git lock and never raises: within 60 s of any stale check (the claim included), after every session, at run end, and with `--as-of` (the supervisor's clock) at least every 30 min to extend open bars. The generator takes `--as-of TS` but still never reads the clock; `--check` honours the as-of the block records. A project whose script copy lacks `--as-of` still refreshes without it.
 **Consequences.** More `docs(plan): refresh timeline` commits on `main` (about two per hour of a running phase at most). A merge that conflicts over the generated block takes either side and re-runs `--write` (unchanged rule). A running `phx` process must be restarted to load this. Prompts changed: shared instructions §4a and the skill template.
+
+## ADR-0031: README sells PHX with real, unedited examples
+**Recorded.** 2026-11-05 02:26 CST (planning for Phase 12e)
+
+**Context.** Nick asked for the public README to set out the benefits of PHX, with example images, and named P11's implementation plan as a good example. P11's timeline shows the planning lane, two collapsed idle gaps and an 8 h 37 m blocked span in one picture, but it also lists phase names such as "Video face-swap pipeline", and the README is PHX's public front page. P11 is public by Nick's own decision (P11 owner question 21), and its SVG holds no paths or names of people.
+
+| Decision | Option | Pros | Cons |
+|---|---|---|---|
+| P11 image | **A. Unedited snapshot, lead example** (chosen) | Honest; Nick's example; shows every feature at once | Face-swap labels on the PHX page |
+| | B. PHX's own chart leads, P11 second | First impression stays on PHX | Only a 25 m block; labels still appear |
+| | C. Relabelled copy | No such labels | No longer true generated output; must be disclosed |
+| Voice | **A. Neutral section plus a short first-person note signed by handle** (chosen) | Real endorsement; sounds human; fits ADR-0023 | Slightly more personal |
+| | B. Neutral throughout | Consistent | Loses credibility of real use |
+| | C. First person throughout | Strongest voice | Dates; less contributor-friendly |
+
+**Decision.** A and A (Nick, 2026-11-05 02:26 CST). The chart is copied byte-for-byte from P11's `origin/main` to `docs/images/PHX_example-P11-timeline.svg` rather than hotlinked, so PHX's page can't break or change with another repo. It is a dated snapshot. Defaults left to the phase: the status chart is a native Markdown excerpt rather than an image (searchable, no binary), and links name only repos confirmed public.
+**Consequences.** The snapshot goes stale by design and its caption gives its as-of time. No automation refreshes it. Only public repos may be named. Selling harder must not bury the bypassed-permissions warning.

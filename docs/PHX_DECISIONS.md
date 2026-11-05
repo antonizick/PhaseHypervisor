@@ -35,6 +35,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0029 | 2026-10-31 20:15 CDT | Phase 12d build decisions: steps are completed `tool_result`s; tool-trail stage heuristic; one shared tracker with a single save path; ETA fallback `PhaseTotals.wall_s`; stall computed where the clock runs (runner warns, status/watch read); declined notifications recorded; no spec amendment | Accepted | 12d |
 | ADR-0030 | 2026-11-02 15:34 CST | The supervisor refreshes the generated timeline itself (claim, every 60 s when stale, after each session, at run end, open bars every 30 min) on a clean `main`, in its own commit; `--as-of TS` for open bars; agents also refresh after the claim | Accepted | ad hoc fix |
 | ADR-0031 | 2026-11-05 02:26 CST | README benefits: real unedited P11 timeline snapshot as lead example, native status-table excerpt, short first-person note signed by handle only | Accepted | 12e |
+| ADR-0032 | 2026-11-05 04:06 CST | `phx report`: read-only aggregation of the existing `run.jsonl` records across projects, deterministic evidence-cited recommendations (no LLM), terminal/JSON/Markdown/vault/SVG outputs, honest about manual sessions and list-price cost | Accepted | 12f |
 
 ---
 
@@ -567,3 +568,23 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 
 **Decision.** A and A (Nick, 2026-11-05 02:26 CST). The chart is copied byte-for-byte from P11's `origin/main` to `docs/images/PHX_example-P11-timeline.svg` rather than hotlinked, so PHX's page can't break or change with another repo. It is a dated snapshot. Defaults left to the phase: the status chart is a native Markdown excerpt rather than an image (searchable, no binary), and links name only repos confirmed public.
 **Consequences.** The snapshot goes stale by design and its caption gives its as-of time. No automation refreshes it. Only public repos may be named. Selling harder must not bury the bypassed-permissions warning.
+
+---
+
+## ADR-0032: `phx report` reads what PHX already records and advises with fixed rules
+**Recorded.** 2026-11-05 04:06 CST (planning for Phase 12f)
+
+**Context.** Nick asked for a `phx report` command for trend analysis of resource consumption, AI model and time use, with optimization recommendations where warranted, so the README's claim that month, quarter and year trends are easy to compile is backed by a command. PHX already records per-session duration, tokens by kind, list-price cost and per-model usage in `run.jsonl` (`session_end`), plus waits, retries, timeouts and verification outcomes, with no log rotation. Nothing aggregates it across runs, projects or time. Manual `/phase` sessions leave no token or cost record.
+
+| Decision | Option | Pros | Cons |
+|---|---|---|---|
+| Recommendations | **A. Deterministic rules only** (chosen) | Testable; every advice cites its numbers; zero tokens; keeps ADR-0001 | Cannot phrase insights outside the rule set |
+| | B. Rules plus optional LLM narrative | Friendlier prose | Costs tokens; the reporter would call a model; harder to trust and test |
+| Outputs | **A. Terminal and `--json`, Markdown with optional vault note, SVG charts** (chosen, all three) | Fits scripts, the vault and the README | More surface to test |
+| | B. Terminal and `--json` only | Smallest | No vault note or charts |
+| Placement | **A. 12f after 12e** (chosen) | Last phase; nothing to rewire | None |
+| Data source | **A. `run.jsonl` only; no transcripts** (default) | Small, already redacted, additive | No data for manual sessions |
+| | B. Also parse `sessions/*.jsonl` | Finer detail | Large; may hold anything a session saw |
+
+**Decision.** A on every row (Nick, 2026-11-05 04:04 CST; the data-source row is the planning default). The report is read-only and never writes under the state root; a missing field is added to the existing event, additively, not to a new log. Unknown cost is never `$0`; cost is labelled list-price, not an invoice; the header says manual sessions are not measured. Thresholds sit in one table with a reason each; a rule below its minimum sample reports "not enough data". Recommendations are advisory: the command changes neither the plan nor `config.toml`.
+**Consequences.** Real figures and private repo names stay out of public files; public examples are synthetic. Per-project tables go only to the vault note. Manual-session usage stays a known gap (a possible later phase could estimate time from Phase Log Timeline bullets, but not tokens).

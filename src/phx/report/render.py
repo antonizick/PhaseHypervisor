@@ -1,13 +1,14 @@
 """Terminal, Markdown and JSON forms of a report, plus the optional vault note.
 
 Terminal and Markdown are two renderings of the same ``Section`` list, so they cannot
-disagree. Only the vault note and an explicit PATH write anything, and neither writes
-under the state root.
+disagree. A default run saves a vault note and its charts (ADR-0035); otherwise only an
+explicit PATH or ``--vault`` writes. Nothing is written under the state root.
 """
 
 import json
 import os
-from collections.abc import Mapping
+import time
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from phx.report.rules import (
     money,
     percent,
 )
+from phx.report.svg import write_charts
 from phx.state import now_ts
 from phx.vault import note_path, vault_root
 
@@ -341,6 +343,7 @@ def to_markdown(
     *,
     top: int = 10,
     links: Mapping[str, str] | None = None,
+    charts: Sequence[str] = (),
 ) -> str:
     def cell(text: str) -> str:
         return text.replace("|", "\\|")
@@ -362,7 +365,11 @@ def to_markdown(
     ]
     if links:
         out += ["", "**Project notes:** " + ", ".join(f"[[{v}]]" for _, v in sorted(links.items()))]
+    embeds = [f"![[{chart}]]" for chart in charts]
     for section in sections(report, recommendations, notes, top, markdown=True):
+        if embeds and section.title != "Projects":
+            out += ["", "## Charts", "", *embeds]
+            embeds = []
         out += ["", f"## {section.title}", ""]
         if section.title == "Recommendations":
             out += _recommendations_md(section.lines)
@@ -461,13 +468,14 @@ def write_vault(
     repos: Repos,
     env: Mapping[str, str] | None = None,
     now: float | None = None,
+    charts: Sequence[str] = (),
 ) -> tuple[Path | None, str]:
     """A new timestamped note under the vault; it never replaces an existing file."""
     root = vault_root(env).resolve()
     if not root.is_dir():
         return None, f"no vault at {root} (set PHX_VAULT_ROOT); note skipped"
     links = project_links(repos.paths, root)
-    text = to_markdown(report, recommendations, notes, top=top, links=links)
+    text = to_markdown(report, recommendations, notes, top=top, links=links, charts=charts)
     stamp = now_ts(now)
     folder = root / VAULT_FOLDER
     name = f"PHX Report {stamp[:10]} {stamp[11:16].replace(':', '')}"
@@ -486,3 +494,51 @@ def write_vault(
     except OSError as exc:
         return None, f"note not written: {type(exc).__name__}"
     return None, f"note not written: too many reports named {name}"
+
+
+def reserve_chart_folder(parent: Path, now: float) -> Path:
+    """A new ``charts<YYYY-MM-DD-HHMM>`` folder under ``parent``; it never reuses one."""
+    stamp = now_ts(now)
+    name = f"charts{stamp[:10]}-{stamp[11:16].replace(':', '')}"
+    parent.mkdir(parents=True, exist_ok=True)
+    for n in range(1, 100):
+        folder = parent / (name if n == 1 else f"{name}-{n}")
+        try:
+            folder.mkdir()
+        except FileExistsError:
+            continue
+        return folder
+    raise FileExistsError(name)
+
+
+def save_report(
+    report: Report,
+    recommendations: list[Recommendation],
+    notes: list[str],
+    *,
+    top: int,
+    repos: Repos,
+    env: Mapping[str, str] | None = None,
+    now: float | None = None,
+) -> list[str]:
+    """The default run's charts and note, sharing one time stamp (ADR-0035); returns messages.
+
+    Either can fail alone: charts that were not written are not embedded, and a note that
+    was not written leaves its charts in place.
+    """
+    root = vault_root(env).resolve()
+    if not root.is_dir():
+        return [f"no vault at {root} (set PHX_VAULT_ROOT); report not saved"]
+    moment = time.time() if now is None else now
+    messages: list[str] = []
+    embeds: list[str] = []
+    try:
+        folder = reserve_chart_folder(root / VAULT_FOLDER, moment)
+        embeds = [f"{folder.name}/{path.name}" for path in write_charts(report, folder)]
+        messages.append(f"wrote {folder}")
+    except OSError as exc:
+        messages.append(f"charts not written: {type(exc).__name__}")
+    _path, message = write_vault(
+        report, recommendations, notes, top=top, repos=repos, env=env, now=moment, charts=embeds
+    )
+    return [*messages, message]

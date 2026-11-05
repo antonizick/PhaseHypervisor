@@ -141,6 +141,7 @@ phx log ~/Work/YTPL2 -n 0 --json   # everything, raw JSON
 ## `phx report`: where the time and money went
 ```bash
 phx report                          # every project, by month; the pilot sandbox left out
+                                    # also saves a vault note and charts (see below)
 phx report --by quarter             # or --by year
 phx report my-repo other-repo       # named repos (a name or a path)
 phx report --all --exclude my-repo  # --all includes the pilot sandbox
@@ -148,10 +149,15 @@ phx report --since 2026-Q3 --until 2026-11-30   # YYYY-MM-DD, YYYY-MM, YYYY-Qn o
 phx report --json                   # the schema 1 document below
 phx report --markdown report.md     # or --markdown alone to print it
 phx report --svg charts/            # four SVG charts
-phx report --vault                  # a new timestamped note in the vault
+phx report --vault                  # only a new timestamped note in the vault
 phx report --no-repos               # logs only: no Projects section, no repo opened
+phx report --no-save                # print only, write nothing
 ```
-Read-only, offline and quick: it reads `run.jsonl`, plus `README.md` and the plan from each project's `main` with `git show` for the Projects section, never the session transcripts. It calls no model, fetches nothing, and writes nothing under the state root or in a repo. `--state-root PATH` reads another root, and `--top N` sets the rows per table (default 10). `--svg` and `--vault` work alongside any output form. `--vault` writes `04 Resources/PHX Reports/PHX Report YYYY-MM-DD HHMM.md` under `PHX_VAULT_ROOT` (default `~/Documents`), links each project note it can find and never overwrites a file. Per-project figures belong there, not in a public repo.
+Offline and quick: it reads `run.jsonl`, plus `README.md` and the plan from each project's `main` with `git show` for the Projects section, never the session transcripts. It calls no model, fetches nothing, and writes nothing under the state root or in a repo.
+
+**What it saves.** A run with no output option prints the report and also saves it to the vault, under `04 Resources/PHX Reports/`: a note `PHX Report YYYY-MM-DD HHMM.md` and a folder `chartsYYYY-MM-DD-HHMM/` with the four charts, embedded in the note. Filters such as `--by quarter`, a named repo, `--top`, `--no-repos` and `--state-root` still save. An explicit `--json`, `--markdown`, `--svg DIR` or `--vault` does only what it says, so a script gets no side effects, and `--no-save` prints only. Nothing is overwritten: a second run in the same minute gets `(2)` on the note and `-2` on the folder. With no vault nothing is saved and a message says so. Notes and folders accumulate; delete old ones when you like.
+
+Other options: `--state-root PATH` reads another root, and `--top N` sets the rows per table (default 10). `--svg` and `--vault` work alongside any output form. `--vault` writes `04 Resources/PHX Reports/PHX Report YYYY-MM-DD HHMM.md` under `PHX_VAULT_ROOT` (default `~/Documents`), links each project note it can find and never overwrites a file. Per-project figures belong there, not in a public repo.
 
 **What it cannot see.** Only sessions `phx` launched are measured. Manual `/phase` sessions leave no token or cost record, so they are absent, not estimated.
 

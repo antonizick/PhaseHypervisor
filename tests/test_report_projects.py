@@ -732,3 +732,16 @@ def test_no_repos_vault_note_has_no_project_links(tmp_path: Path) -> None:
     )
     assert path is not None
     assert "Project notes" not in path.read_text(encoding="utf-8")
+
+
+def test_a_manual_only_window_saves_with_empty_charts(
+    world: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    monkeypatch.setenv("PHX_VAULT_ROOT", str(vault))
+    run(capsys, "--state-root", str(world), "--since", "2026-10-05", "--until", "2026-10-06")
+    folder = vault / "04 Resources" / "PHX Reports"
+    assert len(list(folder.glob("*.md"))) == 1
+    (charts,) = [p for p in folder.iterdir() if p.is_dir()]
+    assert len(list(charts.glob("*.svg"))) == 4

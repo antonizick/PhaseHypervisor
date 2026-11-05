@@ -292,7 +292,7 @@ stream events ──► ProgressTracker.feed (pure parsing, never raises)   tool
 - **Attribution (ADR-0033).** A resumed session keeps its ID and reports running `cost_usd` and `usage.models`, so `extract()` charges each `session_end` the increase over its chain. This must run before any `--since` filter, or a window would treat a running total as new spend.
 - **One `Totals` class** serves every grouping, so tables add up by construction. A session counts under its primary model (most tokens) for time and session count; tokens and cost go to the model that used them.
 - **Output depends only on the logs.** "As of" is the newest record, not the clock, which is what makes SVG output byte-identical.
-- **Boundaries.** No import of the runner or supervisor, no provider call, and nothing written under the state root (a test runs it on a read-only tree).
+- **Boundaries.** No import of the runner or supervisor, no provider call, and nothing written under the state root (a test runs it on a read-only tree). Since Phase 12h a default run writes to the vault.
 
 ## Phase 12g: project summaries (`report/projects.py`, ADR-0034, built)
 ```text
@@ -308,6 +308,18 @@ Source list (from load.py)
 - **Apart from the figures.** `model.build` stays pure and summaries attach to the `Report` after it, so no total, rule or chart can depend on repo text. `summaries is None` means `--no-repos`, and every output then matches a report without the section.
 - **Untrusted text.** `clean()` (escapes, control and format characters, redaction) runs before the 300-character cap, so a cut cannot leave half a secret unredacted, and on everything before it is stored. `inert()` adds Markdown neutralisation at render time. Each paragraph is capped before the inline patterns run, which bounds them on hostile text.
 - **An empty window is not always empty.** `_cmd_report` exits early with "no recorded runs" only if no project has a phase in the window either, so a window of manual work still reports.
+
+## Phase 12h: saving by default (ADR-0035, built)
+```text
+_cmd_report: no output option and no --no-save
+  └─► render.save_report(): one time stamp
+        ├─► reserve_chart_folder()  mkdir without exist_ok: charts<YYYY-MM-DD-HHMM>, then -2, -3
+        ├─► svg.write_charts()      the same function as --svg DIR
+        └─► write_vault(charts=…)   the note embeds each chart under `## Charts`
+```
+- **Stdout does not change.** Saving reports on stderr, so `phx report > file` is unaffected.
+- **Each part fails alone.** Unwritten charts are not embedded, and an unwritten note leaves its charts; the report prints either way.
+- **Tests** cannot reach a real vault: an autouse fixture in `tests/conftest.py` points `PHX_VAULT_ROOT` at a path that does not exist.
 
 ## Interface with phase sessions
 PHX and a phase session talk only through the repo and one line of output, defined in [PHX_AUTO_MODE_CONTRACT.md](PHX_AUTO_MODE_CONTRACT.md) (contract version 1, Phase 03):

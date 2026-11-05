@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import stat
 import time
 import xml.etree.ElementTree as ET
@@ -914,3 +915,189 @@ def test_tests_cannot_reach_the_real_vault() -> None:
     root = vault_root()
     assert root != Path.home() / "Documents"
     assert not root.exists()
+
+
+# --- Saving by default (Phase 12h, ADR-0035) ------------------------------------------
+
+
+@pytest.fixture
+def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    root = tmp_path / "vault"
+    root.mkdir()
+    monkeypatch.setenv("PHX_VAULT_ROOT", str(root))
+    return root
+
+
+def saved(root: Path) -> tuple[list[Path], list[Path]]:
+    """The notes and charts folders ``root`` holds."""
+    folder = root / "04 Resources" / "PHX Reports"
+    if not folder.is_dir():
+        return [], []
+    return sorted(folder.glob("*.md")), sorted(p for p in folder.iterdir() if p.is_dir())
+
+
+@pytest.mark.parametrize(
+    "argv", [[], ["--by", "quarter"], ["alpha-project"], ["--no-repos"], ["--top", "3"]]
+)
+def test_a_view_with_no_output_option_saves(
+    argv: list[str], vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run(argv, capsys)
+    notes, folders = saved(vault)
+    assert len(notes) == len(folders) == 1
+    assert len(list(folders[0].glob("*.svg"))) == 4
+
+
+@pytest.mark.parametrize(
+    "argv", [["--json"], ["--markdown"], ["--no-save"], ["--json", "--no-save"]]
+)
+def test_output_options_and_no_save_write_nothing(
+    argv: list[str], vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run(argv, capsys)
+    assert saved(vault) == ([], [])
+
+
+def test_explicit_vault_keeps_its_plain_note(
+    vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run(["--vault"], capsys)
+    notes, folders = saved(vault)
+    assert len(notes) == 1 and folders == []
+    assert "## Charts" not in notes[0].read_text(encoding="utf-8")
+
+
+def test_explicit_svg_writes_only_there(
+    vault: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run(["--svg", str(tmp_path / "mine")], capsys)
+    assert saved(vault) == ([], [])
+    assert len(list((tmp_path / "mine").glob("*.svg"))) == 4
+
+
+@pytest.mark.parametrize("option", [["--vault"], ["--svg", "x"]])
+def test_no_save_conflicts(
+    option: list[str], vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(["report", "--state-root", str(STATE), "--no-save", *option])
+    assert code != 0
+    assert "--no-save" in capsys.readouterr().err
+    assert saved(vault) == ([], [])
+
+
+def test_no_recorded_runs_saves_nothing(
+    vault: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "state").mkdir()
+    assert main(["report", "--state-root", str(tmp_path / "state")]) == 0
+    capsys.readouterr()
+    assert saved(vault) == ([], [])
+
+
+def save(root: Path, now: float = ev.JAN_02_2026) -> list[str]:
+    return R.save_report(
+        fixture_report(), [], [], top=5, repos=P.Repos(), env={"PHX_VAULT_ROOT": str(root)}, now=now
+    )
+
+
+def test_note_and_folder_share_a_stamp(vault: Path) -> None:
+    save(vault)
+    (note,), (folder,) = saved(vault)
+    assert note.name == "PHX Report 2026-01-02 0000.md"
+    assert folder.name == "charts2026-01-02-0000"
+
+
+def test_a_second_run_in_the_same_minute_overwrites_nothing(vault: Path) -> None:
+    save(vault)
+    (_,), (first,) = saved(vault)
+    (first / "phx-report-cost.svg").write_text("mine")
+    save(vault)
+    notes, folders = saved(vault)
+    assert [p.name for p in notes] == [
+        "PHX Report 2026-01-02 0000 (2).md",
+        "PHX Report 2026-01-02 0000.md",
+    ]
+    assert [p.name for p in folders] == ["charts2026-01-02-0000", "charts2026-01-02-0000-2"]
+    assert (first / "phx-report-cost.svg").read_text() == "mine"
+    assert "charts2026-01-02-0000-2/" in notes[0].read_text(encoding="utf-8")
+
+
+def test_every_chart_is_embedded_once_and_exists(vault: Path) -> None:
+    save(vault)
+    (note,), (folder,) = saved(vault)
+    text = note.read_text(encoding="utf-8")
+    assert text.index("## Charts") < text.index("## Totals")
+    for chart in folder.iterdir():
+        assert text.count(f"![[{folder.name}/{chart.name}]]") == 1
+
+
+def test_charts_follow_the_projects_section(vault: Path) -> None:
+    r = fixture_report()
+    r.summaries = [M.ProjectSummary("p", False, None, "repo not found", [])]
+    text = R.to_markdown(r, [], [], charts=["c/a.svg"])
+    assert text.index("## Projects") < text.index("## Charts") < text.index("## Totals")
+
+
+def test_markdown_without_charts_is_unchanged() -> None:
+    r = fixture_report()
+    assert R.to_markdown(r, [], []) == R.to_markdown(r, [], [], charts=())
+    assert "## Charts" not in R.to_markdown(r, [], [])
+
+
+def test_no_vault_saves_nothing_and_still_prints(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, out, err = run([], capsys)
+    assert code == 0
+    assert "\nTotals\n" in out
+    assert "report not saved" in err
+
+
+def test_charts_that_fail_leave_a_note_without_embeds(
+    vault: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def fail(*_args: object) -> list[Path]:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(R, "write_charts", fail)
+    _, out, err = run([], capsys)
+    assert "\nTotals\n" in out
+    assert "charts not written: OSError" in err
+    (note,), _ = saved(vault)
+    assert "## Charts" not in note.read_text(encoding="utf-8")
+
+
+def test_a_note_that_fails_leaves_the_charts(
+    vault: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    real_open = os.open
+
+    def fail(path: Any, *args: Any, **kw: Any) -> int:
+        if str(path).endswith(".md"):
+            raise PermissionError("no")
+        return real_open(path, *args, **kw)
+
+    monkeypatch.setattr(R.os, "open", fail)
+    _, out, err = run([], capsys)
+    assert "\nTotals\n" in out
+    assert "note not written: PermissionError" in err
+    notes, folders = saved(vault)
+    assert notes == [] and len(folders) == 1
+
+
+def test_stdout_is_the_same_whether_or_not_it_saves(
+    vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run([], capsys)[1] == run(["--no-save"], capsys)[1]
+
+
+def test_a_default_run_leaves_the_state_root_unchanged(
+    vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def digest() -> dict[str, str]:
+        files = [p for p in sorted(STATE.rglob("*")) if p.is_file()]
+        return {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
+
+    before = digest()
+    run([], capsys)
+    assert digest() == before

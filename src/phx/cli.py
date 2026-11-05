@@ -57,7 +57,7 @@ COMMANDS: dict[str, tuple[str, str]] = {
     "log": ("show or follow the run log", "7"),
     "answer": ("answer a recorded owner question and unblock its phase", "7"),
     "plan": ("parse a plan read-only and print it, the next phase and any drift", "4"),
-    "report": ("resource trends and recommendations across runs, read-only", "12f"),
+    "report": ("resource trends and recommendations; saves a vault note and charts", "12f"),
 }
 
 
@@ -170,7 +170,12 @@ def build_parser() -> argparse.ArgumentParser:
                 help="print Markdown, or write it to PATH",
             )
             cmd.add_argument("--svg", type=Path, metavar="DIR", help="write four SVG charts to DIR")
-            cmd.add_argument("--vault", action="store_true", help="write a timestamped vault note")
+            cmd.add_argument("--vault", action="store_true", help="write only a vault note")
+            cmd.add_argument(
+                "--no-save",
+                action="store_true",
+                help="print only; by default a run with no output option saves a note and charts",
+            )
     return parser
 
 
@@ -979,6 +984,8 @@ def _cmd_report(args: argparse.Namespace) -> int:
             raise ValueError("name repos or use --all, not both")
         if args.top < 1:
             raise ValueError("--top must be at least 1")
+        if args.no_save and (args.vault or args.svg is not None):
+            raise ValueError("--no-save cannot be used with --vault or --svg")
         names = _report_names(args, root)
         loaded = report_load.load(root, names)
         report = report_model.build(
@@ -1004,6 +1011,13 @@ def _cmd_report(args: argparse.Namespace) -> int:
     report.summaries = summaries
     report.warnings += warnings
     recommendations, notes = report_rules.evaluate(report)
+    chose_output = args.json or args.markdown is not None or args.svg is not None or args.vault
+    if not chose_output and not args.no_save:
+        messages = report_render.save_report(
+            report, recommendations, notes, top=args.top, repos=repos
+        )
+        for message in messages:
+            print(message, file=sys.stderr)
     if args.svg is not None:
         for path in report_svg.write_charts(report, args.svg):
             print(f"wrote {path}", file=sys.stderr)

@@ -616,7 +616,7 @@ gantt
 - **Files:** `prompts/PHX_phase-12f-resource-report.md` (new); this plan (row, graph, model rationale, Last updated, this entry); `docs/PHX_DECISIONS.md` (ADR-0032, index row); vault note row and log line; timeline.
 
 ### 2026-11-05 04:58 CST: Phase 12f: `phx report`, resource trends and optimization recommendations (✅ Complete)
-- **Timeline:** started 2026-11-05 04:38 CST (claim commit 54989ce) · finished 2026-11-05 04:58 CST · merged MERGED_TS
+- **Timeline:** started 2026-11-05 04:38 CST (claim commit 54989ce) · finished 2026-11-05 04:58 CST · merged 2026-11-05 04:58 CST
 - **Model:** ran as claude-opus-5-5 (interactive session; plan lists Opus 5.5)
 - **Built:** `src/phx/report/` (`load.py`, `model.py`, `rules.py`, `render.py`, `svg.py`) and `phx report [<repo>…] [--all] [--by month|quarter|year] [--since X] [--until Y] [--exclude …] [--state-root PATH] [--top N] [--json] [--markdown [PATH]] [--svg DIR] [--vault]`. Tolerant loader, one `Totals` class at every grouping, period trends with `n/a` rules, rules R1 to R8 with all thresholds in one table, schema 1 JSON, Markdown, a never-overwriting vault note, four deterministic SVG charts. Docs: user guide section (definitions, rules, synthetic example, JSON), README sentence and command row, architecture, shared layout tree, CHANGELOG, spec amendment R25, ADR-0033.
 - **Deviations (ADR-0033):** the real logs disproved the prompt's plain sums.

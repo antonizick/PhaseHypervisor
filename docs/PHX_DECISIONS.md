@@ -38,6 +38,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0032 | 2026-11-05 04:06 CST | `phx report`: read-only aggregation of the existing `run.jsonl` records across projects, deterministic evidence-cited recommendations (no LLM), terminal/JSON/Markdown/vault/SVG outputs, honest about manual sessions and list-price cost | Accepted | 12f |
 | ADR-0033 | 2026-11-05 04:55 CST | `phx report` charges each run its increase over a resumed session's running totals, keeps cost with no known price apart, and also counts a completion found on resume | Accepted | 12f |
 | ADR-0034 | 2026-11-05 05:21 CST | `phx report` project summaries: README opening as the description, `phx` and manual phases listed for the window, reads each repo's `main` (amends ADR-0032's data-source row), resource totals stay `phx`-only | Accepted | 12g |
+| ADR-0035 | 2026-11-05 06:26 CST | `phx report` saves by default: note and `charts<stamp>` folder in the vault unless an output is chosen, `--no-save` to print only (amends ADR-0032's read-only default) | Accepted | 12h |
 
 ---
 
@@ -632,3 +633,23 @@ A fourth: a verification killed by SIGTERM logs `verify` outcome `failed`, and t
 **Decision.** A on both rows (Nick, 2026-11-05 05:21 CST). This amends ADR-0032's data-source row: the reporter may also read `README.md` and the plan from each repo's `main`, read-only. Transcripts stay unread. Manual phases appear only in the new section, never in a total, rule or chart. README and plan text are untrusted and are sanitised before output. `--no-repos` keeps logs-only output.
 
 **Consequences.** The report now depends on repos being present; a missing one is a note, not a failure. Projects with no state directory stay invisible. A poor description is fixed by editing the README's opening paragraph. Real descriptions go only to the terminal and the vault note, never into public files.
+
+## ADR-0035: `phx report` saves a vault note and charts by default
+**Recorded.** 2026-11-05 06:26 CST (planning for Phase 12h)
+
+**Context.** Nick asked that a plain `phx report` always do what `--vault` and `--svg` do, with the charts folder named `charts<date time stamp>`. ADR-0032 made the report read-only, and scripts may rely on `--json` having no side effects. The request names no location for the folder.
+
+| Decision | Option | Pros | Cons |
+|---|---|---|---|
+| When it saves | **A. Unless an output is chosen** (chosen) | Filtered views are kept; scripts stay clean | Every filtered look adds a note and a folder |
+| | B. Bare command only | Fewest files | `--by quarter` silently saves nothing |
+| | C. Every run | Closest to "always" | `--json` in a script writes files |
+| Charts folder | **A. Beside the note, embedded** (chosen) | Charts show in the note; paired by time stamp | SVGs accumulate in the vault |
+| | B. Beside the note, not embedded | Shorter note | Charts need opening separately |
+| | C. Current directory | No vault needed | Folders land in repos and may be committed |
+| Opt-out | **A. `--no-save`** (chosen) | Looking never has to leave files | One more flag |
+| | B. None | Simplest | Frequent checks fill the vault |
+
+**Decision.** A on all three rows (Nick, 2026-11-05 06:26 CST). `--svc` in the request is read as `--svg`. This amends ADR-0032: the report stays read-only over logs and repos, but its default run writes one note and one charts folder in the vault. Nothing is written under the state root or in a repo, and nothing is overwritten.
+
+**Consequences.** Notes and folders accumulate, with no pruning. With no vault nothing is saved and a message says so. `--state-root` runs save too. Tests must isolate `PHX_VAULT_ROOT`, since a default run would otherwise reach the real vault.

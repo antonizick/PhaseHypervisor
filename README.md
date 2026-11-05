@@ -1,10 +1,55 @@
 # PhaseHypervisor (`phx`)
 
-> **Status: v0.1.0 (released 2026-10-27 04:39 CDT, public repo since 2026-10-27 04:59 CDT).** `phx preflight`, `phx run` and the rest of the CLI work end to end: piloted on real sessions (`docs/PHX_PILOT_REPORT.md`), hardened against a written threat model (`docs/PHX_THREAT_MODEL.md`), and summed up in `docs/PHX_FINAL-REPORT.md` (Definition of done, measured results, known limitations, build timeline). Publishing a GitHub Release object still needs the owner's confirmation.
+**Plan a big build in phases, run each one in a fresh Claude Code session, and keep an accurate record and picture of what happened.**
 
-PhaseHypervisor is a hands-off deployer for implementation plans made with the `phased-project` method. It reads a repo's `<PREFIX>_IMPLEMENTATION_PLAN.md`, asks the owner every foreseeable question once (`phx preflight`), then runs the remaining phases one at a time. Each phase is a fresh headless Claude Code session started through `ai-provider run -p "/phase NN --auto"` on the model the plan names. PHX verifies each phase independently, waits out usage limits and resumes. The supervisor itself is a plain Python program that never calls an LLM.
+Status: v0.1.0, public. The [final report](docs/PHX_FINAL-REPORT.md) has the definition-of-done evidence, measured results and known limitations.
 
-PHX is additive and opt-in (ADR-0011): manual `/phased-project` and `/phase` runs keep working unchanged.
+## Why use it
+PHX is built on the `phased-project` method: a spec, a plan of phases, and one self-contained prompt per phase, each run in its own Claude Code session on the model the plan names. You get three things out of it. They come from the method, so they work with manual `/phase` runs too; `phx` adds the hands-off runner on top.
+
+### Documentation that stays accurate
+Every project gets a spec with amendments, an ADR log, a plan, self-contained phase prompts, a timestamped Phase Log and, at the end, a final report. Updating them is a required step of closing a phase, so they are kept current as the work goes rather than written afterwards. [Project P11](https://github.com/antonizick/project1111) (a local image studio, built with this method) is a public example: its [plan](https://github.com/antonizick/project1111/blob/main/P11_IMPLEMENTATION_PLAN.md), [48 ADRs](https://github.com/antonizick/project1111/blob/main/docs/P11_DECISIONS.md), [phase prompts](https://github.com/antonizick/project1111/tree/main/prompts), [threat model](https://github.com/antonizick/project1111/blob/main/docs/P11_THREAT-MODEL.md) and [final report](https://github.com/antonizick/project1111/blob/main/docs/P11_FINAL-REPORT.md) are all there to read.
+
+### Quick-reference charts
+The plan's status table shows every phase's stage at a glance. This is an excerpt of P11's real table (as of 2026-11-05 01:52 CST; the [full table](https://github.com/antonizick/project1111/blob/main/P11_IMPLEMENTATION_PLAN.md) has 26 phases):
+
+| Phase | Name | Model | Depends on | Status | Gate |
+|---|---|---|---|---|---|
+| 05 | Engine adapter, FakeEngine & lifecycle | Opus 5.5 | 03, 04 | ✅ Complete | auto |
+| 16 | Hardening, security review & QA | Opus 5.5 | 09, 11, 13, 14, 15 | ✅ Complete | auto |
+| 17 | Release & publication | Sonnet 5.5 | 16 | ✅ Complete | review |
+| 17e | Ship the fixes to the running Studio | Opus 5.5 | 17d | ✅ Complete | review |
+| 17f | Release v1.0.2 | Sonnet 5.5 | 17e, 17g, 17h | ⬜ Not started | review |
+
+Stages: ⬜ not started · 🔄 in progress · ⛔ blocked · ✅ complete. Dependencies decide which phase runs next, and a Gate says whether a run may continue by itself or waits for the owner.
+
+### The timeline
+The timeline is generated from the plan's Phase Log and git, not drawn by hand. It shows planning as well as building, collapses idle time and marks blocked time. This is a snapshot of P11 as of 2026-11-05 01:52 CST, unedited ([live version](https://github.com/antonizick/project1111/blob/main/P11_IMPLEMENTATION_PLAN.md#timeline)):
+
+![P11 timeline: a planning lane with brainstorming, plan draft and inserted phases, then one bar per phase, two collapsed idle gaps and a hatched blocked span on Phase 17](docs/images/PHX_example-P11-timeline.svg)
+
+What to look at:
+- **Planning lane (top):** brainstorming, the plan draft, preflight and each later phase insertion, drawn on the same clock as the build.
+- **Zigzag grey bands:** idle gaps (here 1 h 16 m and 2 h 56 m) squeezed out so the chart stays readable instead of stretching over days.
+- **Hatched span on Phase 17:** time the phase sat blocked or paused (8 h 37 m), shown next to its 58 m of active work.
+- **One bar per phase,** labelled with its active time, so a quick glance shows where the effort went.
+
+Its summary totals: elapsed 2 d 17 h, active phase time 1 d 20 h, blocked or paused 8 h 37 m, idle 4 h 12 m in 2 gaps over 60 min.
+
+<details>
+<summary>PHX's own timeline (this project)</summary>
+
+![PHX timeline: the planning lane, one bar per phase and a blocked span](docs/PHX_TIMELINE.svg)
+
+Regenerated whenever a phase is claimed, blocked, resumed or closed; see the plan's [Timeline](PHX_IMPLEMENTATION_PLAN.md#timeline).
+</details>
+
+> I've used this method on several projects now. The timeline is my favourite part: it shows planning and each phase of the build, including the idle gaps and the blocked stretches.
+> — `antonizick`
+
+**What `phx` adds.** The method works without it. `phx` is the optional runner: it asks the foreseeable questions once (`phx preflight`), then runs the remaining phases hands-off, verifies each one independently, and waits out usage limits and resumes.
+
+> **Read this before running `phx`:** it starts AI agents with bypassed permissions on your own machine. See [SECURITY.md](SECURITY.md) and the [threat model](docs/PHX_THREAT_MODEL.md).
 
 ## Use PHX yourself
 This repo also ships the method itself: the `phased-project` skill (which writes each project's plan, prompts and `/phase` and `/phase-add` commands) and the `/phx` command, as a Claude Code plugin with a manual-copy fallback. **Start with [docs/PHX_GETTING_STARTED.md](docs/PHX_GETTING_STARTED.md)**: what the pieces are, how to install them, a first project, and the safety model.
@@ -22,23 +67,29 @@ PHX is built with its own method. Work is split into phases in [PHX_IMPLEMENTATI
 | [PHX_IMPLEMENTATION_PLAN.md](PHX_IMPLEMENTATION_PLAN.md) | Phase table, status, owner questions, phase log |
 | [docs/PHX_DECISIONS.md](docs/PHX_DECISIONS.md) | Architecture decision records |
 | [docs/PHX_ARCHITECTURE.md](docs/PHX_ARCHITECTURE.md) | Components and control flow |
-| [docs/PHX_GETTING_STARTED.md](docs/PHX_GETTING_STARTED.md) | Public guide: install the plugin and `phx`, run a first phased project (Phase 12a) |
-| [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md) | How to use `phx` (grows with each phase) |
-| [docs/PHX_THREAT_MODEL.md](docs/PHX_THREAT_MODEL.md) | Threats, ratings, mitigations and their tests, accepted risks (Phase 11) |
-| [docs/PHX_PILOT_REPORT.md](docs/PHX_PILOT_REPORT.md) | Measured results of the real-token pilots (Phase 10) |
-| [docs/PHX_FINAL-REPORT.md](docs/PHX_FINAL-REPORT.md) | v0.1.0 final report: Definition of done evidence, results, limitations, timeline (Phase 12) |
+| [docs/PHX_GETTING_STARTED.md](docs/PHX_GETTING_STARTED.md) | Public guide: install the plugin and `phx`, run a first phased project |
+| [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md) | How to use `phx` |
+| [docs/PHX_THREAT_MODEL.md](docs/PHX_THREAT_MODEL.md) | Threats, ratings, mitigations and their tests, accepted risks  |
+| [docs/PHX_PILOT_REPORT.md](docs/PHX_PILOT_REPORT.md) | Measured results of the real-token pilots  |
+| [docs/PHX_FINAL-REPORT.md](docs/PHX_FINAL-REPORT.md) | v0.1.0 final report: Definition of done evidence, results, limitations, timeline  |
 | [docs/PHX_AUTO_MODE_CONTRACT.md](docs/PHX_AUTO_MODE_CONTRACT.md) | Hands-off `/phase NN --auto` contract (version 1) shared by PHX and every phase command |
-| [docs/PHX_TIMELINE.svg](docs/PHX_TIMELINE.svg) | Generated picture of this project's planning and build (see the plan's [Timeline](PHX_IMPLEMENTATION_PLAN.md#timeline); `scripts/phase_timeline.py`, Phase 12b) |
+| [docs/PHX_TIMELINE.svg](docs/PHX_TIMELINE.svg) |Generated picture of this project's planning and build (see the plan's [Timeline](PHX_IMPLEMENTATION_PLAN.md#timeline); `scripts/phase_timeline.py`) |
 | [CLAUDE.md](CLAUDE.md) | Rules for AI agents working in this repo |
 
 ## Usage
-`phx plan [<repo>] [--json]` (Phase 04) parses a phased-project repo read-only, from `main`, and prints its phase table with model aliases, Gates and live branches/worktrees, the next eligible phase, resume candidates, drift, open owner questions, the `PHX-CONTRACT` version and the test command. See [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md).
+Full details for every command are in [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md). Install with `uv tool install git+https://github.com/antonizick/PhaseHypervisor`, or `uv tool install --editable .` from a clone.
 
-`phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--dry-run [--skip-test-check]] [--require-preflight]` (Phase 07) runs the remaining phases hands-off: one `/phase NN --auto` session at a time on the plan's model, verified after each phase, waiting out usage limits (or resuming at once when you switch to OpenRouter), pausing at Gates and blocks with a desktop notification. `phx status`, `phx watch`, `phx log [-f]`, `phx stop`, `phx answer <repo> <#> "<answer>"` and `phx resume` manage a run; `--detach` runs it as a systemd user unit. While a session works, a `progress` event in the log (at most every 5 minutes and at once on a stage change) and the live `Doing:` line in `phx status` / the single redrawing line of `phx watch <repo>` show what it is doing, step counts, tokens, cost and an honest ETA — derived from events PHX already parses, at zero token cost (Phase 12d). Install with `uv tool install --editable .`. See [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md).
-
-`phx preflight [<repo>]` (Phase 08) opens one interactive Claude Code session on `opus` that reads the remaining phase prompts, asks you everything it can foresee (in rounds of up to four questions, recommended answer first), records the answers and ADRs, sets Gates, and records `.phx/preflight.json`. `phx run` warns when that record is missing or stale (`--require-preflight` refuses). `--dry-run` shows the prompt and command; `--check` says whether the record is current. See [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUIDE.md).
-
-`/phx status|run|resume|preflight [repo]` (Phase 09; from Phase 12a shipped in the plugin, `plugins/phased-project/commands/phx.md`, typed `/phased-project:phx` when installed as a plugin) drives the CLI from inside a Claude Code session. Each phase session starts through `ai-provider run` when that script is installed, otherwise through `claude` directly.
+| Command | What it does |
+|---|---|
+| `phx plan [<repo>] [--json]` | Read-only: parse a plan from `main` and show phases, models, Gates, live branches, the next eligible phase, drift and open owner questions |
+| `phx preflight [<repo>]` | One interactive session that asks every foreseeable question, records answers and ADRs, sets Gates; `phx run` warns when the record is missing or stale |
+| `phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--dry-run]` | Run the remaining phases hands-off, verifying each one, waiting out usage limits, pausing at Gates and blocks |
+| `phx status [<repo>]` | Run state, plus a live `Doing:` line with step counts, tokens, cost and an ETA range |
+| `phx watch <repo>` | One redrawing line of live progress; turns amber before the idle timeout |
+| `phx log [-f]` | The run's event log |
+| `phx answer <repo> <#> "<answer>"` / `phx resume` | Answer a blocking owner question and continue |
+| `phx stop` | Stop a run |
+| `/phx status\|run\|resume\|preflight [repo]` | The same from inside Claude Code (typed `/phased-project:phx` when installed as a plugin) |
 
 ## Development setup
 ```bash

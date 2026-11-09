@@ -14,7 +14,7 @@ phx = "phx.cli:main"
 
 [dependency-groups]
 dev = [
-    "coverage>=7.6",
+    "coverage>=7.17.2",
     "mypy>=1.13",
     "pre-commit>=4.0",
     "pytest>=8.3",

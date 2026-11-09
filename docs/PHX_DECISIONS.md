@@ -39,6 +39,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0033 | 2026-11-05 04:55 CST | `phx report` charges each run its increase over a resumed session's running totals, keeps cost with no known price apart, and also counts a completion found on resume | Accepted | 12f |
 | ADR-0034 | 2026-11-05 05:21 CST | `phx report` project summaries: README opening as the description, `phx` and manual phases listed for the window, reads each repo's `main` (amends ADR-0032's data-source row), resource totals stay `phx`-only | Accepted | 12g |
 | ADR-0035 | 2026-11-05 06:26 CST | `phx report` saves by default: note and `charts<stamp>` folder in the vault unless an output is chosen, `--no-save` to print only (amends ADR-0032's read-only default) | Accepted | 12h |
+| ADR-0036 | 2026-11-09 17:40 CST | `phx run --only NN` runs exactly one named phase, ignoring other phases' states; gates and refusals still apply to it | Accepted | 12i |
 
 ---
 
@@ -653,3 +654,19 @@ A fourth: a verification killed by SIGTERM logs `verify` outcome `failed`, and t
 **Decision.** A on all three rows (Nick, 2026-11-05 06:26 CST). `--svc` in the request is read as `--svg`. This amends ADR-0032: the report stays read-only over logs and repos, but its default run writes one note and one charts folder in the vault. Nothing is written under the state root or in a repo, and nothing is overwritten.
 
 **Consequences.** Notes and folders accumulate, with no pruning. With no vault nothing is saved and a message says so. `--state-root` runs save too. Tests must isolate `PHX_VAULT_ROOT`, since a default run would otherwise reach the real vault.
+
+## ADR-0036: `phx run --only NN` runs exactly one named phase
+**Recorded.** 2026-11-09 17:40 CST (planning for Phase 12i; decided by Nick in the Lucent2 Phase 20k session, Lucent2 ADR-0120)
+
+**Context.** Lucent2's self-improvement plans a change request as a new phase and, after Nick's yes, must have PHX build only that phase. `phx run` picks the lowest eligible phase and ends at the first owner gate or other `🔄` phase, so in a plan with earlier owner-gated phases the new one is never reached. `--until` and `--max-phases` only bound the run from above.
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. `phx run --only NN`** (chosen) | Keeps PHX's locks, usage-limit waits, verification and notices; small, testable change | A PHX phase must ship before Lucent2's live run |
+| B. Lucent2 runs `/phase NN --auto` itself | Works today | Duplicates the supervisor without its waits and checks; "built by PHX" is no longer true |
+| C. Refuse unless `NN` is next | No change anywhere | Unusable while earlier owner-gated phases exist |
+
+**Decision.** A. `--only NN` changes only which phase the supervisor picks: other phases' states (eligible, owner-gated, `🔄` by hand, `⛔`) never stop or redirect the run. For `NN` itself the usual rules hold: unknown → refuse, complete → nothing to do, a dependency not `✅` or an open question → refuse, `owner` → refuse, `🔄`/`⛔` → resume as today. The run ends after `NN`, also for a `review` gate. Exit 0 only when `NN` is `✅ Complete`. `--only` excludes `--until`, `--max-phases` and `--pause-after`. Contract version stays 1.
+
+**Consequences.** Lucent2 detects support from `phx run --help` and stays hidden until it is installed. Two runs on one repo remain impossible (the per-repo lock), so a manual `🔄` phase and an `--only` run can coexist only in different worktrees, as today.
+

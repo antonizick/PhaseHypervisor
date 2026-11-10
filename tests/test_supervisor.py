@@ -873,3 +873,85 @@ def test_progress_shows_the_wait_not_a_stale_line(h: Callable[..., H]) -> None:
     assert x.run(until="01") == EXIT_FINISHED
     assert any("waiting for capacity" in s for s in seen)
     assert x.state().progress is None  # cleared when the wait ended
+
+
+# --------------------------------------------------------------------------- --only (12i)
+
+ROW_01 = "| 00 | ⬜ Not started | [SMP_phase-01-hello.md](prompts/SMP_phase-01-hello.md) | auto |"
+ROW_01A_DEPS = "| Haiku 5.5 (`claude-haiku-5-5`) | 01 | ⬜ Not started |"
+
+
+def only_rig(x: H) -> H:
+    """01a depends on 00 only, so 01 and 01a are both eligible and 01 comes first."""
+    x.all_auto().decide_q1()
+    x.edit_plan(ROW_01A_DEPS, "| Haiku 5.5 (`claude-haiku-5-5`) | 00 | ⬜ Not started |")
+    return x
+
+
+def test_only_runs_the_named_phase_past_a_lower_eligible_one(h: Callable[..., H]) -> None:
+    x = only_rig(h())
+    assert x.run(only="01a") == EXIT_FINISHED
+    assert x.phase_calls() == ["01a"]
+    assert x.status("01a") is Status.COMPLETE and x.status("01") is Status.NOT_STARTED
+    end = x.last_event("run_end")
+    assert end["rule"] == "only" and end["reason"] == "--only 01a done"
+
+
+def test_only_ignores_owner_gates_and_other_in_progress_phases(h: Callable[..., H]) -> None:
+    x = only_rig(h())
+    x.edit_plan(ROW_01, ROW_01.replace("⬜ Not started", "🔄 In progress").replace("auto", "owner"))
+    assert x.run() == EXIT_PAUSED  # a plain run stops at the owner phase being run by hand
+    assert x.last_event("run_end")["rule"] == "owner_gate"
+    assert x.run(only="01a") == EXIT_FINISHED
+    assert x.phase_calls() == ["01a"] and x.status("01") is Status.IN_PROGRESS
+    # the plain run's pause, about 01, is kept for the next plain run
+    pause = x.state().pause
+    assert pause is not None and pause.phase == "01" and pause.rule == "owner_gate"
+    assert x.last_event("pause_carried")["phase"] == "01"
+
+
+def test_only_refusals(h: Callable[..., H]) -> None:
+    x = h().all_auto()
+    assert x.run(only="07") == EXIT_ERROR
+    assert x.last_event("run_end")["rule"] == "only_unknown"
+    assert x.run(only="00") == EXIT_FINISHED
+    assert x.last_event("run_end")["rule"] == "only_done"
+    assert x.run(only="02") == EXIT_PAUSED
+    end = x.last_event("run_end")
+    assert end["rule"] == "only_deps" and "01a (⬜ Not started)" in end["reason"]
+    assert x.calls() == []
+
+
+def test_only_refuses_an_open_question_and_an_owner_gate(h: Callable[..., H]) -> None:
+    x = h().all_auto()
+    x.edit_plan(
+        "| Favourite colour? | Open. Proposed default: blue | Phase 02 |",
+        "| Favourite colour? | Open. Proposed default: blue | Phase 01 |",
+    )
+    assert x.run(only="01") == EXIT_PAUSED
+    end = x.last_event("run_end")
+    assert end["rule"] == "blocked" and "#1" in end["reason"]
+    # that pause names 01, so the next --only 01 needs phx resume, as any pause does
+    x.decide_q1()
+    assert x.run(only="01") == EXIT_PAUSED
+    assert "`phx resume` clears the pause" in x.last_event("refused")["reason"]
+    x.edit_plan(ROW_01, ROW_01.replace("auto", "owner"))
+    assert x.run(only="01", resume=True) == EXIT_PAUSED
+    assert x.last_event("run_end")["rule"] == "owner_gate"
+    assert x.calls() == []
+
+
+def test_only_ends_after_a_review_gated_phase(h: Callable[..., H]) -> None:
+    x = h().all_auto().decide_q1()
+    x.edit_plan(ROW_01, ROW_01.replace("auto", "review"))
+    assert x.run(only="01") == EXIT_FINISHED
+    assert x.phase_calls() == ["01"] and x.last_event("run_end")["rule"] == "only"
+
+
+def test_only_dry_run_lists_only_the_named_phase(h: Callable[..., H]) -> None:
+    x = only_rig(h())
+    assert x.run(only="01a", dry_run=True, test_check=False) == EXIT_FINISHED
+    out = x.out.getvalue()
+    assert "01a  Inserted phase" in out and "  01  Hello file" not in out
+    assert [s["phase"] for s in x.last_event("dry_run")["steps"]] == ["01a"]
+    assert x.calls() == []

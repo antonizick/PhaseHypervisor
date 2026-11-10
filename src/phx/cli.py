@@ -108,6 +108,11 @@ def build_parser() -> argparse.ArgumentParser:
                 "--max-phases", metavar="N", type=int, help="stop after N phases complete"
             )
             cmd.add_argument(
+                "--only",
+                metavar="NN",
+                help="run only phase NN, then stop; other phases' states are ignored",
+            )
+            cmd.add_argument(
                 "--dry-run", action="store_true", help="print what would run; launch nothing"
             )
             cmd.add_argument(
@@ -299,6 +304,8 @@ def _forward_args(args: argparse.Namespace) -> list[str]:
         out += ["--until", args.until]
     if args.max_phases is not None:
         out += ["--max-phases", str(args.max_phases)]
+    if args.only:
+        out += ["--only", args.only]
     if args.require_preflight:
         out.append("--require-preflight")
     return out
@@ -308,6 +315,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
     if os.geteuid() == 0:
         print("phx: refusing to run as root (spec S1)", file=sys.stderr)
         return EXIT_ERROR
+    if args.only and (args.until or args.max_phases is not None or args.pause_after):
+        print(
+            "phx: --only runs one phase; it cannot be combined with --until, --max-phases "
+            "or --pause-after",
+            file=sys.stderr,
+        )
+        return EXIT_ERROR
     repo = _repo(args.repo)
     if args.max_phases is not None and args.max_phases < 1:
         raise SystemExit("phx: --max-phases must be at least 1")
@@ -315,6 +329,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         pause_after=_phase_arg(args.pause_after, "--pause-after"),
         max_phases=args.max_phases,
         until=_phase_arg(args.until, "--until"),
+        only=_phase_arg(args.only, "--only"),
         dry_run=args.dry_run,
         resume=args.command == "resume",
         require_preflight=args.require_preflight,

@@ -157,6 +157,7 @@ Supervisor.run
   state.json: refuse if paused (unless phx resume); carry sessions, wait, recoveries from the last run
   loop ─────────────────────────────────────────────────────────────────────────────┐
     load_plan + check_contract (first round: config from main, test-command warnings) │
+    _select: --only NN → that phase or a refusal (other phases ignored, ADR-0036)  │
     _select: pending wait → 🔄 (check_resumable; --resume recorded session | fresh) │
              → ⛔ (pause if a question is open | fresh) → next_eligible → finished/pause
     Gate owner → pause · require_alias → pause on unknown model                      │

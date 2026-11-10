@@ -51,7 +51,7 @@ Publishing is never pre-approved: making a repo public, publishing a release or 
 
 ## `phx run`: run a plan hands-off
 ```bash
-phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--dry-run [--skip-test-check]] [--require-preflight]
+phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--only NN] [--dry-run [--skip-test-check]] [--require-preflight]
 ```
 Each round, PHX re-reads the plan from `main` and picks, in this order:
 1. a usage-limit wait left by an earlier run (it finishes the wait, then resumes that session);
@@ -66,10 +66,11 @@ Options:
 - `--pause-after NN`: pause after phase NN completes.
 - `--until NN`: run up to and including NN, start nothing later, then finish.
 - `--max-phases N`: finish after N phases complete in this run.
+- `--only NN` (Phase 12i, ADR-0036): run exactly phase NN, then finish (`--only NN done`, also after a `review` gate). Other phases' states are ignored: a lower eligible phase, another owner-gated phase, a phase someone is running by hand (`🔄`) and a pause recorded about another phase (kept for the next plain run, `pause_carried` in the log) neither stop nor redirect it. For NN itself the usual rules hold: not in the table → exit 1 (`only_unknown`); already `✅` → exit 0 with nothing launched (`only_done`); a dependency not `✅` (`only_deps`), an open owner question needing it (`blocked`) or Gate `owner` → paused, exit 3; `🔄` resumes with the live-session check, `⛔` with its questions answered resumes (contract §4.3). A pause that names NN still needs `phx resume --only NN`. Cannot be combined with `--until`, `--max-phases` or `--pause-after`. Lucent2's self-improvement (Lucent2 Phase 20k) uses it to build one planned phase.
 - `--dry-run`: print the phases it would run in order (assuming each completes), with the exact launch command, and where it would stop. Launches nothing, takes no lock, writes no state. It then runs the test command once, exactly as verification will (a clean clone of `main`, no installed dependencies, no shell). If the command fails, PHX says so; when the repo tracks a lockfile (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `uv.lock`), it also prints a `test_command` for `.phx/config.toml` that installs dependencies first (Phase 11). A failure can be expected early in a plan, before the phase that adds what the tests check. `--skip-test-check` skips this step.
 - `--require-preflight`: refuse to start (exit 1, rule `preflight_missing` or `preflight_stale`) unless a current preflight is recorded. Without it, PHX only warns. A `phx resume` refused this way keeps its pause (`pause_kept` in the log).
 
-Exit status: `0` finished (nothing left, or `--until`/`--max-phases` reached), `1` error (another supervisor running, plan or contract problem, repo outside `~/Work`, internal error), `3` paused, `4` stopped.
+Exit status: `0` finished (nothing left, `--until`/`--max-phases` reached, or the `--only` phase complete), `1` error (another supervisor running, plan or contract problem, repo outside `~/Work`, internal error), `3` paused, `4` stopped.
 
 Only one supervisor runs on the machine at a time (ADR-0007). While it runs, a manual `/phase` in that repo sees its lock and stops instead of claiming (contract §8). If the manual check cannot run (for example, a permission prompt denies it), `/phase` stops too and says so (fail-closed, ADR-0020).
 

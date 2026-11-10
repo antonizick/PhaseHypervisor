@@ -288,3 +288,29 @@ def test_watch_json_prints_one_object_per_change(
     assert payload["status"] == "running"
     assert payload["progress"]["stage"] == "working"
     assert payload["frame"].startswith("12d attempt 1")
+
+
+def test_run_help_lists_only(capsys: pytest.CaptureFixture[str]) -> None:
+    """Lucent2 (ADR-0120) detects `--only` from this help text."""
+    with pytest.raises(SystemExit):
+        main(["run", "--help"])
+    assert "--only NN" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "extra", [["--until", "02"], ["--max-phases", "1"], ["--pause-after", "01"]]
+)
+def test_only_excludes_the_other_bounds(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], extra: list[str]
+) -> None:
+    code = main(["--state-dir", str(tmp_path), "run", str(tmp_path), "--only", "01", *extra])
+    assert code == 1
+    assert "--only runs one phase" in capsys.readouterr().err
+
+
+def test_detach_forwards_only(tmp_path: Path) -> None:
+    from phx.cli import _forward_args, build_parser
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    args = build_parser().parse_args(["run", str(tmp_path), "--detach", "--only", "20o"])
+    assert _forward_args(args)[-2:] == ["--only", "20o"]

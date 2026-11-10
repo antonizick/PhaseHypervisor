@@ -4,6 +4,9 @@ All notable changes to PhaseHypervisor are recorded here. The format follows [Ke
 
 ## [Unreleased]
 
+### Added
+- Phase 12i: `phx run --only NN` (and `phx resume --only NN`) runs exactly one named phase with PHX's locks, usage-limit waits, verification and notices, then finishes. Other phases' states are ignored, including owner-gated and hand-run `🔄` phases and a pause about another phase, which is kept; for the named phase an unknown ID, a dependency not complete, an open owner question or Gate `owner` is refused, and a complete phase is a no-op. Cannot be combined with `--until`, `--max-phases` or `--pause-after`. `--dry-run` and `--detach` honour it. ADR-0036, spec R28. Built for Lucent2's self-improvement.
+
 ### Changed
 - Phase 12e: the README now opens with why to use PHX (accurate documentation, quick-reference status charts, the visual timeline) instead of only how it works. It embeds an unedited snapshot of project P11's real timeline (`docs/images/PHX_example-P11-timeline.svg`, from P11 `origin/main` commit `bccc1f2`), a real status-table excerpt and a short note from the maintainer, and `Usage` is now a command table that includes `phx watch`. The bypassed-permissions warning stays in the opening. Two more sections cover the built-in security phase (threat model, review, resolution) and resource tracking (time, models, tokens, cost) for post-project analysis and trends.
 

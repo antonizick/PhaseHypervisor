@@ -121,6 +121,7 @@ class RunOptions:
     resume: bool = False  # `phx resume`: clear a pause first
     require_preflight: bool = False  # refuse instead of warn without a current preflight
     test_check: bool = True  # dry run: run the test command once in a clean clone (F9)
+    only: str | None = None  # `--only NN`: run exactly this phase, then end (ADR-0036)
 
 
 class EndKind(StrEnum):
@@ -211,6 +212,7 @@ class Supervisor:
         self._last_growth = 0.0
         self._state_unsaved = False
         self._held_pause: Pause | None = None  # the pause `phx resume` clears once it starts
+        self._carried_pause: Pause | None = None  # `--only`: another phase's pause, kept
         self._tracker: ProgressTracker | None = None  # live session activity (Phase 12d)
         self._plan_file: str | None = None
 
@@ -279,7 +281,22 @@ class Supervisor:
 
     def _run_locked(self, started: str) -> int:
         prev = load_state(self.state_dir)
-        if prev and prev.pause and not self.options.resume:
+        if (
+            prev
+            and prev.pause
+            and not self.options.resume
+            and self.options.only is not None
+            and prev.pause.phase != self.options.only
+        ):
+            # ADR-0036: a pause about another phase does not stop `--only`; it is kept
+            self._carried_pause = prev.pause
+            self.log.event(
+                "pause_carried",
+                phase=prev.pause.phase,
+                reason=f"--only {self.options.only} ignores the pause on another phase "
+                f"({prev.pause.reason}); it is kept for the next plain run",
+            )
+        elif prev and prev.pause and not self.options.resume:
             self.log.event(
                 "refused",
                 phase=prev.pause.phase,
@@ -465,6 +482,8 @@ class Supervisor:
             # finished outside PHX (by hand after a stop): never resume that session later
             del self.state.sessions[pid]
             self.log.event("session_dropped", phase=pid, reason=f"phase {pid} is ✅ Complete")
+        if self.options.only is not None:
+            return self._choose_only(plan, self.options.only, live_check=live_check)
         choice = self._choose(plan, elig.next, elig.resume, live_check=live_check)
         until = self.options.until
         if (
@@ -524,44 +543,7 @@ class Supervisor:
                 resume[0].id,
             )
         if resume:
-            p = resume[0]
-            if p.gate is Gate.OWNER:
-                return End(
-                    EndKind.PAUSED,
-                    f"phase {p.id} has Gate owner and is 🔄 In progress (being run by hand?): "
-                    f"finish it with /phase {p.id}, then phx resume",
-                    "owner_gate",
-                    p.id,
-                )
-            if live_check:
-                r = check_resumable(
-                    self.repo,
-                    p.id,
-                    since=last_session_end(self.state_dir, p.id),
-                    proc_root=self.proc_root,
-                    exclude=self.exclude,
-                )
-                self.log.event("resume_check", phase=p.id, reason=r.reason, resumable=r.resumable)
-                if not r.resumable:
-                    return End(EndKind.PAUSED, r.reason, "live_session", p.id)
-            sid = self.state.sessions.get(p.id)
-            if sid:
-                return Selection(
-                    p,
-                    continue_prompt(p.id),
-                    sid,
-                    f"phase {p.id} is 🔄 In progress and PHX recorded its session {sid}; "
-                    "resuming that session (R14)",
-                    "resume_recorded",
-                )
-            return Selection(
-                p,
-                phase_prompt(p.id),
-                None,
-                f"phase {p.id} is 🔄 In progress with no PHX session recorded; "
-                "a fresh /phase --auto session resumes it (R14)",
-                "resume_fresh",
-            )
+            return self._resume_in_progress(resume[0], live_check=live_check)
 
         for p in plan.phases:
             if p.status is not Status.BLOCKED:
@@ -619,6 +601,110 @@ class Supervisor:
             question_ids=open_ids,
         )
 
+    def _choose_only(self, plan: Plan, only: str, *, live_check: bool) -> Selection | End:
+        """``--only NN`` (ADR-0036): that phase or a refusal; other phases are ignored."""
+        try:
+            p = plan.phase(only)
+        except KeyError:
+            return End(EndKind.FAILED, f"--only {only}: no such phase in the plan", "only_unknown")
+        if p.status is Status.COMPLETE:
+            return End(
+                EndKind.FINISHED, f"--only {only}: phase is already ✅ Complete", "only_done", p.id
+            )
+        status = {q.id: q.status for q in plan.phases}
+        unmet = [d for d in p.depends_on if status.get(d) is not Status.COMPLETE]
+        if unmet:
+            parts = ", ".join(
+                f"{d} ({STATUS_LABELS[status[d]] if d in status else 'missing'})" for d in unmet
+            )
+            return End(
+                EndKind.PAUSED,
+                f"--only {only}: dependencies not complete: {parts}",
+                "only_deps",
+                p.id,
+            )
+        open_qs = plan.open_questions_for(p.id)
+        if open_qs:
+            ids = tuple(q.id for q in open_qs)
+            return End(
+                EndKind.PAUSED,
+                f"phase {p.id} is waiting on open owner question "
+                + ", ".join(f"#{q}" for q in ids),
+                "blocked",
+                p.id,
+                question_ids=ids,
+            )
+        wait = self.state.wait
+        if wait is not None and wait.phase == p.id and p.status is not Status.BLOCKED:
+            return Selection(
+                p,
+                wait.prompt or continue_prompt(p.id),
+                wait.session_id,
+                f"--only {only}: a usage-limit wait for it is pending; finishing it",
+                "pending_wait",
+                wait,
+            )
+        if p.status is Status.IN_PROGRESS:
+            return self._resume_in_progress(p, live_check=live_check)
+        if p.gate is Gate.OWNER:
+            return self._owner_gate(p)
+        if p.status is Status.BLOCKED:
+            return Selection(
+                p,
+                phase_prompt(p.id),
+                None,
+                f"--only {only}: ⛔ Blocked and its questions are answered; "
+                "/phase --auto resumes it (contract §4.3)",
+                "resume_blocked",
+            )
+        return Selection(
+            p,
+            phase_prompt(p.id),
+            None,
+            f"--only {only}: the named phase (⬜, dependencies ✅)",
+            "only",
+        )
+
+    def _resume_in_progress(self, p: Phase, *, live_check: bool) -> Selection | End:
+        """Resume a 🔄 phase: owner gate, live-session check, recorded session (R14)."""
+        if p.gate is Gate.OWNER:
+            return End(
+                EndKind.PAUSED,
+                f"phase {p.id} has Gate owner and is 🔄 In progress (being run by hand?): "
+                f"finish it with /phase {p.id}, then phx resume",
+                "owner_gate",
+                p.id,
+            )
+        if live_check:
+            r = check_resumable(
+                self.repo,
+                p.id,
+                since=last_session_end(self.state_dir, p.id),
+                proc_root=self.proc_root,
+                exclude=self.exclude,
+            )
+            self.log.event("resume_check", phase=p.id, reason=r.reason, resumable=r.resumable)
+            if not r.resumable:
+                return End(EndKind.PAUSED, r.reason, "live_session", p.id)
+        sid = self.state.sessions.get(p.id)
+        if sid:
+            return Selection(
+                p,
+                continue_prompt(p.id),
+                sid,
+                f"phase {p.id} is 🔄 In progress and PHX recorded its session {sid}; "
+                "resuming that session (R14)",
+                "resume_recorded",
+            )
+        return Selection(
+            p,
+            phase_prompt(p.id),
+            None,
+            f"phase {p.id} is 🔄 In progress with no PHX session recorded; "
+            "a fresh /phase --auto session resumes it (R14)",
+            "resume_fresh",
+        )
+
     def _owner_gate(self, p: Phase) -> End:
         return End(
             EndKind.PAUSED,
@@ -634,6 +720,9 @@ class Supervisor:
         return None
 
     def _gate_after(self, p: Phase) -> End | None:
+        if self.options.only == p.id:
+            # the named phase is done; a review gate has no next phase to pause before
+            return End(EndKind.FINISHED, f"--only {p.id} done", "only", p.id)
         if p.gate is Gate.REVIEW:
             return End(
                 EndKind.PAUSED,
@@ -1015,6 +1104,8 @@ class Supervisor:
             self.state.pause = Pause(
                 end.reason, end.rule, end.phase, now_ts(), list(end.question_ids), summary
             )
+        elif self._carried_pause is not None:
+            self.state.pause = self._carried_pause  # `--only` leaves another phase's pause
         elif self._held_pause is not None:
             self.state.pause = self._held_pause
             self.log.event(
@@ -1178,7 +1269,11 @@ class Supervisor:
                     EndKind.FINISHED, f"--max-phases {self.options.max_phases}", "max_phases"
                 )
             elig = next_eligible(sim)
-            choice = self._choose(sim, elig.next, elig.resume, live_check=False)
+            choice = (
+                self._choose_only(sim, self.options.only, live_check=False)
+                if self.options.only is not None
+                else self._choose(sim, elig.next, elig.resume, live_check=False)
+            )
             if isinstance(choice, End):
                 return choice
             p = choice.phase

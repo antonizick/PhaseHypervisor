@@ -91,7 +91,7 @@ Full details for every command are in [docs/PHX_USER_GUIDE.md](docs/PHX_USER_GUI
 |---|---|
 | `phx plan [<repo>] [--json]` | Read-only: parse a plan from `main` and show phases, models, Gates, live branches, the next eligible phase, drift and open owner questions |
 | `phx preflight [<repo>]` | One interactive session that asks every foreseeable question, records answers and ADRs, sets Gates; `phx run` warns when the record is missing or stale |
-| `phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--dry-run]` | Run the remaining phases hands-off, verifying each one, waiting out usage limits, pausing at Gates and blocks |
+| `phx run [<repo>] [--detach] [--pause-after NN] [--until NN] [--max-phases N] [--only NN] [--dry-run]` | Run the remaining phases hands-off, verifying each one, waiting out usage limits, pausing at Gates and blocks; `--only NN` runs just that phase |
 | `phx status [<repo>]` | Run state, plus a live `Doing:` line with step counts, tokens, cost and an ETA range |
 | `phx watch <repo>` | One redrawing line of live progress; turns amber before the idle timeout |
 | `phx log [-f]` | The run's event log |

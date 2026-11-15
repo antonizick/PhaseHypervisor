@@ -40,6 +40,7 @@ Lightweight ADRs. Append new decisions at the bottom, and never rewrite history:
 | ADR-0034 | 2026-11-05 05:21 CST | `phx report` project summaries: README opening as the description, `phx` and manual phases listed for the window, reads each repo's `main` (amends ADR-0032's data-source row), resource totals stay `phx`-only | Accepted | 12g |
 | ADR-0035 | 2026-11-05 06:26 CST | `phx report` saves by default: note and `charts<stamp>` folder in the vault unless an output is chosen, `--no-save` to print only (amends ADR-0032's read-only default) | Accepted | 12h |
 | ADR-0036 | 2026-11-09 17:40 CST | `phx run --only NN` runs exactly one named phase, ignoring other phases' states; gates and refusals still apply to it | Accepted | 12i |
+| ADR-0037 | 2026-11-15 07:39 CST | Brainstorm documents are a first-class planning input: detected by convention, drawn in the timeline from their own entry stamps, traced into the spec, read by `/phase`, `/phase-add` and preflight | Accepted | 12j |
 
 ---
 
@@ -670,3 +671,18 @@ A fourth: a verification killed by SIGTERM logs `verify` outcome `failed`, and t
 
 **Consequences.** Lucent2 detects support from `phx run --help` and stays hidden until it is installed. Two runs on one repo remain impossible (the per-repo lock), so a manual `🔄` phase and an `--only` run can coexist only in different worktrees, as today.
 
+## ADR-0037: Brainstorm documents are captured by the method, the timeline and PHX
+**Recorded.** 2026-11-15 07:39 CST (planning for Phase 12j; requested by Nick)
+
+**Context.** Projects usually start as a timestamped brainstorming transcript in the repo root. The method reads it only informally, nothing records what it contributed, the timeline shows brainstorming only when someone hand-writes a `Planning:` entry, and an untracked brainstorm file stops `phx`'s timeline refresh.
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Detect by convention; time from entry stamps; trace content once in the spec; read by every command** (chosen) | No retyping, no drift, same on every project; the trace shows where each idea went | A convention to learn; the generator reads one more input |
+| B. Hand-written `Planning:` entries only (today) | No code | Inconsistent, forgotten, times retyped |
+| C. Summarise the brainstorm with an LLM inside `phx` | Richer digest | The supervisor never calls an LLM (spec); cost and nondeterminism |
+| D. Copy the whole brainstorm into the spec | Complete | Duplicates a 1,000-line transcript and goes stale |
+
+**Decision.** A. A root Markdown file whose name contains `brainstorm` (or a `**Brainstorm:**` plan header) is the source. The generator draws bursts (gap over 90 minutes) from its `**YYYY-MM-DD HH:MM**` entry headers, unless a hand-written brainstorm `Planning:` entry exists. `/phased-project` writes a Brainstorm trace (item, stamp, disposition) in the spec Amendments, a `- **Brainstorm:**` Phase Log bullet and a vault section; `/phase-add` reads only entries after "covered through"; `/phase` and preflight read the trace. The refresh ignores untracked and brainstorm files. The file is committed with Phase 00 unless the owner marks it private. The `PHX-CONTRACT` stays 1.
+
+**Consequences.** Existing projects keep their output byte for byte until a rollout phase copies the new script and commands in. Content beyond stamps and labels is never parsed by tools; the trace is written by the planning agent.

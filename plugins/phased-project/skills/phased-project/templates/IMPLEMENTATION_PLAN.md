@@ -2,7 +2,8 @@
 
 **Spec:** [`docs/{{PREFIX}}_SPECIFICATION.md`](docs/{{PREFIX}}_SPECIFICATION.md). **Decisions:** [`docs/{{PREFIX}}_DECISIONS.md`](docs/{{PREFIX}}_DECISIONS.md). **Agent rules:** [`CLAUDE.md`](CLAUDE.md). **Shared phase instructions:** [`prompts/{{PREFIX}}_shared-instructions.md`](prompts/{{PREFIX}}_shared-instructions.md)
 **Last updated:** {{TIMESTAMP}} (Phase 00, planning)
-
+{{#BRAINSTORM}}**Brainstorm:** {{BRAINSTORM_FILES}} (traced in the spec's Amendments, "Brainstorm trace"; drawn in the timeline's Planning lane)
+{{/BRAINSTORM}}
 > ⚠️ **Mandatory:** every agent that works on this project keeps this file accurate. **Before doing any other work, set your phase to `🔄 In progress` and commit that change to `main`** (claim protocol: `prompts/{{PREFIX}}_shared-instructions.md` §1a). Other agents read this table from `main`. At the end, set it to `✅ Complete` or `⛔ Blocked` and add a Phase Log entry. See `CLAUDE.md`.
 
 ## How to run a phase
@@ -58,4 +59,5 @@ Newest entries at the bottom. Format: `### YYYY-MM-DD HH:MM TZ: Phase NN: <title
 
 ### {{TIMESTAMP}}: Phase 00: Planning & spec refinement (✅ Complete)
 - **Timeline:** started {{PHASE00_STARTED}} · finished {{TIMESTAMP}}
-{{PHASE00_LOG_BULLETS}}
+{{#BRAINSTORM}}- **Brainstorm:** `{{BRAINSTORM_FILES}}`, {{N_ENTRIES}} entries from {{FIRST_STAMP}} to {{LAST_STAMP}}; {{N_ADOPTED}} adopted, {{N_DEFERRED}} deferred, {{N_DROPPED}} dropped (spec Amendments, "Brainstorm trace"); covered through {{LAST_STAMP}}.
+{{/BRAINSTORM}}{{PHASE00_LOG_BULLETS}}

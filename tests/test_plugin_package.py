@@ -183,11 +183,13 @@ TIMELINE_FRAGMENTS = (
     ", the timeline SVG included,",
 )
 TIMELINE_SENTENCE = re.compile(r" Run `python3 scripts/phase_timeline\.py --check`.*?close-out\)\.")
-TIMELINE_LINE = re.compile(r"refresh the timeline|Timeline refreshed|^- Refresh the timeline", re.I)
+TIMELINE_LINE = re.compile(
+    r"refresh the timeline|Timeline refreshed|^- Refresh the timeline|brainstorm", re.I
+)
 
 
 def without_timeline(text: str) -> str:
-    """Rendered template text with the Phase 12b timeline additions taken out again."""
+    """Rendered template text without the 12b timeline and 12j brainstorm additions."""
     text = re.sub(r"\n## 4a\. Visual timeline.*?(?=\n## |\Z)", "", text, flags=re.S)
     text = TIMELINE_SENTENCE.sub("", text)
     for fragment in TIMELINE_FRAGMENTS:

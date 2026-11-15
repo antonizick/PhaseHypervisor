@@ -13,6 +13,7 @@ a planning Phase Log entry, ADRs for any decisions made now, {{#VAULT}}the vault
 - Read `CLAUDE.md`, `{{PREFIX}}_IMPLEMENTATION_PLAN.md` (from `main`, including the Phase Log and owner questions),
   `prompts/{{PREFIX}}_shared-instructions.md`, `docs/{{PREFIX}}_DECISIONS.md` (the list of ADR titles plus any the request touches),
   the Amendments section of `docs/{{PREFIX}}_SPECIFICATION.md`, and the **most recent phase prompt** as a style reference.
+- **Brainstorm.** If the project has a brainstorm document (the plan's `**Brainstorm:**` header, else a root Markdown file with "brainstorm" in its name), read the spec's Brainstorm trace and every brainstorm entry stamped after the trace's "Covered through" time.
 
 ## 1. Intake
 **No argument (`$ARGUMENTS` is empty): interview {{OWNER}} before anything else.** Never guess the request.
@@ -32,6 +33,7 @@ a planning Phase Log entry, ADRs for any decisions made now, {{#VAULT}}the vault
 1. The request is either a file path (read it in full, plus everything it attaches or links) or pasted text.
    The recommended shape is `prompts/{{PREFIX}}_change-request-template.md`, but any free text works.
 2. Split it into numbered items. Keep {{OWNER}}'s wording: the prompt will quote it under "{{OWNER}}'s request (verbatim intent, TIMESTAMP)".
+   Brainstorm entries newer than "Covered through" are part of the request: number them as items too and quote them with their stamps. Each gets a trace row (Adopted, Deferred or Dropped, with where it went); then move "Covered through" to the newest entry read.
 3. **Ground every item in the code.** Find the files, functions, routes, templates, settings, ADRs and docs
    it touches, and note what already exists, what is half-built, and anything that contradicts the request
    (for example a UI hint promising a feature that does not exist). This becomes the prompt's
@@ -90,6 +92,7 @@ a planning Phase Log entry, ADRs for any decisions made now, {{#VAULT}}the vault
      scope, the placement and model rationale, the decisions taken, and the other files changed.
 3. **ADRs** in `docs/{{PREFIX}}_DECISIONS.md` for decisions made during intake (append, add the row to the index table at the top, and mark any ADR it supersedes).
    Spec amendments are normally left to the phase; add one now only if {{OWNER}} changed the product definition.
+   Brainstorm: when brainstorm entries were used, append their rows to the spec's Brainstorm trace, move "Covered through" to the newest entry, and put a bullet `- **Brainstorm:** <file>, <N> new entries <first stamp> to <last stamp>; <A> adopted, <D> deferred, <X> dropped; covered through <stamp>` right after the Timeline bullet of the planning entry. The timeline draws the brainstorm sessions itself: never hand-write a Planning entry for them.
 4. **Later prompts:** edit any not-started prompt whose assumptions change (at least the release phase's
    "depends on" and anything about screenshots, notices or docs).
 5. {{#VAULT}}**Vault note** `{{VAULT_NOTE_PATH}}`: add the row (`⬜ Not started`) and a timestamped log line.{{/VAULT}}{{^VAULT}}**Vault note:** none is kept for this project; skip.{{/VAULT}}

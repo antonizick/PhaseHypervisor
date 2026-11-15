@@ -30,6 +30,7 @@ The timeline is generated from the plan's Phase Log and git, not drawn by hand. 
 
 What to look at:
 - **Planning lane (top):** brainstorming, the plan draft, preflight and each later phase insertion, drawn on the same clock as the build.
+  Brainstorming is drawn from your own brainstorming document: any root Markdown file with "brainstorm" in its name and `**YYYY-MM-DD HH:MM**` entry headers gives one bar per working burst, with no hand-written entry. `/phased-project` also records where each idea went in a Brainstorm trace in the spec.
 - **Zigzag grey bands:** idle gaps (here 1 h 16 m and 2 h 56 m) squeezed out so the chart stays readable instead of stretching over days.
 - **Hatched span on Phase 17:** time the phase sat blocked or paused (8 h 37 m), shown next to its 58 m of active work.
 - **One bar per phase,** labelled with its active time, so a quick glance shows where the effort went.

@@ -537,3 +537,111 @@ def test_bootstrap_from_templates_shows_phase00(tmp_path: Path) -> None:
         [sys.executable, "scripts/phase_timeline.py", "--check"], cwd=tmp_path, check=False
     )
     assert check.returncode == 0
+
+
+# ---- brainstorm documents (Phase 12j, ADR-0037) ------------------------------------------
+
+BRAINSTORM = """\
+# Brainstorming
+
+---
+
+**2026-10-20 08:00**    Planning Step 1
+
+first idea
+
+**2026-10-20 08:10**    AI Response
+
+reply
+
+**2026-10-20 09:39**    Me to AI
+
+89 minutes after the previous entry: same burst
+
+**2026-10-20 11:11 CDT**    Me to AI
+
+92 minutes later: a new burst
+"""
+
+
+def _brainstorm_repo(tmp_path: Path, name: str = "XYZ_Brainstorming.md", log: str = "") -> Path:
+    root = _phx_repo(tmp_path)
+    if log:
+        plan = root / "XYZ_IMPLEMENTATION_PLAN.md"
+        plan.write_text(plan.read_text().rstrip("\n") + "\n\n" + log)
+    (root / name).write_text(BRAINSTORM)
+    return root
+
+
+def _bursts(root: Path) -> list[object]:
+    tl, *_ = pt.build_timeline(root)
+    return [it for it in tl.planning if it.label == "brainstorm"]
+
+
+def test_brainstorm_entries_become_one_bar_per_burst(tmp_path: Path) -> None:
+    items = _bursts(_brainstorm_repo(tmp_path))
+    assert [it.title for it in items] == ["Brainstorming (3 entries)", "Brainstorming (1 entry)"]
+    assert items[0].start.moment.stamp()[:16] == "2026-10-20 08:00"
+    assert items[0].end.moment.stamp()[:16] == "2026-10-20 09:39"
+    assert items[1].marker and not items[0].marker
+
+
+def test_brainstorm_is_drawn_in_every_output(tmp_path: Path) -> None:
+    root = _brainstorm_repo(tmp_path)
+    assert run(root, "--write").returncode == 0
+    plan = (root / "XYZ_IMPLEMENTATION_PLAN.md").read_text()
+    svg = (root / "docs" / "XYZ_TIMELINE.svg").read_text()
+    assert "Brainstorming (3 entries)" in plan and "| brainstorm |" in plan
+    assert "section Planning" in plan and "Brainstorming (3 entries)" in svg
+    ET.fromstring(svg)  # still well-formed
+    assert run(root, "--check").returncode == 0
+    (root / "XYZ_Brainstorming.md").write_text(BRAINSTORM + "\n**2026-10-20 11:20**  More\n")
+    assert run(root, "--check").returncode == 1  # a new entry makes the outputs stale
+
+
+def test_handwritten_brainstorm_entry_wins(tmp_path: Path) -> None:
+    log = (
+        "### 2026-10-20 07:00 CDT: Planning: Brainstorming with Grok (Planned)\n"
+        "- **Timeline:** started 2026-10-20 07:00 CDT · finished 2026-10-20 07:30 CDT\n"
+    )
+    root = _brainstorm_repo(tmp_path, log=log)
+    tl, *_ = pt.build_timeline(root)
+    assert [it.title for it in tl.planning if "rainstorm" in it.title] == [
+        "Brainstorming with Grok"
+    ]
+
+
+def test_plan_header_and_explicit_option_choose_the_source(tmp_path: Path) -> None:
+    root = _brainstorm_repo(tmp_path, name="Notes of the first week.md")
+    assert _bursts(root) == []  # not named "brainstorm", no header
+    plan = root / "XYZ_IMPLEMENTATION_PLAN.md"
+    plan.write_text("**Brainstorm:** `Notes of the first week.md`\n" + plan.read_text())
+    assert len(_bursts(root)) == 2
+    plan.write_text(plan.read_text().replace("**Brainstorm:** `Notes of the first week.md`\n", ""))
+    out = run(root, "--print", "--brainstorm", "Notes of the first week.md")
+    assert "Brainstorming (3 entries)" in out.stdout
+
+
+def test_brainstorm_outside_the_repo_is_ignored(tmp_path: Path) -> None:
+    (tmp_path / "repo").mkdir()
+    root = _phx_repo(tmp_path / "repo")
+    elsewhere = tmp_path / "elsewhere_brainstorm.md"
+    elsewhere.write_text(BRAINSTORM)
+    assert pt.find_brainstorms(root, "", (elsewhere,)) == []
+    (root / "link_brainstorm.md").symlink_to(elsewhere)
+    assert pt.find_brainstorms(root, "") == []
+
+
+def test_brainstorm_without_stamps_or_unreadable_is_harmless(tmp_path: Path) -> None:
+    root = _phx_repo(tmp_path)
+    (root / "a_brainstorm.md").write_text("just prose, no stamps\n")
+    (root / "b_brainstorm.md").write_bytes(b"\xff\xfe not utf-8 \x80")
+    assert _bursts(root) == []
+    assert run(root, "--print").returncode == 0
+
+
+def test_projects_without_a_brainstorm_are_unchanged(tmp_path: Path) -> None:
+    root = _phx_repo(tmp_path)
+    before = run(root, "--print").stdout
+    (root / "README.md").write_text("# not a brainstorm file\n")
+    assert run(root, "--print").stdout == before

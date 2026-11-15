@@ -47,6 +47,8 @@ Publishing is never pre-approved: making a repo public, publishing a release or 
 
 **Mid-plan:** a preflight covers only the phases not yet complete, so you can run one at any phase boundary, for example after `/phase-add`.
 
+**Brainstorm trace:** if the spec has a Brainstorm trace (ADR-0037), the preflight session also reads its `Deferred` rows and warns when the brainstorm document has entries newer than the trace's "Covered through" stamp, because the plan has not seen them. It never reads the brainstorm transcript itself.
+
 **Staleness:** `phx run` checks `.phx/preflight.json` on `main` before starting. It warns (or, with `--require-preflight`, refuses) when there is none, or when it is stale: a phase row was added, removed or redefined (name, model, dependencies, prompt, Gate) since, or an owner question is open that the preflight never saw. Completing phases and answering questions do not make it stale. `phx status <repo>` shows the same line.
 
 ## `phx run`: run a plan hands-off

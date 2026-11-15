@@ -49,7 +49,8 @@ its folder name, used for phase worktrees `../{{REPO_NAME}}-phase-NN`; `{{PREFIX
 `owner`; `{{OWNER}}` is the `Owner` setting, capitalised at the start of a sentence). Two section markers
 depend on the settings:
 - `{{#NAME}}…{{/NAME}}`: keep the text inside when the setting is present (`VAULT`: a vault root is set;
-  `OS_LOG`: an OS-modifications log is set), otherwise delete it, markers included;
+  `OS_LOG`: an OS-modifications log is set; `BRAINSTORM`: the project has a brainstorm document, see
+  "Brainstorm documents"), otherwise delete it, markers included;
 - `{{^NAME}}…{{/NAME}}`: the reverse, kept only when the setting is missing.
 
 A dropped section that fills whole lines takes its line breaks with it. Replace every marker, then confirm
@@ -103,7 +104,8 @@ date quoted from an external source, or a file name such as a dated export.
 ## Workflow
 1. **Model check:** planning deserves the strongest available model; if you are not running on it, say so and
    give the `/model` command. Run `date '+%Y-%m-%d %H:%M %Z'` now and keep it: it is Phase 00's *started* time (`{{PHASE00_STARTED}}`).
-2. **Read everything.** Read the source document(s) in full, plus related notes the source links to or that
+2. **Read everything.** Find the project's **brainstorm document(s)** (see "Brainstorm documents") and read them
+   in full first: they hold the owner's reasoning, rejected options and unstated constraints. Read the source document(s) in full, plus related notes the source links to or that
    share the project name (in the vault, if one is set). A meeting or conversation summary is a good source:
    its decisions are the owner's, its unverified claims must be verified (never copy them as facts), and its
    open questions are owner questions. Inspect the environment where it matters: hardware (`nvidia-smi`),
@@ -113,6 +115,11 @@ date quoted from an external source, or a file name such as a dated export.
    security and privacy controls, and open questions the source leaves unresolved. Resolve what you
    can with a justified default. Unrecoverable data loss, privacy and publishing choices always go
    to the owner.
+3a. **Trace the brainstorm** (only if there is one). List every idea, decision, constraint and open question in it as
+   a row of the spec's Brainstorm trace (`templates/spec-amendments.md`, §6): the entry it came from (its
+   `**YYYY-MM-DD HH:MM**` stamp and label), the idea in one line, and a disposition: **Adopted** (name the ADR,
+   amendment or phase), **Deferred** (an owner question) or **Dropped** (the reason, in the owner's terms). Nothing
+   from the brainstorm is silently lost, and nothing is copied in bulk: the transcript stays in its file.
 4. **Ask** (AskUserQuestion, at most 4 per round, recommended option first, labelled "(Recommended)").
    The first round always settles the project **prefix** (see "Naming and timestamps"), unless the owner gave one.
    Ask only about decisions that change what you write. If the owner asks for trade-offs instead of
@@ -132,9 +139,9 @@ date quoted from an external source, or a file name such as a dated export.
    source notes with `[[wikilinks]]`. Without a vault root, skip it and say so in the report.
 9. **Verify:** every link in the plan resolves (`ls` each `prompts/…` and `docs/…` path); every
    table row has exactly one status icon; no `{{` remains; each prompt's "Depends on" matches the
-   table; the claim protocol (§1a of the shared instructions) and step 4 of `/phase` are present; `grep '^PHX-CONTRACT: 1' .claude/commands/phase.md` matches; every row has a Gate cell.
+   table; the claim protocol (§1a of the shared instructions) and step 4 of `/phase` are present; `grep '^PHX-CONTRACT: 1' .claude/commands/phase.md` matches; every row has a Gate cell; with a brainstorm document: the trace has a row for every idea, no idea lacks a disposition, `**Brainstorm:**` is in the plan header and the Phase 00 entry, and `python3 scripts/phase_timeline.py --print` shows a `Brainstorming` bar.
 10. **Report to the owner:** a phases table (number, name, model), refinements made, open questions with
-    the phase that needs each answer, and how to start (`/phase`). Run `python3 scripts/phase_timeline.py --write{{#VAULT}} --vault-note "{{VAULT_NOTE_PATH}}"{{/VAULT}}` so Phase 00 shows from day one, then make the first commit (`docs(plan): phase 00 planning`) and report its hash.
+    the phase that needs each answer, the brainstorm trace in one line (entries, adopted, deferred, dropped), and how to start (`/phase`). Run `python3 scripts/phase_timeline.py --write{{#VAULT}} --vault-note "{{VAULT_NOTE_PATH}}"{{/VAULT}}` so Phase 00 shows from day one, then make the first commit (`docs(plan): phase 00 planning`) and report its hash.
 
 ## Git authority (method convention)
 The templates give agents this standing authority: commit, merge, push and create **private** GitHub repos without asking, at checkpoints and at close-out. Only making a repo **public**, publishing a GitHub **release**, or force-pushing shared history needs the owner's explicit confirmation. If an action looks high-risk or a bad idea, stop and ask anyway. This applies to the planning session (first commit), every phase and `/phase-add`. Hands-off runs depend on it: a phase that had to ask before merging could never finish unattended. If the owner's global rules say otherwise (for example "never push without asking"), follow them, tell the owner, and write their rule into the generated `CLAUDE.md` instead.
@@ -178,11 +185,35 @@ The normative definition is `docs/PHX_AUTO_MODE_CONTRACT.md` in the PhaseHypervi
 - Every owner question gets a row in the plan's question table with a "Needed by: Phase NN"
   column. Phase prompts that depend on an open question must **stop and ask** if it is still open.
 
+## Brainstorm documents
+Many projects start as a timestamped brainstorming transcript in the repo root. The method treats it as a first-class input.
+- **Finding it.** The plan's header line `**Brainstorm:** <path>[, <path>…]` names it. Without that line, every Markdown file in
+  the repo root whose name contains `brainstorm` (any case: `<PREFIX>_Brainstorming.md`, `Brainstorming Project X.md`) is one.
+  Companion drafts (`Plan Draft.md`, `<PREFIX>_Draft Plan.md`) are listed as sources in the trace but have no times.
+- **Format it carries.** Entry headers `**YYYY-MM-DD HH:MM**  <label>` (a zone after the time is optional). Those lines are the
+  evidence; tools never parse anything else in the file.
+- **Where it goes.**
+
+  | Artifact | What it gets |
+  |---|---|
+  | Timeline (`scripts/phase_timeline.py`) | One Planning-lane bar per working burst (a pause over 90 minutes starts a new one), titled `Brainstorming (N entries)`, in the SVG, the Mermaid charts and the summary table. Automatic: never hand-write a Planning entry for it (if one exists whose title mentions brainstorming, it replaces the automatic bars) |
+  | Spec Amendments, "Brainstorm trace" | A row per idea with its disposition and where it went; "Covered through" the newest entry read |
+  | Phase 00 Phase Log entry | A `- **Brainstorm:**` bullet: file, entries, span, counts by disposition, covered through |
+  | Plan header | `**Brainstorm:** <path>` |
+  | Vault note | A Brainstorm section linking the file |
+  | `/phase-add` | Reads only entries after "Covered through", appends trace rows, adds the same bullet to its planning entry |
+  | `/phase`, shared instructions, `phx preflight` | Read the trace; a phase updates the rows it fulfils; preflight turns still-Deferred rows into candidate questions |
+- **Committing it.** The brainstorm file is committed with the Phase 00 planning commit; it is the evidence behind the timeline. If
+  the owner wants it private, list it in `.gitignore` and tell them the timeline still reads it from the working tree, so a fresh clone draws no brainstorm bar.
+- **Adopting it in an existing repo.** Add the plan header line, build the trace from the document, add the Phase 00 bullet, copy the
+  current `phase_timeline.py` and refresh the timeline on `main`. Skip this when a hand-written `Planning:` entry already records it and the owner does not want the trace.
+
 ## Visual timeline
 Every project carries a picture of its own history: when planning happened, when each phase started, stopped,
 waited and merged. It is **generated, never drawn by hand**, by `scripts/phase_timeline.py` (one file, Python
 ≥ 3.9 standard library, `git`; no network, no JavaScript, no `phx`).
-- **Inputs:** the plan's phase table, the Phase Log (Timeline bullets, headings) and `git log HEAD`. Where a
+- **Inputs:** the plan's phase table, the Phase Log (Timeline bullets, headings), `git log HEAD` and the project's
+  brainstorm document(s) (see "Brainstorm documents"), whose entry stamps draw the brainstorming sessions in the Planning lane. Where a
   bullet is missing it falls back to git (`chore(plan): start phase NN`, `… phase NN blocked`, `resume phase NN`,
   merge commits, commits that name the phase), then to the heading timestamp. A time it had to infer is
   marked approximate (≈, dashed outline), never shown as exact; a phase with no usable time is listed as "not shown".

@@ -8,6 +8,7 @@ Read this file in full before starting any phase. Each phase prompt assumes it.
 1. Read `CLAUDE.md`, `PHX_IMPLEMENTATION_PLAN.md` (including the Phase Log and Owner questions) and the spec sections named in your phase prompt. Always read the Amendments (spec §4).
 2. Confirm that every phase listed under "Depends on" is `✅ Complete`. If one is not, stop and tell Nick.
 3. Read the Phase Log entries of the dependency phases; they may record deviations that change what you build.
+   If the spec's Amendments have a Brainstorm trace, read the rows your phase fulfils; they say what the owner's brainstorming intended.
 4. If an owner question this phase needs is still open, ask Nick before doing the affected work. (Hands-off mode: block-with-question, §1b.)
 5. **Claim the phase on `main`** by following §1a. This is the first file change of every phase session. Do not start the Tasks until the claim is verified.
 6. If the prompt is ambiguous or contradicts the spec, prefer the spec's Amendments. If it is still unclear, ask Nick before guessing on anything user-visible or hard to reverse. (Hands-off mode: block-with-question, §1b.)
@@ -103,6 +104,7 @@ Runtime state lives outside the repo: `~/.local/state/phx/<repo-name>/` (`run.js
 - [ ] README, SECURITY, `PHX_ARCHITECTURE`, user guide, THIRD_PARTY_NOTICES, ignore files updated where affected.
 - [ ] ADR added for any notable choice (timestamped in both the entry and its row in the index table); spec amendment added if the spec changed.
 - [ ] Later phase prompts corrected if your work changed their assumptions.
+- [ ] Brainstorm trace (spec Amendments, when the project has one) updated for every row this phase fulfilled, changed or dropped.
 - [ ] Obsidian project note updated (status icons, `updated:` field and a timestamped log line).
 - [ ] OSMods documentation updated if the host system was modified; playbook note updated if the skill was changed.
 - [ ] Work committed on the phase branch. Once the phase is `✅ Complete` and every check passes, merge it into `main` from the main checkout without asking (fast-forward where possible), push `main` if a remote exists (ADR-0004), then `git worktree remove ../PhaseHypervisor-phase-NN`, `git branch -d phase-NN-<slug>`, and remove any temporary files or processes you created. Do not merge a `⛔ Blocked` phase or one with failing checks. Making the repo public or publishing a GitHub release requires Nick's explicit confirmation (hands-off mode: block-with-question, §1b).

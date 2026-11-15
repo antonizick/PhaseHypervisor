@@ -3,7 +3,7 @@
 **Model:** {{MODEL_NAME}} (`/model {{MODEL_ID}}`) · **Depends on:** {{DEPENDS_ON}} · **Branch:** `phase-{{NN}}-{{SLUG}}` · **Gate:** {{GATE}}
 
 ## Read first
-`CLAUDE.md`, `prompts/{{PREFIX}}_shared-instructions.md`, and the spec sections {{SPEC_SECTIONS}}. Phase Log entries for {{DEPENDENCY_PHASES}}. {{RELEVANT_OWNER_QUESTIONS}}
+`CLAUDE.md`, `prompts/{{PREFIX}}_shared-instructions.md`, and the spec sections {{SPEC_SECTIONS}}. Phase Log entries for {{DEPENDENCY_PHASES}}. {{RELEVANT_OWNER_QUESTIONS}}{{#BRAINSTORM}} The Brainstorm trace rows this phase fulfils or changes: {{TRACE_ROWS}}.{{/BRAINSTORM}}
 
 ## Goal
 {{ONE_PARAGRAPH_OUTCOME}}

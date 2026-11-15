@@ -42,7 +42,8 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
 def refresh(repo: Path, *, grow: bool = False) -> Refresh:
     """Regenerate the timeline when stale (or, with ``grow``, to extend an open bar).
 
-    Only on a clean ``main`` checkout with no git lock, so it never collides with an agent
+    Only on a ``main`` checkout with no uncommitted changes to tracked files (untracked files and
+    brainstorm documents are ignored, ADR-0037) and no git lock, so it never collides with an agent
     that is committing or merging there.
     """
     try:
@@ -62,8 +63,19 @@ def _refresh(repo: Path, grow: bool) -> Refresh:
     head = _git(repo, "symbolic-ref", "--short", "-q", "HEAD")
     if head.stdout.strip() != "main":
         return Refresh(False, "main checkout is not on main")
-    if _git(repo, "status", "--porcelain").stdout.strip():
-        return Refresh(False, "main checkout has uncommitted changes")
+    # Untracked files (a brainstorm document, scratch notes) and brainstorm edits never block it:
+    # the refresh commits only the files the generator wrote.
+    dirty = _git(
+        repo,
+        "status",
+        "--porcelain",
+        "--untracked-files=no",
+        "--",
+        ".",
+        ":(exclude,icase)*brainstorm*",
+    )
+    if dirty.stdout.strip():
+        return Refresh(False, "main checkout has uncommitted changes to tracked files")
     vault = note_path(repo)
     extra = ["--vault-note", str(vault)] if vault is not None and vault.is_file() else []
     script = [sys.executable, str(SCRIPT), "--repo", "."]

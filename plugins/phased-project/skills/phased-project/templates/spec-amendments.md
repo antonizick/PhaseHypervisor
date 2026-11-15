@@ -18,3 +18,11 @@ The project lives in a single Git repository that is ready to publish on GitHub.
 
 #### {{N}}.5 Owner questions (status as of {{TIMESTAMP}})
 1. **{{Open|Decided|Deferred to Phase NN}}.** {{QUESTION_AND_ANSWER_OR_PROPOSED_DEFAULT}}
+{{#BRAINSTORM}}
+#### {{N}}.6 Brainstorm trace
+Where each idea in `{{BRAINSTORM_FILES}}` went. Disposition: **Adopted** (with the ADR, amendment or phase that carries it), **Deferred** (with its owner question) or **Dropped** (with the reason). A phase that fulfils or changes a row updates it at close-out; `/phase-add` appends rows for new brainstorm entries. Covered through: {{BRAINSTORM_COVERED_THROUGH}}.
+
+| # | Entry (stamp: label) | Idea | Disposition | Where |
+|---|---|---|---|---|
+| B1 | {{ENTRY_STAMP}}: {{ENTRY_LABEL}} | {{IDEA_IN_ONE_LINE}} | {{Adopted|Deferred|Dropped}} | {{ADR_AMENDMENT_PHASE_QUESTION_OR_REASON}} |
+{{/BRAINSTORM}}

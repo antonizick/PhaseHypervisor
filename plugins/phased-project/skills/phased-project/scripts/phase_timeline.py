@@ -16,6 +16,9 @@ needs ``git`` and nothing else. It reads the plan's phase table, the Phase Log (
 and headings) and ``git log HEAD``, then writes:
 
 - ``docs/<PREFIX>_TIMELINE.svg``: a static, self-contained image (no scripts, no web fonts);
+- the Planning lane also shows the project's brainstorm documents (a root Markdown file with
+  "brainstorm" in its name, a plan header ``**Brainstorm:** path``, or ``--brainstorm PATH``),
+  one bar per working burst, timed from their ``**YYYY-MM-DD HH:MM**`` entry headers;
 - a generated Markdown block (image link, one Mermaid gantt per working session, a summary table
   and totals) between the markers below, in the plan, in the final report if it has the markers,
   and (``--vault-note``) in a vault note without the image.
@@ -23,7 +26,7 @@ and headings) and ``git log HEAD``, then writes:
 Only text between the markers is ever rewritten. The output depends only on the repo state (no
 clock is read), so ``--check`` is deterministic.
 
-    python3 scripts/phase_timeline.py --write [--vault-note PATH]
+    python3 scripts/phase_timeline.py --write [--vault-note PATH] [--brainstorm PATH ...]
     python3 scripts/phase_timeline.py --check      # exit 1 if any output is stale
     python3 scripts/phase_timeline.py --print      # the block on stdout
 """
@@ -410,9 +413,16 @@ def _hash_in(seg: str) -> str | None:
 
 
 class Builder:
-    def __init__(self, rows: list[TableRow], entries: list[LogEntry], commits: list[Commit]):
+    def __init__(
+        self,
+        rows: list[TableRow],
+        entries: list[LogEntry],
+        commits: list[Commit],
+        brainstorm: list[tuple[str, str]] | None = None,
+    ):
         self.rows = rows
         self.entries = entries
+        self.brainstorm = brainstorm or []  # (stamp text, label) of every entry, oldest first
         self.commits = commits  # newest first
         self.clock = Clock(commits)
         self.by_hash = {}
@@ -505,6 +515,7 @@ class Builder:
                 continue
             phases.append(rec)
         planning += self.planning_entries(not_shown)
+        planning += self.brainstorm_items(not_shown, planning)
         planning += self.preflights()
         planning.sort(key=lambda p: (p.start.moment.at if p.start else _EPOCH, p.key))
         del status_of
@@ -674,6 +685,42 @@ class Builder:
                 not_shown.append(f"planning {e.heading_ts} ({label})")
         return items
 
+    def brainstorm_items(
+        self, not_shown: list[str], planning: list[PlanningItem]
+    ) -> list[PlanningItem]:
+        """One Planning item per working burst of the brainstorm document's entries.
+
+        A hand-written ``Planning:`` entry about brainstorming wins, so a project that already
+        records it (older plans) is not drawn twice.
+        """
+        if not self.brainstorm:
+            return []
+        if any(
+            re.search("brainstorm", e.title, re.I)
+            for e in self.entries
+            if e.title.startswith("Planning")
+        ):
+            return []
+        values = [v for v in (self.value(t) for t, _label in self.brainstorm) if v]
+        if not values:
+            not_shown.append("brainstorm (no usable entry times)")
+            return []
+        values.sort(key=lambda v: v.moment.at)
+        bursts: list[list[Value]] = [[values[0]]]
+        for v in values[1:]:
+            if v.moment.at - bursts[-1][-1].moment.at > BRAINSTORM_GAP:
+                bursts.append([])
+            bursts[-1].append(v)
+        items = []
+        for n, burst in enumerate(bursts, 1):
+            count = len(burst)
+            title = f"Brainstorming ({count} {'entry' if count == 1 else 'entries'})"
+            first, last = burst[0], burst[-1]
+            items.append(
+                PlanningItem(f"bs{n}", "brainstorm", title, first, last, marker=count == 1)
+            )
+        return items
+
     def preflights(self) -> list[PlanningItem]:
         out = []
         for c in reversed(self._subject_matches(r"^docs\(plan\): phx preflight")):
@@ -684,14 +731,61 @@ class Builder:
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 BURST_GAP = timedelta(hours=2)
+BRAINSTORM_GAP = timedelta(minutes=90)  # a longer pause between entries starts a new bar
+_BS_ENTRY = re.compile(rf"^\*\*({_TS})\*\*(?:[ \t]+(.*\S))?[ \t]*$")
+_BS_HEADER = re.compile(r"^\*\*Brainstorms?:\*\*[ \t]*(.+?)[ \t]*$", re.M | re.I)
 
 
-def build_timeline(repo: Path, as_of: str | None = None) -> tuple[Timeline, Path, list[str], int]:
+def find_brainstorms(repo: Path, plan_text: str, explicit: tuple[Path, ...] = ()) -> list[Path]:
+    """Brainstorm documents: ``--brainstorm`` paths, else the plan's ``**Brainstorm:**`` header,
+    else every root Markdown file with "brainstorm" in its name. Only files inside the repo."""
+    root = repo.resolve()
+    chosen: list[Path] = [p if p.is_absolute() else repo / p for p in explicit]
+    if not chosen:
+        m = _BS_HEADER.search(plan_text)
+        if m:
+            chosen = [repo / n.strip().strip("`") for n in m.group(1).split(",") if n.strip()]
+    if not chosen:
+        chosen = sorted(
+            p
+            for p in repo.iterdir()
+            if p.suffix.lower() == ".md" and "brainstorm" in p.name.lower()
+        )
+    out = []
+    for p in chosen:
+        try:
+            inside = p.resolve().is_relative_to(root)
+        except OSError:
+            continue
+        if inside and p.is_file():
+            out.append(p)
+    return out
+
+
+def read_brainstorm(paths: list[Path]) -> list[tuple[str, str]]:
+    """``(stamp, label)`` of each ``**YYYY-MM-DD HH:MM**  <label>`` entry header, oldest first."""
+    found: list[tuple[str, str]] = []
+    for p in paths:
+        try:
+            text = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for line in text.splitlines():
+            m = _BS_ENTRY.match(line)
+            if m:
+                found.append((m.group(1), (m.group(2) or "").strip()))
+    return found
+
+
+def build_timeline(
+    repo: Path, as_of: str | None = None, brainstorm: tuple[Path, ...] = ()
+) -> tuple[Timeline, Path, list[str], int]:
     plan, prefix = locate_plan(repo)
     lines = plan.read_text(encoding="utf-8").splitlines()
     rows, table_end = parse_phase_table(lines)
     entries = parse_phase_log(lines)
-    builder = Builder(rows, entries, git_commits(repo))
+    sources = find_brainstorms(repo, "\n".join(lines), brainstorm)
+    builder = Builder(rows, entries, git_commits(repo), read_brainstorm(sources))
     builder.clock.saw("\n".join(lines))
     return builder.build(prefix, as_of), plan, lines, table_end
 
@@ -1138,7 +1232,11 @@ def _planning_lane(add: Add, axis: Axis, tl: Timeline, y: int) -> None:
             axis.x(o.start.moment.at) for o in items[i + 1 :] if o.start and o.label != "preflight"
         ]
         limit = (min(later) if later else W - RIGHT) - 6
-        name = it.title if it.label.startswith(("plan", "+")) else f"{it.label} {it.title}"
+        name = (
+            it.title
+            if it.label.startswith(("plan", "+", "brainstorm"))
+            else f"{it.label} {it.title}"
+        )
         text = _fit(name, limit - x0, 11) or it.label
         lx = min(x0, W - RIGHT - _text_w(text, 11))
         if lx > last_end + 6:
@@ -1413,7 +1511,7 @@ def render_table(tl: Timeline) -> list[str]:
             if it.end
             else ""
         )
-        pid = it.label if it.label.startswith("+") or it.label == "00" else "plan"
+        pid = it.label if it.label.startswith("+") or it.label in ("00", "brainstorm") else "plan"
         out.append(
             f"| {pid} | {_md(it.title)} | {_cell(it.start, None)} | "
             f"{'' if it.marker else _cell(it.end, it.start)} |  | {dur} |  | n/a |"
@@ -1550,10 +1648,14 @@ def recorded_as_of(plan: Path) -> str | None:
 
 
 def outputs(
-    repo: Path, gap_minutes: int, vault_note: Path | None, as_of: str | None = None
+    repo: Path,
+    gap_minutes: int,
+    vault_note: Path | None,
+    as_of: str | None = None,
+    brainstorm: tuple[Path, ...] = (),
 ) -> dict[Path, str]:
     """Every output file and the full text it should have."""
-    tl, plan, _lines, table_end = build_timeline(repo, as_of)
+    tl, plan, _lines, table_end = build_timeline(repo, as_of, brainstorm)
     svg_path = repo / "docs" / (f"{tl.prefix}_TIMELINE.svg" if tl.prefix else "TIMELINE.svg")
     result: dict[Path, str] = {svg_path: render_svg(tl, gap_minutes)}
     plan_text = plan.read_text(encoding="utf-8")
@@ -1595,6 +1697,15 @@ def main(argv: list[str] | None = None) -> int:
         help="draw open bars up to this time (YYYY-MM-DD HH:MM TZ) if later than the "
         "latest recorded event; --check keeps the time the block already records",
     )
+    ap.add_argument(
+        "--brainstorm",
+        type=Path,
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="a brainstorm document (repeatable); default: the plan's **Brainstorm:** header, "
+        "else root Markdown files with 'brainstorm' in the name",
+    )
     args = ap.parse_args(argv)
     if args.gap_minutes < 1:
         print("phase_timeline: --gap-minutes must be at least 1", file=sys.stderr)
@@ -1605,9 +1716,9 @@ def main(argv: list[str] | None = None) -> int:
             as_of = args.as_of
             if as_of is None and args.check:
                 as_of = recorded_as_of(locate_plan(repo)[0])
-            wanted = outputs(repo, args.gap_minutes, args.vault_note, as_of)
+            wanted = outputs(repo, args.gap_minutes, args.vault_note, as_of, tuple(args.brainstorm))
         else:
-            tl, _plan, _lines, _end = build_timeline(repo)
+            tl, _plan, _lines, _end = build_timeline(repo, None, tuple(args.brainstorm))
             svg = f"docs/{tl.prefix}_TIMELINE.svg" if tl.prefix else "docs/TIMELINE.svg"
             sys.stdout.write(render_block(tl, args.gap_minutes, svg) + "\n")
             return 0

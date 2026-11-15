@@ -8,6 +8,7 @@ Read this file in full before starting any phase. Each phase prompt assumes it.
 1. Read `CLAUDE.md`, `{{PREFIX}}_IMPLEMENTATION_PLAN.md` (including the Phase Log and Owner questions) and the spec sections named in your phase prompt. Always read the Amendments.
 2. Confirm that every phase listed under "Depends on" is `✅ Complete`. If one is not, stop and tell {{OWNER}}.
 3. Read the Phase Log entries of the dependency phases; they may record deviations that change what you build.
+   If the spec's Amendments have a Brainstorm trace, read the rows your phase fulfils; they say what the owner's brainstorming intended.
 4. If an owner question this phase needs is still open, ask {{OWNER}} before doing the affected work. (Hands-off mode: block-with-question, §1b.)
 5. **Claim the phase on `main`** by following §1a. This is the first file change of every phase session. Do not start the Tasks until the claim is verified.
 6. If the prompt is ambiguous or contradicts the spec, prefer the spec's Amendments. If it is still unclear, ask {{OWNER}} before guessing on anything user-visible or hard to reverse. (Hands-off mode: block-with-question, §1b.)
@@ -58,7 +59,8 @@ A question is **open** while its Status cell starts with `Open`; `Answered …`,
 - [ ] README, SECURITY, `{{PREFIX}}_ARCHITECTURE`, guides, THIRD_PARTY_NOTICES, ignore files updated where affected.
 - [ ] ADR added for any notable choice (timestamped in both the entry and its row in the index table at the top of `docs/{{PREFIX}}_DECISIONS.md`); spec amendment added if the spec changed.
 - [ ] Later phase prompts corrected if your work changed their assumptions.
-{{#VAULT}}- [ ] Obsidian project note updated (status icons, `updated:` field and a timestamped log line).
+{{#BRAINSTORM}}- [ ] Brainstorm trace (spec Amendments) updated for every row this phase fulfilled, changed or dropped.
+{{/BRAINSTORM}}{{#VAULT}}- [ ] Obsidian project note updated (status icons, `updated:` field and a timestamped log line).
 {{/VAULT}}- [ ] {{#OS_LOG}}OS-modification log (`{{OS_LOG}}`) updated if the host system was modified.{{/OS_LOG}}{{^OS_LOG}}Host OS changes recorded, if the project keeps an OS-modification log.{{/OS_LOG}}
 - [ ] Work committed on the phase branch. Once the phase is `✅ Complete` and every check passes, merge it into `main` without asking (fast-forward where possible), from the main checkout. Conflicts in `{{PREFIX}}_IMPLEMENTATION_PLAN.md` and the changelog are expected when phases ran in parallel: keep every row and entry from both sides, and use the branch's final status for this phase's row. Then push `main` if a remote exists (create a **private** GitHub repo if the plan calls for one), `git worktree remove ../{{REPO_NAME}}-phase-NN` and `git branch -d phase-NN-<slug>`. Do not merge a `⛔ Blocked` phase or one with failing checks. Making a repo public or publishing a release needs {{OWNER}}'s explicit confirmation (hands-off mode: block-with-question, §1b).
 - [ ] **Timeline refreshed on `main`** after the merge (§4a), committed as `docs(plan): refresh timeline` and pushed.

@@ -65,9 +65,9 @@ def test_grow_redraws_an_up_to_date_timeline(
 
 def test_refuses_on_dirty_or_wrong_branch_or_locked(tmp_path: Path) -> None:
     root = project(tmp_path)
-    (root / "scratch.txt").write_text("x")
+    (root / "XYZ_IMPLEMENTATION_PLAN.md").write_text("changed\n")
     assert "uncommitted" in timeline.refresh(root).reason
-    (root / "scratch.txt").unlink()
+    git(root, "checkout", "-q", "--", "XYZ_IMPLEMENTATION_PLAN.md")
     (root / ".git" / "index.lock").write_text("")
     assert "locked" in timeline.refresh(root).reason
     (root / ".git" / "index.lock").unlink()
@@ -78,3 +78,23 @@ def test_refuses_on_dirty_or_wrong_branch_or_locked(tmp_path: Path) -> None:
 
 def test_no_script_is_a_quiet_no_op(tmp_path: Path) -> None:
     assert timeline.refresh(tmp_path).reason == "no scripts/phase_timeline.py"
+
+
+def test_untracked_and_brainstorm_files_do_not_block_the_refresh(tmp_path: Path) -> None:
+    root = project(tmp_path)
+    (root / "scratch.txt").write_text("x")
+    (root / "XYZ_Brainstorming.md").write_text("**2026-10-20 08:00**  Idea\n")
+    result = timeline.refresh(root)
+    assert result.committed, result.reason
+    assert git(root, "status", "--porcelain").splitlines() == [
+        "?? XYZ_Brainstorming.md",
+        "?? scratch.txt",
+    ]
+    # a tracked brainstorm document being edited does not block it either
+    git(root, "add", "XYZ_Brainstorming.md")
+    git(root, "commit", "-q", "-m", "docs: brainstorm")
+    (root / "XYZ_Brainstorming.md").write_text(
+        "**2026-10-20 08:00**  Idea\n**2026-10-20 08:10**  More\n"
+    )
+    edited = timeline.refresh(root)  # 2 entries now: the stale bar is redrawn
+    assert edited.committed, edited.reason
